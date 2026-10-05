@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "cli-proxy-api",
+  // Personal account "Ollin" (gustavoocanto@gmail.com).
+  "account_id": "60bada38ab19d58ec34f53af74bfa796",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
