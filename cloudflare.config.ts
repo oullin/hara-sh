@@ -23,6 +23,8 @@ const worker = defineWorker({
 		OBJECTSTORE_ACCESS_KEY: bindings.secret(),
 		OBJECTSTORE_SECRET_KEY: bindings.secret(),
 		MANAGEMENT_PASSWORD: bindings.secret(),
+		// Client key restricted to Codex models by the Worker (src/index.ts).
+		CODEX_API_KEY: bindings.secret(),
 	},
 	exports: {
 		CliProxy: exports.durableObject({ storage: "sqlite", container: cliProxy }),
