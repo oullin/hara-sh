@@ -24,6 +24,9 @@ make deploy        # type-check, build the image, deploy (secrets from 1Password
 make deploy-dry    # build and validate without uploading
 make config-push   # render config.yaml from 1Password and upload it to R2
 make claude        # run Claude Code through the proxy (ARGS="..." for flags)
+make codex         # run Codex CLI through the proxy (`hara` profile, ARGS="..." for flags)
+make codex-smoke   # one non-interactive Codex turn through the proxy
+make codex-backup  # copy ~/.codex/config.toml + hara.config.toml into codex/
 make alias         # print the claude-hara alias for ~/.zshrc
 make health        # /healthz
 make accounts      # connected provider accounts
@@ -36,6 +39,10 @@ make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to overrid
 - **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `make deploy`.
 - **Change config:** edit `config.yaml`, then run `make config-push`. Changes made in the management panel are written straight to R2, and `config-push` overwrites them.
 - **Logs:** `make logs` reads the server log files (rotated at 10 MB, capped at 512 MB in total, lost on container restart). `make logs-cf` shows Worker request logs from Cloudflare observability.
+
+## Codex CLI
+
+`~/.codex/config.toml` defines the `hara` model provider (`https://proxy.hara.sh/v1`, Responses API, key from `HARA_PROXY_API_KEY`), and `~/.codex/hara.config.toml` is the `hara` profile (`model_provider = "hara"`, `model = "gpt-6.1-sol"`). Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`. Backups of both files live in `codex/`; refresh them with `make codex-backup`.
 
 ## Logging in to providers
 
