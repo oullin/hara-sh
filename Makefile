@@ -15,7 +15,7 @@ MGMT_KEY = $$(op read $(OP_ITEM)/management-password)
 
 .DEFAULT_GOAL := help
 .PHONY: help install types check deploy deploy-dry config-push \
-        claude codex codex-backup codex-smoke alias health models accounts smoke logs logs-cf
+        claude codex codex-direct codex-backup codex-smoke alias health models accounts smoke logs logs-cf
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -48,16 +48,20 @@ claude: ## Run Claude Code through the proxy (pass flags with ARGS="...")
 	@ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
 
 ## --- Codex CLI -------------------------------------------------------------
-# Uses the `hara` profile in ~/.codex/config.toml (backup: codex/config.toml).
+# ~/.codex/config.toml routes Codex through the proxy by default (provider `hara`,
+# key fetched from 1Password via auth.command). Backups live in codex/.
 
-codex: ## Run Codex CLI through the proxy (pass flags with ARGS="...")
-	@HARA_PROXY_API_KEY="$(API_KEY)" codex --profile hara $(ARGS)
+codex: ## Run Codex CLI (proxy is the default provider; pass flags with ARGS="...")
+	@codex $(ARGS)
 
-codex-backup: ## Copy ~/.codex/config.toml and hara.config.toml into codex/ (commit to keep a backup)
-	cp -p $(HOME)/.codex/config.toml $(HOME)/.codex/hara.config.toml codex/
+codex-direct: ## Run Codex CLI with the direct ChatGPT login (profile `openai`)
+	@codex --profile openai $(ARGS)
+
+codex-backup: ## Copy ~/.codex/config.toml and openai.config.toml into codex/ (then commit)
+	cp -p $(HOME)/.codex/config.toml $(HOME)/.codex/openai.config.toml codex/
 
 codex-smoke: ## Run one non-interactive Codex turn through the proxy
-	@HARA_PROXY_API_KEY="$(API_KEY)" codex exec --profile hara --skip-git-repo-check "Reply with exactly: pong" </dev/null
+	@codex exec --skip-git-repo-check "Reply with exactly: pong" </dev/null
 
 alias: ## Print the claude-hara shell alias for ~/.zshrc
 	@echo "alias claude-hara='ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$(op read --account $(OP_ACCOUNT) $(OP_ITEM)/api-key)\" claude'"

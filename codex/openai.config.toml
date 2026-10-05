@@ -1,0 +1,5 @@
+# Codex profile: bypass the proxy and use the direct ChatGPT/OpenAI login.
+# Select with: codex --profile openai
+model_provider = "openai"
+# gpt-6.1-sol (the base default) is rejected for this ChatGPT login when used directly.
+model = "gpt-5.5"

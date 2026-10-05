@@ -1,5 +1,7 @@
 personality = "pragmatic"
 model = "gpt-6.1-sol"
+# Default: route through CLIProxyAPI (proxy.hara.sh). Direct OpenAI login: codex --profile openai
+model_provider = "hara"
 model_reasoning_effort = "high"
 approval_policy = "never"
 default_permissions = ":danger-full-access"
@@ -371,11 +373,13 @@ command = "executor"
 args = ["mcp"]
 
 # CLIProxyAPI on Cloudflare (https://proxy.hara.sh) - pool of 2 Claude + 2 Codex accounts.
-# Profile: ~/.codex/hara.config.toml. Usage:
-#   HARA_PROXY_API_KEY="$(op read --account my.1password.com op://cloudflare/cli-proxy-api/api-key)" codex --profile hara
-# Or from github.com/oullin/cli-proxy-api: make codex
+# Default provider (see model_provider above). The key is read from 1Password on demand.
+# Switch back to the direct ChatGPT login with: codex --profile openai
 [model_providers.hara]
 name = "hara proxy"
 base_url = "https://proxy.hara.sh/v1"
-env_key = "HARA_PROXY_API_KEY"
 wire_api = "responses"
+auth.command = "op"
+auth.args = ["read", "--account", "my.1password.com", "op://cloudflare/cli-proxy-api/api-key"]
+auth.timeout_ms = 30000
+auth.refresh_interval_ms = 3600000

@@ -1,5 +1,0 @@
-# Codex profile: route through CLIProxyAPI at https://proxy.hara.sh (provider defined in config.toml).
-# Select with: codex --profile hara   (needs HARA_PROXY_API_KEY; see `make codex` in oullin/cli-proxy-api)
-model_provider = "hara"
-model = "gpt-6.1-sol"
-model_reasoning_effort = "high"
