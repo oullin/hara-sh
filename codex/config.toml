@@ -1,0 +1,381 @@
+personality = "pragmatic"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+approval_policy = "never"
+default_permissions = ":danger-full-access"
+
+service_tier = "priority"
+
+
+notify = ["/Users/gocanto/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
+
+[mcp_servers]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@0.0.78", "--headless", "--ignore-https-errors", "--output-dir", "/Users/gocanto/.codex/cache/codex/browser-artifacts"]
+startup_timeout_sec = 120.0
+
+[mcp_servers.playwright.tools.browser_run_code_unsafe]
+approval_mode = "approve"
+
+[mcp_servers.node_repl]
+args = []
+command = "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+startup_timeout_sec = 120
+
+[mcp_servers.node_repl.env]
+NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
+NODE_REPL_NODE_MODULE_DIRS = "/Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules"
+NODE_REPL_NODE_PATH = "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node"
+NODE_REPL_TRUSTED_CODE_PATHS = "/Users/gocanto/.codex:/Applications/ChatGPT.app/Contents/Resources/cua_node/lib/node_modules"
+CODEX_HOME = "/Users/gocanto/.codex"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab,mcpapps"
+BROWSER_USE_TINYSKY_ENABLED = "1"
+NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = ""
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = ""
+NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = ""
+BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
+BROWSER_USE_CODEX_APP_VERSION = "26.930.51102"
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"/Users/gocanto/.codex/plugins/cache/openai-bundled/browser/26.930.51102/scripts/browser-service.mjs","sky":"@oai/sky/service"}'
+SKY_CUA_SERVICE_PATH = "/Users/gocanto/.codex/computer-use/Codex Computer Use.app"
+CODEX_CLI_PATH = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.computer-use]
+command = "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient"
+args = ["mcp"]
+cwd = "."
+enabled = false
+
+[features.context_management]
+experimental_mode = true
+
+[projects."/"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/alloy"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/skills"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/sasu"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.codex/work/codex/skills-finalize-036.k6jA74/repo"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/edgekit"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/fmtkit"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/orbitpad"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.codex/work/codex/plan016-skills-purge-verify-eQvSjK"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/oullin/web"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/dot-files"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/gocanto-sh"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/herdr-plugin"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/work/gocanto-monitors"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Documents/Codex/2026-07-23/le"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/hookdeck"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/invoice"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/oullin/api"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Documents/Codex/2026-07-28/gi"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Documents/Codex/2026-07-28/wha"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/ex-dark-mode-lite"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Documents/Codex/2026-07-29/do"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/pi-harness"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/work"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat-collection/collections"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat-collection/roadmap"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Documents/ChatGPT/mac"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat-collection/agents"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/worktrees/e2e-repo"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/worktrees/fastrel-fastrel-09101119/e2e"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/work/faker-upstream"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Documents/Codex/2026-09-22/i-wanna-have-a-factory-and"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat-collection/planning"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat-collection/docs"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/work/probe-346"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/work/route-probe6/sol"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/work/lanes/collections-ro-sol"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/worktrees/mobile-salesforce-vocabulary"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/.claude/worktrees/salesforce"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/omniyat-collection"]
+trust_level = "trusted"
+
+[projects."/Users/gocanto/Sites/CLIProxyAPI"]
+trust_level = "trusted"
+
+[marketplaces.openai-bundled]
+source_type = "local"
+source = "/Users/gocanto/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.openai-primary-runtime]
+last_updated = "2026-05-04T03:59:08Z"
+source_type = "local"
+source = "/Users/gocanto/.codex/runtimes/codex/codex-primary-runtime/plugins/openai-primary-runtime"
+
+[marketplaces.claude-plugins-official]
+last_updated = "2026-08-23T06:33:44Z"
+last_revision = "340e33aef211d95769d252324854497af871dafe"
+source_type = "git"
+source = "https://github.com/anthropics/claude-plugins-official.git"
+
+[marketplaces.goland-codex-marketplace]
+source_type = "git"
+source = "https://github.com/JetBrains/go-modern-guidelines.git"
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[plugins."documents@openai-primary-runtime"]
+enabled = false
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = false
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = false
+
+[plugins."chrome@openai-bundled"]
+enabled = true
+
+[plugins."computer-use@openai-bundled"]
+enabled = true
+
+[plugins."visualize@openai-bundled"]
+enabled = false
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."aikido@claude-plugins-official"]
+enabled = true
+
+[plugins."claude-md-management@claude-plugins-official"]
+enabled = true
+
+[plugins."feature-dev@claude-plugins-official"]
+enabled = false
+
+[plugins."frontend-design@claude-plugins-official"]
+enabled = true
+
+[plugins."github@claude-plugins-official"]
+enabled = false
+
+[plugins."codex-app-tools@openai-bundled"]
+enabled = true
+
+[plugins."unified-computer-use@openai-bundled"]
+enabled = true
+
+[plugins."modern-go-guidelines@goland-codex-marketplace"]
+enabled = true
+
+[plugins."code-review@openai-bundled"]
+enabled = true
+
+[tui]
+screen_reader_detection_done = true
+
+[tui.model_availability_nux]
+"gpt-5.5" = 4
+"gpt-5.6-sol" = 4
+gpt-6-astra = 4
+
+[features]
+workspace_dependencies = false
+hooks = true
+memories = true
+js_repl = false
+
+[hooks.state]
+
+[hooks.state."/Users/gocanto/Sites/madora/.codex/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:01cee826ad7e579eba924f3d805600363a4d7e84d4c018d5bff087512091f5f8"
+enabled = false
+
+[hooks.state."/Users/gocanto/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:b8101bb33ad65f5c602018d2d2760661a4a9750670f3698cacac4000f6d1525a"
+
+[desktop]
+ambient-suggestions-enabled = true
+appearanceTheme = "system"
+appearanceLightCodeThemeId = "raycast"
+appearanceDarkCodeThemeId = "dracula"
+sansFontSize = 15
+codeFontSize = 12
+useFontSmoothing = true
+usePointerCursors = true
+mac-menu-bar-enabled = false
+dictationDictionary = []
+followUpQueueMode = "steer"
+reviewDelivery = "inline"
+preventSleepWhileRunning = false
+keepRemoteControlAwakeWhilePluggedIn = false
+git-branch-prefix = "chore/"
+git-create-pull-request-as-draft = true
+git-pull-request-merge-method = "merge"
+git-show-sidebar-pr-icons = true
+notifications-turn-mode = "off"
+notifications-permissions-enabled = false
+notifications-questions-enabled = false
+conversationDetailMode = "STEPS_COMMANDS"
+show-context-window-usage = true
+dock-icon-preference = "app-default"
+git-commit-instructions = """
+- always run "make format-all"
+- commit by phases"""
+git-pr-instructions = "- keep PRs in draft to save compute"
+appshotSoundEnabled = false
+open-link-in-target-preference = "external-browser"
+enabled-reasoning-efforts = ["low", "medium", "high", "xhigh"]
+open-local-url-in-target-preference = "external-browser"
+browser-annotation-screenshots-mode = "necessary"
+computerUseAlwaysHidePictureInPicture = true
+appearanceDiffMarkerStyle = "color"
+external-agent-import-sync-enabled = false
+worktree-keep-count = 1
+code-review-github-link-target = "external-browser"
+
+[desktop.appearanceLightChromeTheme]
+accent = "#ff6363"
+accentSource = "custom"
+contrast = 40
+ink = "#030303"
+opaqueWindows = false
+surface = "#ffffff"
+
+[desktop.appearanceLightChromeTheme.fonts]
+code = '"Jetbrains Mono"'
+ui = "Inter"
+
+[desktop.appearanceLightChromeTheme.semanticColors]
+diffAdded = "#006b4f"
+diffRemoved = "#b12424"
+skill = "#9a1b6e"
+
+[desktop.appearanceDarkChromeTheme]
+accent = "#ff79c6"
+contrast = 60
+ink = "#f8f8f2"
+opaqueWindows = false
+surface = "#282a36"
+
+[desktop.appearanceDarkChromeTheme.fonts]
+code = '"Jetbrains Mono"'
+ui = "Inter"
+
+[desktop.appearanceDarkChromeTheme.semanticColors]
+diffAdded = "#50fa7b"
+diffRemoved = "#ff5555"
+skill = "#ff79c6"
+
+[desktop.open-in-target-preferences]
+global = "systemDefault"
+
+[desktop.open-in-target-preferences.perPath]
+"/Users/gocanto/Sites/go-fmt" = "goland"
+"/Users/gocanto/Sites/madora" = "phpstorm"
+
+[memories]
+generate_memories = true
+use_memories = true
+disable_on_external_context = true
+
+[apps.connector_76869538009648d5b282a4bb21c3d157.tools."github.create_pull_request"]
+approval_mode = "approve"
+
+[shell_environment_policy.set]
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "9230e2bd8b24b7ac7a0ba6774c64bf0d78ecdabbdd91d0ed627b02a587bae2df"
+
+[mcp_servers.executor]
+command = "executor"
+args = ["mcp"]
+
+# CLIProxyAPI on Cloudflare (https://proxy.hara.sh) - pool of 2 Claude + 2 Codex accounts.
+# Profile: ~/.codex/hara.config.toml. Usage:
+#   HARA_PROXY_API_KEY="$(op read --account my.1password.com op://cloudflare/cli-proxy-api/api-key)" codex --profile hara
+# Or from github.com/oullin/cli-proxy-api: make codex
+[model_providers.hara]
+name = "hara proxy"
+base_url = "https://proxy.hara.sh/v1"
+env_key = "HARA_PROXY_API_KEY"
+wire_api = "responses"
