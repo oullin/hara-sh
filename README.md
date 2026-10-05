@@ -11,6 +11,19 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
   - `r2-endpoint`, `r2-bucket`, `r2-access-key-id`, `r2-secret-access-key`: the R2 S3 credentials.
 - **Account:** the personal Cloudflare account "Ollin" (`accountId` in `cloudflare.config.ts`). The `cf` auth profile `personal` is bound to this directory with `cf auth activate personal .`.
 
+## Source layout
+
+| File | Concern |
+|---|---|
+| `src/index.ts` | Worker entry: sends Codex-key requests to the guard and everything else straight to the container |
+| `src/upstream.ts` | The single `CliProxy` Durable Object instance, pinned to Western Europe |
+| `src/container/cli-proxy.ts` | The Durable Object that owns the container: port, sleep timeout, environment |
+| `src/container/explicit-image.ts` | Workaround that makes start() pass the image explicitly (`@cloudflare/containers` 0.3.7) |
+| `src/auth/client-key.ts` | Reads the client key from `Authorization` or `x-api-key`, with a constant-time comparison |
+| `src/codex/policy.ts` | Which models and paths the Codex key may use |
+| `src/codex/guard.ts` | Enforces that policy and filters `/v1/models` |
+| `src/http/errors.ts` | JSON error responses |
+
 ## Requirements
 
 Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as a dev dependency). `wrangler` stays installed because `cf` uses it as the bundler (`wrangler.config.ts`).
