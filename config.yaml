@@ -40,7 +40,15 @@ oauth:
 observability:
   logs:
     debug: false
-    logging-to-file: false
+    # Logs go to rotating 10 MB files under /data/logs (container disk, 4 GB on "basic")
+    # instead of stdout, so they are viewable in the panel and via `make logs`.
+    # The disk is ephemeral: logs are lost when the container sleeps or restarts.
+    logging-to-file: true
+    # Retention: delete the oldest log files once the directory exceeds this size.
+    # Upstream default is 0 (unbounded); rotation alone never deletes anything.
+    logs-max-total-size-mb: 512
+    # Keep at most this many request error logs (upstream default 10).
+    error-logs-max-files: 10
     request-log: false
 
 # Plugin runtime (enabled from the management panel). Plugin binaries are installed
