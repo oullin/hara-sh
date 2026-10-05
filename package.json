@@ -1,0 +1,19 @@
+{
+  "name": "cli-proxy-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "types": "wrangler types",
+    "config:push": "./scripts/config-push.sh",
+    "secrets:push": "./scripts/secrets-push.sh"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "wrangler": "^4.147.0"
+  }
+}
