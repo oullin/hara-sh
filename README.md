@@ -32,9 +32,9 @@ make smoke         # send a test message (MODEL=... to override)
 make logs          # recent container and Worker logs (MINUTES=... to override)
 ```
 
-- **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `npm run deploy`.
-- **Change config:** edit `config.yaml`, then run `npm run config:push`. Changes made in the management panel are written straight to R2, and `config:push` overwrites them.
-- **Logs:** use `npx cf logs query`, or open the Worker's Observability tab in the dashboard.
+- **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `make deploy`.
+- **Change config:** edit `config.yaml`, then run `make config-push`. Changes made in the management panel are written straight to R2, and `config-push` overwrites them.
+- **Logs:** use `make logs`, or open the Worker's Observability tab in the dashboard.
 
 ## Logging in to providers
 
