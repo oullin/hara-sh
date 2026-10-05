@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Print a cli-proxy-api secret, cached in the macOS login Keychain for 30 days.
+# 1Password is only asked when the cache is missing or older than MAX_AGE_DAYS.
+#
+#   hara-key                       # api-key (default)
+#   hara-key management-password
+#   hara-key --refresh [field]     # force a new fetch from 1Password
+#   hara-key --clear [field]       # drop the cached value
+set -euo pipefail
+
+OP_ACCOUNT="${OP_ACCOUNT:-my.1password.com}"
+OP_ITEM="op://cloudflare/cli-proxy-api"
+SERVICE="cli-proxy-api"
+MAX_AGE_DAYS="${HARA_KEY_MAX_AGE_DAYS:-30}"
+
+mode=get
+case "${1:-}" in
+  --refresh) mode=refresh; shift ;;
+  --clear) mode=clear; shift ;;
+esac
+field="${1:-api-key}"
+
+if [[ "$mode" == clear ]]; then
+  security delete-generic-password -s "$SERVICE" -a "$field" >/dev/null 2>&1 || true
+  exit 0
+fi
+
+now=$(date +%s)
+
+# Cached value is stored as "<fetched-at-epoch>:<secret>".
+if [[ "$mode" == get ]] && cached=$(security find-generic-password -s "$SERVICE" -a "$field" -w 2>/dev/null); then
+  fetched="${cached%%:*}"
+  if [[ "$fetched" =~ ^[0-9]+$ ]] && (( now - fetched < MAX_AGE_DAYS * 86400 )); then
+    printf '%s\n' "${cached#*:}"
+    exit 0
+  fi
+fi
+
+secret=$(op read --account "$OP_ACCOUNT" "$OP_ITEM/$field")
+# -U updates in place; -T lets /usr/bin/security read it back without a Keychain prompt.
+security add-generic-password -U -s "$SERVICE" -a "$field" -l "cli-proxy-api $field (cached from 1Password)" \
+  -T /usr/bin/security -w "$now:$secret" >/dev/null
+printf '%s\n' "$secret"

@@ -373,13 +373,14 @@ command = "executor"
 args = ["mcp"]
 
 # CLIProxyAPI on Cloudflare (https://proxy.hara.sh) - pool of 2 Claude + 2 Codex accounts.
-# Default provider (see model_provider above). The key is read from 1Password on demand.
+# Default provider (see model_provider above). The key comes from scripts/hara-key in
+# oullin/cli-proxy-api: cached in the macOS Keychain, re-read from 1Password every 30 days.
 # Switch back to the direct ChatGPT login with: codex --profile openai
 [model_providers.hara]
 name = "hara proxy"
 base_url = "https://proxy.hara.sh/v1"
 wire_api = "responses"
-auth.command = "op"
-auth.args = ["read", "--account", "my.1password.com", "op://cloudflare/cli-proxy-api/api-key"]
-auth.timeout_ms = 30000
-auth.refresh_interval_ms = 3600000
+auth.command = "/Users/gocanto/Sites/CLIProxyAPI/scripts/hara-key"
+auth.args = ["api-key"]
+auth.timeout_ms = 60000
+auth.refresh_interval_ms = 86400000

@@ -14,6 +14,16 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
 
 Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as a dev dependency). `wrangler` stays installed because `cf` uses it as the bundler (`wrangler.config.ts`).
 
+## Keys on this Mac
+
+`scripts/hara-key [api-key|management-password]` prints a secret from the 1Password item.
+
+- It caches the value in the macOS login Keychain (service `cli-proxy-api`) for 30 days, so 1Password prompts at most once a month.
+- Codex (`auth.command`), the `claude-hara` alias and every `make` target use it.
+- After rotating a key in 1Password, run `make keys-refresh`.
+- To remove the cached values, run `scripts/hara-key --clear api-key` and `scripts/hara-key --clear management-password`.
+- Override the cache lifetime with `HARA_KEY_MAX_AGE_DAYS`.
+
 ## Common tasks
 
 Run `make` to list every target. Secrets are read from 1Password when a target runs.
@@ -29,6 +39,7 @@ make codex-direct  # run Codex CLI with the direct ChatGPT login
 make codex-smoke   # one non-interactive Codex turn through the proxy
 make codex-backup  # copy ~/.codex/config.toml + openai.config.toml into codex/
 make alias         # print the claude-hara alias for ~/.zshrc
+make keys-refresh  # re-fetch the Keychain-cached keys from 1Password now
 make health        # /healthz
 make accounts      # connected provider accounts
 make models        # models available through the proxy
@@ -46,7 +57,7 @@ make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to overrid
 Plain `codex` goes through the proxy:
 
 - `~/.codex/config.toml` sets `model_provider = "hara"` and defines the `hara` provider (`https://proxy.hara.sh/v1`, Responses API).
-- Codex fetches the API key from 1Password on demand via `auth.command = "op"`, so no environment variable is needed.
+- Codex gets the API key from `scripts/hara-key` (`auth.command`), so no environment variable is needed.
 - `codex --profile openai` (or `make codex-direct`) bypasses the proxy and uses the direct ChatGPT login. The profile lives in `~/.codex/openai.config.toml` and uses `gpt-5.5`, because `gpt-6.1-sol` is rejected for that login when used directly.
 - Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`.
 - Backups of both files live in `codex/`. Refresh them with `make codex-backup`, then commit.

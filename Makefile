@@ -10,12 +10,14 @@ MODEL      ?= claude-haiku-4-5-20251001
 
 export OP_ACCOUNT
 
-API_KEY  = $$(op read $(OP_ITEM)/api-key)
-MGMT_KEY = $$(op read $(OP_ITEM)/management-password)
+# Cached in the macOS Keychain for 30 days (scripts/hara-key); 1Password is asked once a month.
+HARA_KEY = $(CURDIR)/scripts/hara-key
+API_KEY  = $$($(HARA_KEY) api-key)
+MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
 .PHONY: help install types check deploy deploy-dry config-push \
-        claude codex codex-direct codex-backup codex-smoke alias health models accounts smoke logs logs-cf
+        claude codex codex-direct codex-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -64,7 +66,10 @@ codex-smoke: ## Run one non-interactive Codex turn through the proxy
 	@codex exec --skip-git-repo-check "Reply with exactly: pong" </dev/null
 
 alias: ## Print the claude-hara shell alias for ~/.zshrc
-	@echo "alias claude-hara='ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$(op read --account $(OP_ACCOUNT) $(OP_ITEM)/api-key)\" claude'"
+	@echo "alias claude-hara='ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
+
+keys-refresh: ## Re-fetch the cached keys from 1Password now (e.g. after rotating them)
+	@$(HARA_KEY) --refresh api-key >/dev/null && $(HARA_KEY) --refresh management-password >/dev/null && echo "keys refreshed"
 
 ## --- Operations ------------------------------------------------------------
 
