@@ -2,7 +2,7 @@
 # Print a cli-proxy-api secret, cached in the macOS login Keychain for 30 days.
 # 1Password is only asked when the cache is missing or older than MAX_AGE_DAYS.
 #
-#   hara-key                       # api-key (default)
+#   hara-key                       # claude-api-key (default)
 #   hara-key management-password
 #   hara-key --refresh [field]     # force a new fetch from 1Password
 #   hara-key --clear [field]       # drop the cached value
@@ -18,7 +18,7 @@ case "${1:-}" in
   --refresh) mode=refresh; shift ;;
   --clear) mode=clear; shift ;;
 esac
-field="${1:-api-key}"
+field="${1:-claude-api-key}"
 
 if [[ "$mode" == clear ]]; then
   security delete-generic-password -s "$SERVICE" -a "$field" >/dev/null 2>&1 || true

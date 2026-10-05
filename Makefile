@@ -12,12 +12,12 @@ export OP_ACCOUNT
 
 # Cached in the macOS Keychain for 30 days (scripts/hara-key); 1Password is asked once a month.
 HARA_KEY = $(CURDIR)/scripts/hara-key
-API_KEY  = $$($(HARA_KEY) api-key)
+API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
 .PHONY: help install types check deploy deploy-dry config-push \
-        claude codex codex-direct codex-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf
+        claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -62,6 +62,9 @@ codex-direct: ## Run Codex CLI with the direct ChatGPT login (profile `openai`)
 codex-backup: ## Copy ~/.codex/config.toml and openai.config.toml into codex/ (then commit)
 	cp -p $(HOME)/.codex/config.toml $(HOME)/.codex/openai.config.toml codex/
 
+claude-backup: ## Copy ~/.claude settings into claude/ (Omniyat auto-mode section redacted), then commit
+	./scripts/claude-backup.sh
+
 codex-smoke: ## Run one non-interactive Codex turn through the proxy
 	@codex exec --skip-git-repo-check "Reply with exactly: pong" </dev/null
 
@@ -69,7 +72,7 @@ alias: ## Print the claude-hara shell alias for ~/.zshrc
 	@echo "alias claude-hara='ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
 
 keys-refresh: ## Re-fetch the cached keys from 1Password now (e.g. after rotating them)
-	@for f in api-key codex-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
+	@for f in claude-api-key codex-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
 
 ## --- Operations ------------------------------------------------------------
 

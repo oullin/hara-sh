@@ -5,7 +5,7 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
 - **Runtime:** a Worker (`src/index.ts`) forwards every request to a single container running `eceasy/cli-proxy-api` (`Dockerfile`). The container is managed by the `CliProxy` Durable Object, as configured in `cloudflare.config.ts`.
 - **State:** `config.yaml` and the OAuth token files live in the R2 bucket `cli-proxy-api`, under `config/config.yaml` and `auths/*.json`. The server uses its built-in object store (`OBJECTSTORE_*`) to read and write them. The container disk is only a cache.
 - **Secrets:** 1Password, account `my.1password.com`, vault `cloudflare`, item `cli-proxy-api`.
-  - `api-key`: the main client API key, which can reach every provider.
+  - `claude-api-key`: the main client API key (Claude Code, scripts), which can reach every provider.
   - `codex-api-key`: the Codex CLI key. The Worker limits it to Codex/GPT models, so it only uses the Codex accounts.
   - `management-password`: the password for the management API and panel.
   - `r2-endpoint`, `r2-bucket`, `r2-access-key-id`, `r2-secret-access-key`: the R2 S3 credentials.
@@ -17,12 +17,12 @@ Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as
 
 ## Keys on this Mac
 
-`scripts/hara-key [api-key|codex-api-key|management-password]` prints a secret from the 1Password item.
+`scripts/hara-key [claude-api-key|codex-api-key|management-password]` prints a secret from the 1Password item.
 
 - It caches the value in the macOS login Keychain (service `cli-proxy-api`) for 30 days, so 1Password prompts at most once a month.
 - Codex (`auth.command`), the `claude-hara` alias and every `make` target use it.
 - After rotating a key in 1Password, run `make keys-refresh`.
-- To remove the cached values, run `scripts/hara-key --clear api-key` and `scripts/hara-key --clear management-password`.
+- To remove the cached values, run `scripts/hara-key --clear claude-api-key` and `scripts/hara-key --clear management-password`.
 - Override the cache lifetime with `HARA_KEY_MAX_AGE_DAYS`.
 
 ## Common tasks
@@ -39,6 +39,7 @@ make codex         # run Codex CLI (proxy is the default provider; ARGS="..." fo
 make codex-direct  # run Codex CLI with the direct ChatGPT login
 make codex-smoke   # one non-interactive Codex turn through the proxy
 make codex-backup  # copy ~/.codex/config.toml + openai.config.toml into codex/
+make claude-backup # copy ~/.claude settings into claude/ (Omniyat section redacted)
 make alias         # print the claude-hara alias for ~/.zshrc
 make keys-refresh  # re-fetch the Keychain-cached keys from 1Password now
 make health        # /healthz
@@ -70,6 +71,14 @@ Plain `codex` goes through the proxy:
 - Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`.
 - Backups of both files live in `codex/`. Refresh them with `make codex-backup`, then commit.
 
+## Claude Code config backup
+
+`claude/` holds copies of `~/.claude/settings.json`, `settings.local.json`, `CLAUDE.md` and `.claude.json`, refreshed with `make claude-backup`.
+
+- **Redaction:** `settings.json` is identical to the original, except that `autoMode.environment` is replaced by a placeholder. That section describes Omniyat-internal systems and stays only in `~/.claude/settings.json`.
+- **Restoring:** keep the existing `autoMode.environment` block when you restore the file.
+- **No secrets:** none of these files holds a key or token.
+
 ## Logging in to providers
 
 1. Open https://proxy.hara.sh/management.html and sign in with `management-password`.
@@ -86,12 +95,12 @@ Plain `codex` goes through the proxy:
 
 `routing.session-affinity` keeps each conversation on one account, so prompt caches are reused. The proxy fails over to the other account when one is rate-limited.
 
-Cursor is **not** an upstream provider. CLIProxyAPI has no built-in support, and the only plugin is a third-party native library that would run with access to every stored token. Cursor can still use this proxy as a client: set the OpenAI base URL to `https://proxy.hara.sh/v1` with the `api-key`.
+Cursor is **not** an upstream provider. CLIProxyAPI has no built-in support, and the only plugin is a third-party native library that would run with access to every stored token. Cursor can still use this proxy as a client: set the OpenAI base URL to `https://proxy.hara.sh/v1` with the `claude-api-key`.
 
 ## Using the proxy
 
 ```bash
-curl https://proxy.hara.sh/v1/models -H "Authorization: Bearer $(op read --account my.1password.com op://cloudflare/cli-proxy-api/api-key)"
+curl https://proxy.hara.sh/v1/models -H "Authorization: Bearer $(op read --account my.1password.com op://cloudflare/cli-proxy-api/claude-api-key)"
 ```
 
 The container sleeps after 30 minutes idle. The first request after that takes a few seconds while it starts.

@@ -1,0 +1,176 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(php artisan:*)",
+      "Bash(vendor/bin/pint:*)",
+      "Bash(make:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(rm -Rf *)",
+      "Bash(rm -fR *)",
+      "Bash(rm -rF *)",
+      "Bash(rm -Fr *)",
+      "Bash(rm -r -f *)",
+      "Bash(rm -f -r *)",
+      "Bash(rm -R -f *)",
+      "Bash(rm -f -R *)",
+      "Bash(rm --recursive --force *)",
+      "Bash(rm --force --recursive *)",
+      "Bash(sudo rm -rf *)",
+      "Bash(sudo rm -fr *)",
+      "Bash(sudo rm -Rf *)",
+      "Bash(sudo rm -r -f *)",
+      "Bash(sudo rm --recursive --force *)",
+      "Bash(rm -r *)",
+      "Bash(rm -R *)",
+      "Bash(rm --recursive *)",
+      "Bash(sudo rm -r *)",
+      "Bash(sudo rm -R *)",
+      "Bash(sudo rm --recursive *)"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(sudo rm *)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "opus[1m]",
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/gocanto/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/gocanto/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/gocanto/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ]
+  },
+  "enableWorkflows": false,
+  "enabledPlugins": {
+    "aikido@claude-plugins-official": true,
+    "autofix-bot@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": false
+  },
+  "extraKnownMarketplaces": {
+    "addy-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "addyosmani/agent-skills"
+      }
+    },
+    "claude-code-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-code"
+      }
+    },
+    "goland-claude-marketplace": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/JetBrains/go-modern-guidelines.git"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "tui": "fullscreen",
+  "theme": "dark",
+  "switchModelsOnFlag": false,
+  "agentPushNotifEnabled": false,
+  "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "environment": [
+      "<redacted: 24 Omniyat-specific auto mode environment lines; restore them from ~/.claude/settings.json>"
+    ]
+  },
+  "releaseChannel": "stable",
+  "inputNeededNotifEnabled": true
+}

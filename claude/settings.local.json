@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew list:*)",
+      "Bash(env:*)",
+      "Bash(java:*)",
+      "Bash(echo:*)",
+      "Bash(brew:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(gemini:*)",
+      "Bash(source:*)",
+      "Bash(cmux --help)",
+      "Bash(cmux themes:*)",
+      "Bash(cmux version:*)",
+      "Bash(pgrep -afl '\\(/Applications/\\(Claude|Codex\\)\\\\.app|claude$| claude |/codex |codex app-server|gemini-cli|antigravity|jetbrains-toolbox|jetbrainsd|webstorm|phpstorm|goland|com\\\\.docker|Docker Desktop|playwright-mcp\\)')"
+    ]
+  }
+}
