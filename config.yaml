@@ -12,7 +12,7 @@ server:
 
 management:
   allow-remote: true
-  # Replaced with a bcrypt hash of the 1Password value by scripts/config-push.sh.
+  # Replaced with a bcrypt hash of the 1Password value by scripts/push-config.sh.
   secret-key: "__MANAGEMENT_PASSWORD_BCRYPT__"
   disable-control-panel: false
 
