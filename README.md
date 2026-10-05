@@ -11,7 +11,13 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
 
 ## Requirements
 
-Node, Docker Desktop (running), the 1Password CLI (`op`), and `npx wrangler login` on the Cloudflare account that owns `hara.sh`.
+Node, Docker Desktop (running), the 1Password CLI (`op`), and a wrangler login on the personal Cloudflare account "Ollin" (pinned as `account_id` in `wrangler.jsonc`).
+
+The default wrangler login on this machine belongs to a work account. The personal login is kept in a separate config directory, so export these before running the commands below:
+
+```bash
+export XDG_CONFIG_HOME=$HOME/.claude/work/wrangler-personal OP_ACCOUNT=my.1password.com
+```
 
 ## Common tasks
 
