@@ -19,7 +19,7 @@ management:
 access:
   api-keys:
     # Main key: every provider (Claude Code, scripts, ...).
-    - "{{ op://YOUR_VAULT/YOUR_ITEM/api-key }}"
+    - "{{ op://YOUR_VAULT/YOUR_ITEM/claude-api-key }}"
     # Codex CLI key: the Worker limits it to Codex/GPT models, i.e. the Codex accounts only.
     - "{{ op://YOUR_VAULT/YOUR_ITEM/codex-api-key }}"
 
