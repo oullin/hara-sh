@@ -34,6 +34,17 @@ npm run deploy:dry    # build and validate without uploading
 3. After you sign in, the browser lands on a `localhost` URL that fails to load. Paste that URL back into the panel. Device-code providers do not need this step.
 4. The tokens are saved to R2 under `auths/`.
 
+### Accounts in the pool
+
+| Provider | Accounts | Login flow |
+|---|---|---|
+| Claude | 2 | Claude OAuth, done once per account. Sign out of claude.ai (or use a private window) before adding the second, otherwise the same account is authorised again. |
+| Codex | 1 | Codex OAuth, or the device-code login |
+
+`routing.session-affinity` keeps each conversation on one account, so prompt caches are reused. The proxy fails over to the other account when one is rate-limited.
+
+Cursor is **not** an upstream provider. CLIProxyAPI has no built-in support, and the only plugin is a third-party native library that would run with access to every stored token. Cursor can still use this proxy as a client: set the OpenAI base URL to `https://proxy.hara.sh/v1` with the `api-key`.
+
 ## Using the proxy
 
 ```bash
