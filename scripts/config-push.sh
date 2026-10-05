@@ -12,3 +12,11 @@ HASH="$(op read op://cloudflare/cli-proxy-api/management-password | htpasswd -ni
 HASH="$HASH" python3 -c 'import os,sys; p=sys.argv[1]; s=open(p).read(); open(p,"w").write(s.replace("__MANAGEMENT_PASSWORD_BCRYPT__", os.environ["HASH"]))' "$OUT"
 npx cf r2 objects put config/config.yaml --bucket-name "$BUCKET" --file "$OUT" --content-type text/yaml -q >/dev/null
 echo "uploaded config/config.yaml to $BUCKET"
+
+# The running server only reads R2 at startup; push the same file through the management
+# API so it reloads now (it writes the file back to R2 itself).
+URL="${URL:-https://proxy.hara.sh}"
+MGMT_KEY="$(./scripts/hara-key management-password)"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$URL/v0/management/config.yaml" \
+  -H "Authorization: Bearer $MGMT_KEY" -H 'content-type: application/yaml' --data-binary @"$OUT")
+if [[ "$code" == 200 ]]; then echo "live config reloaded on $URL"; else echo "live reload skipped (HTTP $code); applies on next container start"; fi

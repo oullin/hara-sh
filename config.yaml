@@ -18,7 +18,10 @@ management:
 
 access:
   api-keys:
+    # Main key: every provider (Claude Code, scripts, ...).
     - "{{ op://cloudflare/cli-proxy-api/api-key }}"
+    # Codex CLI key: the Worker limits it to Codex/GPT models, i.e. the Codex accounts only.
+    - "{{ op://cloudflare/cli-proxy-api/codex-api-key }}"
 
 # Credential pool: 2x Claude OAuth + 1x Codex OAuth (logged in via the management panel).
 routing:

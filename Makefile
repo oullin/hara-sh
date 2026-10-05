@@ -69,7 +69,7 @@ alias: ## Print the claude-hara shell alias for ~/.zshrc
 	@echo "alias claude-hara='ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
 
 keys-refresh: ## Re-fetch the cached keys from 1Password now (e.g. after rotating them)
-	@$(HARA_KEY) --refresh api-key >/dev/null && $(HARA_KEY) --refresh management-password >/dev/null && echo "keys refreshed"
+	@for f in api-key codex-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
 
 ## --- Operations ------------------------------------------------------------
 

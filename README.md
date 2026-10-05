@@ -5,7 +5,8 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
 - **Runtime:** a Worker (`src/index.ts`) forwards every request to a single container running `eceasy/cli-proxy-api` (`Dockerfile`). The container is managed by the `CliProxy` Durable Object, as configured in `cloudflare.config.ts`.
 - **State:** `config.yaml` and the OAuth token files live in the R2 bucket `cli-proxy-api`, under `config/config.yaml` and `auths/*.json`. The server uses its built-in object store (`OBJECTSTORE_*`) to read and write them. The container disk is only a cache.
 - **Secrets:** 1Password, account `my.1password.com`, vault `cloudflare`, item `cli-proxy-api`.
-  - `api-key`: the client API key.
+  - `api-key`: the main client API key, which can reach every provider.
+  - `codex-api-key`: the Codex CLI key. The Worker limits it to Codex/GPT models, so it only uses the Codex accounts.
   - `management-password`: the password for the management API and panel.
   - `r2-endpoint`, `r2-bucket`, `r2-access-key-id`, `r2-secret-access-key`: the R2 S3 credentials.
 - **Account:** the personal Cloudflare account "Ollin" (`accountId` in `cloudflare.config.ts`). The `cf` auth profile `personal` is bound to this directory with `cf auth activate personal .`.
@@ -16,7 +17,7 @@ Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as
 
 ## Keys on this Mac
 
-`scripts/hara-key [api-key|management-password]` prints a secret from the 1Password item.
+`scripts/hara-key [api-key|codex-api-key|management-password]` prints a secret from the 1Password item.
 
 - It caches the value in the macOS login Keychain (service `cli-proxy-api`) for 30 days, so 1Password prompts at most once a month.
 - Codex (`auth.command`), the `claude-hara` alias and every `make` target use it.
@@ -49,7 +50,7 @@ make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to overrid
 ```
 
 - **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `make deploy`.
-- **Change config:** edit `config.yaml`, then run `make config-push`. Changes made in the management panel are written straight to R2, and `config-push` overwrites them.
+- **Change config:** edit `config.yaml`, then run `make config-push`. It uploads the file to R2 and reloads the running server through the management API. Changes made in the management panel are written straight to R2, and `config-push` overwrites them.
 - **Logs:** `make logs` reads the server log files (rotated at 10 MB, capped at 512 MB in total, lost on container restart). `make logs-cf` shows Worker request logs from Cloudflare observability.
 
 ## Codex CLI
@@ -57,7 +58,14 @@ make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to overrid
 Plain `codex` goes through the proxy:
 
 - `~/.codex/config.toml` sets `model_provider = "hara"` and defines the `hara` provider (`https://proxy.hara.sh/v1`, Responses API).
-- Codex gets the API key from `scripts/hara-key` (`auth.command`), so no environment variable is needed.
+- Codex gets its own key, `codex-api-key`, from `scripts/hara-key` (`auth.command`), so no environment variable is needed.
+- **Codex accounts only:** with that key, the Worker (`src/index.ts`):
+  - allows only `/v1/responses`, `/v1/chat/completions` and `/v1/models`;
+  - rejects any model that does not match `gpt-*`, `codex-*` or `o<digit>*` with a 403;
+  - removes non-Codex models from `/v1/models`;
+  - blocks WebSockets, whose model names it cannot inspect.
+
+  The proxy serves those models only from the Codex OAuth accounts, so Codex never uses a Claude account.
 - `codex --profile openai` (or `make codex-direct`) bypasses the proxy and uses the direct ChatGPT login. The profile lives in `~/.codex/openai.config.toml` and uses `gpt-5.5`, because `gpt-6.1-sol` is rejected for that login when used directly.
 - Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`.
 - Backups of both files live in `codex/`. Refresh them with `make codex-backup`, then commit.
