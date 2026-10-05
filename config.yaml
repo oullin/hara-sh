@@ -1,7 +1,7 @@
 # CLIProxyAPI config template (v8 layout).
 #
 # Contains 1Password references only. Render and upload it to R2 with:
-#   npm run config:push
+#   make config-push
 # The server reads config/config.yaml from the R2 bucket, not this file.
 # Full option reference: upstream config.example.yaml.
 config-version: 8
@@ -42,3 +42,9 @@ observability:
     debug: false
     logging-to-file: false
     request-log: false
+
+# Plugin runtime (enabled from the management panel). Plugin binaries are installed
+# into plugins.dir on the container disk, which is NOT persisted to R2.
+plugins:
+  enabled: true
+  dir: "plugins"
