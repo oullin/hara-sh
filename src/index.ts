@@ -1,4 +1,6 @@
-import { Container, getContainer } from "@cloudflare/containers";
+import { Container } from "@cloudflare/containers";
+
+const INSTANCE_REGION: DurableObjectLocationHint = "weur";
 
 // `Env` is generated from cloudflare.config.ts by `cf workers types`.
 export class CliProxy extends Container<Env> {
@@ -40,7 +42,11 @@ export default {
     // ctx.exports.CliProxy is the loopback namespace for the sqlite-backed DO
     // declared in cloudflare.config.ts; its generated type is not narrowed yet.
     const namespace = ctx.exports.CliProxy as unknown as DurableObjectNamespace<CliProxy>;
-    // One named instance so all requests share the same auth state.
-    return getContainer(namespace, "main").fetch(request);
+    // One named instance so all requests share the same auth state. Anthropic's OAuth
+    // endpoint rejects the default placement (near Dubai) with 403 "Request not allowed",
+    // so the DO (and its container) is created with a location hint. Hints only apply when
+    // a DO is first created, hence the region in the instance name.
+    const id = namespace.idFromName(`main-${INSTANCE_REGION}`);
+    return namespace.get(id, { locationHint: INSTANCE_REGION }).fetch(request);
   },
 } satisfies ExportedHandler<Env>;
