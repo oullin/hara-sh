@@ -16,11 +16,20 @@ Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as
 
 ## Common tasks
 
+Run `make` to list every target. Secrets are read from 1Password when a target runs.
+
 ```bash
-npm install
-npm run config:push   # render config.yaml from 1Password and upload it to R2
-npm run deploy        # build the image and deploy; secrets are injected from 1Password (secrets.env.tpl)
-npm run deploy:dry    # build and validate without uploading
+make install       # npm dependencies
+make deploy        # type-check, build the image, deploy (secrets from 1Password)
+make deploy-dry    # build and validate without uploading
+make config-push   # render config.yaml from 1Password and upload it to R2
+make claude        # run Claude Code through the proxy (ARGS="..." for flags)
+make alias         # print the claude-hara alias for ~/.zshrc
+make health        # /healthz
+make accounts      # connected provider accounts
+make models        # models available through the proxy
+make smoke         # send a test message (MODEL=... to override)
+make logs          # recent container and Worker logs (MINUTES=... to override)
 ```
 
 - **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `npm run deploy`.
