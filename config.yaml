@@ -1,0 +1,39 @@
+# CLIProxyAPI config template (v8 layout).
+#
+# Contains 1Password references only. Render and upload it to R2 with:
+#   npm run config:push
+# The server reads config/config.yaml from the R2 bucket, not this file.
+# Full option reference: upstream config.example.yaml.
+config-version: 8
+
+server:
+  host: ""
+  port: 8317
+
+management:
+  allow-remote: true
+  # Plaintext is bcrypt-hashed by the server on first start and written back to R2.
+  secret-key: "{{ op://cloudflare/cli-proxy-api/management-password }}"
+  disable-control-panel: false
+
+access:
+  api-keys:
+    - "{{ op://cloudflare/cli-proxy-api/api-key }}"
+
+routing:
+  strategy: "round-robin"
+
+upstream:
+  codex:
+    # Cloudflare cuts idle proxied responses at 100s; upstream recommends 20s behind a proxy.
+    stream-bootstrap-timeout: "20s"
+
+oauth:
+  # Overridden by the object store (R2 auths/ prefix); kept for clarity.
+  auth-dir: "/data/auths"
+
+observability:
+  logs:
+    debug: false
+    logging-to-file: false
+    request-log: false

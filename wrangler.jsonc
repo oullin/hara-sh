@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cli-proxy-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "proxy.hara.sh", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "CliProxy",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      // A single instance: every container writes to the same R2 keys.
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "CLI_PROXY", "class_name": "CliProxy" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CliProxy"] }]
+}
