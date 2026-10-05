@@ -29,12 +29,13 @@ make health        # /healthz
 make accounts      # connected provider accounts
 make models        # models available through the proxy
 make smoke         # send a test message (MODEL=... to override)
-make logs          # recent container and Worker logs (MINUTES=... to override)
+make logs          # last server log lines (LINES=... to override)
+make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to override)
 ```
 
 - **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `make deploy`.
 - **Change config:** edit `config.yaml`, then run `make config-push`. Changes made in the management panel are written straight to R2, and `config-push` overwrites them.
-- **Logs:** use `make logs`, or open the Worker's Observability tab in the dashboard.
+- **Logs:** `make logs` reads the server log files (rotated at 10 MB, capped at 512 MB in total, lost on container restart). `make logs-cf` shows Worker request logs from Cloudflare observability.
 
 ## Logging in to providers
 
