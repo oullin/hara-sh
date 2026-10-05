@@ -24,9 +24,10 @@ make deploy        # type-check, build the image, deploy (secrets from 1Password
 make deploy-dry    # build and validate without uploading
 make config-push   # render config.yaml from 1Password and upload it to R2
 make claude        # run Claude Code through the proxy (ARGS="..." for flags)
-make codex         # run Codex CLI through the proxy (`hara` profile, ARGS="..." for flags)
+make codex         # run Codex CLI (proxy is the default provider; ARGS="..." for flags)
+make codex-direct  # run Codex CLI with the direct ChatGPT login
 make codex-smoke   # one non-interactive Codex turn through the proxy
-make codex-backup  # copy ~/.codex/config.toml + hara.config.toml into codex/
+make codex-backup  # copy ~/.codex/config.toml + openai.config.toml into codex/
 make alias         # print the claude-hara alias for ~/.zshrc
 make health        # /healthz
 make accounts      # connected provider accounts
@@ -42,7 +43,13 @@ make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to overrid
 
 ## Codex CLI
 
-`~/.codex/config.toml` defines the `hara` model provider (`https://proxy.hara.sh/v1`, Responses API, key from `HARA_PROXY_API_KEY`), and `~/.codex/hara.config.toml` is the `hara` profile (`model_provider = "hara"`, `model = "gpt-6.1-sol"`). Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`. Backups of both files live in `codex/`; refresh them with `make codex-backup`.
+Plain `codex` goes through the proxy:
+
+- `~/.codex/config.toml` sets `model_provider = "hara"` and defines the `hara` provider (`https://proxy.hara.sh/v1`, Responses API).
+- Codex fetches the API key from 1Password on demand via `auth.command = "op"`, so no environment variable is needed.
+- `codex --profile openai` (or `make codex-direct`) bypasses the proxy and uses the direct ChatGPT login. The profile lives in `~/.codex/openai.config.toml` and uses `gpt-5.5`, because `gpt-6.1-sol` is rejected for that login when used directly.
+- Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`.
+- Backups of both files live in `codex/`. Refresh them with `make codex-backup`, then commit.
 
 ## Logging in to providers
 
