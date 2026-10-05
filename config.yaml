@@ -12,16 +12,21 @@ server:
 
 management:
   allow-remote: true
-  # Plaintext is bcrypt-hashed by the server on first start and written back to R2.
-  secret-key: "{{ op://cloudflare/cli-proxy-api/management-password }}"
+  # Replaced with a bcrypt hash of the 1Password value by scripts/config-push.sh.
+  secret-key: "__MANAGEMENT_PASSWORD_BCRYPT__"
   disable-control-panel: false
 
 access:
   api-keys:
     - "{{ op://cloudflare/cli-proxy-api/api-key }}"
 
+# Credential pool: 2x Claude OAuth + 1x Codex OAuth (logged in via the management panel).
 routing:
   strategy: "round-robin"
+  # Keep each conversation on one account so Claude/Codex prompt caches are reused;
+  # fails over to the other account automatically when one is rate-limited.
+  session-affinity: true
+  session-affinity-ttl: "1h"
 
 upstream:
   codex:
