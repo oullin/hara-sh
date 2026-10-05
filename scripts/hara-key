@@ -1,43 +1,53 @@
 #!/usr/bin/env bash
 # Print a cli-proxy-api secret, cached in the macOS login Keychain for 30 days.
-# 1Password is only asked when the cache is missing or older than MAX_AGE_DAYS.
+# 1Password is only asked when the cache is missing or older than HARA_KEY_MAX_AGE_DAYS.
+# Standalone on purpose: Codex runs it as auth.command from any directory.
 #
-#   hara-key                       # claude-api-key (default)
-#   hara-key management-password
-#   hara-key --refresh [field]     # force a new fetch from 1Password
+#   hara-key [field]               # default field: claude-api-key
+#   hara-key --refresh [field]     # fetch from 1Password now and re-cache
 #   hara-key --clear [field]       # drop the cached value
+#
+# Fields: claude-api-key, codex-api-key, management-password.
 set -euo pipefail
 
 OP_ACCOUNT="${OP_ACCOUNT:-my.1password.com}"
 OP_ITEM="op://cloudflare/cli-proxy-api"
-SERVICE="cli-proxy-api"
-MAX_AGE_DAYS="${HARA_KEY_MAX_AGE_DAYS:-30}"
+KEYCHAIN_SERVICE="cli-proxy-api"
+MAX_AGE_SECONDS=$(( ${HARA_KEY_MAX_AGE_DAYS:-30} * 86400 ))
 
-mode=get
+# The Keychain item stores "<fetched-at-epoch>:<secret>".
+cache_read() {
+  security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$1" -w 2>/dev/null
+}
+
+cache_write() {
+  # -U updates in place; -T lets /usr/bin/security read it back without a Keychain prompt.
+  security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$1" -T /usr/bin/security \
+    -l "cli-proxy-api $1 (cached from 1Password)" -w "$(date +%s):$2" >/dev/null
+}
+
+cache_clear() {
+  security delete-generic-password -s "$KEYCHAIN_SERVICE" -a "$1" >/dev/null 2>&1 || true
+}
+
+# Print the cached secret if it is younger than MAX_AGE_SECONDS; fail otherwise.
+cache_fresh() {
+  local entry fetched_at
+  entry="$(cache_read "$1")" || return 1
+  fetched_at="${entry%%:*}"
+  [[ "$fetched_at" =~ ^[0-9]+$ ]] && (( $(date +%s) - fetched_at < MAX_AGE_SECONDS )) || return 1
+  printf '%s\n' "${entry#*:}"
+}
+
+fetch_and_cache() {
+  local value
+  value="$(op read --account "$OP_ACCOUNT" "$OP_ITEM/$1")"
+  cache_write "$1" "$value"
+  printf '%s\n' "$value"
+}
+
 case "${1:-}" in
-  --refresh) mode=refresh; shift ;;
-  --clear) mode=clear; shift ;;
+  --refresh) fetch_and_cache "${2:-claude-api-key}" ;;
+  --clear)   cache_clear "${2:-claude-api-key}" ;;
+  *)         cache_fresh "${1:-claude-api-key}" || fetch_and_cache "${1:-claude-api-key}" ;;
 esac
-field="${1:-claude-api-key}"
-
-if [[ "$mode" == clear ]]; then
-  security delete-generic-password -s "$SERVICE" -a "$field" >/dev/null 2>&1 || true
-  exit 0
-fi
-
-now=$(date +%s)
-
-# Cached value is stored as "<fetched-at-epoch>:<secret>".
-if [[ "$mode" == get ]] && cached=$(security find-generic-password -s "$SERVICE" -a "$field" -w 2>/dev/null); then
-  fetched="${cached%%:*}"
-  if [[ "$fetched" =~ ^[0-9]+$ ]] && (( now - fetched < MAX_AGE_DAYS * 86400 )); then
-    printf '%s\n' "${cached#*:}"
-    exit 0
-  fi
-fi
-
-secret=$(op read --account "$OP_ACCOUNT" "$OP_ITEM/$field")
-# -U updates in place; -T lets /usr/bin/security read it back without a Keychain prompt.
-security add-generic-password -U -s "$SERVICE" -a "$field" -l "cli-proxy-api $field (cached from 1Password)" \
-  -T /usr/bin/security -w "$now:$secret" >/dev/null
-printf '%s\n' "$secret"

@@ -2,11 +2,6 @@
   "name": "cli-proxy-api",
   "private": true,
   "type": "module",
-  "scripts": {
-    "deploy": "./scripts/deploy.sh",
-    "deploy:dry": "npx cf deploy --dry-run",
-    "config:push": "./scripts/config-push.sh"
-  },
   "dependencies": {
     "@cloudflare/containers": "^0.3.7"
   },

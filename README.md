@@ -24,6 +24,15 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
 | `src/codex/guard.ts` | Enforces that policy and filters `/v1/models` |
 | `src/http/errors.ts` | JSON error responses |
 
+| Script | Purpose |
+|---|---|
+| `scripts/deploy.sh` | Renders `secrets.env.tpl` from 1Password and runs `cf deploy` (`make deploy`) |
+| `scripts/push-config.sh` | Renders `config.yaml`, hashes the management password, uploads to R2 and reloads the live server (`make config-push`) |
+| `scripts/hara-key` | Keychain-cached secrets (standalone; used by Codex `auth.command`) |
+| `scripts/backup-codex.sh` / `backup-claude.sh` | Copy `~/.codex` and `~/.claude` config into `codex/` and `claude/` |
+| `scripts/lib/common.sh` | Shared settings (1Password account, proxy URL, bucket) and helpers (`temp_file`, `secret`, `log`, `die`) |
+| `scripts/lib/redact_claude_settings.py` | Redacts `autoMode.environment` from the Claude settings backup |
+
 ## Requirements
 
 Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as a dev dependency). `wrangler` stays installed because `cf` uses it as the bundler (`wrangler.config.ts`).

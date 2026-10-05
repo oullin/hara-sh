@@ -42,7 +42,7 @@ deploy-dry: check ## Build and validate without uploading
 	npx cf deploy --dry-run
 
 config-push: ## Render config.yaml from 1Password and upload it to R2
-	./scripts/config-push.sh
+	./scripts/push-config.sh
 
 ## --- Claude Code -----------------------------------------------------------
 
@@ -60,10 +60,10 @@ codex-direct: ## Run Codex CLI with the direct ChatGPT login (profile `openai`)
 	@codex --profile openai $(ARGS)
 
 codex-backup: ## Copy ~/.codex/config.toml and openai.config.toml into codex/ (then commit)
-	cp -p $(HOME)/.codex/config.toml $(HOME)/.codex/openai.config.toml codex/
+	./scripts/backup-codex.sh
 
 claude-backup: ## Copy ~/.claude settings into claude/ (Omniyat auto-mode section redacted), then commit
-	./scripts/claude-backup.sh
+	./scripts/backup-claude.sh
 
 codex-smoke: ## Run one non-interactive Codex turn through the proxy
 	@codex exec --skip-git-repo-check "Reply with exactly: pong" </dev/null
