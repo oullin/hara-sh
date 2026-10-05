@@ -2,5 +2,5 @@ node_modules/
 .wrangler/
 .dev.vars
 .env
-config.rendered.yaml
+.cloudflare/
 worker-configuration.d.ts
