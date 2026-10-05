@@ -7,6 +7,20 @@ export class CliProxy extends Container<Env> {
 
   constructor(ctx: DurableObjectState<{}>, env: Env) {
     super(ctx, env);
+    // Durable Object-scheduled containers (cf `schedulingPolicy: "durable-object"`) must be
+    // started with an explicit image, but @cloudflare/containers 0.3.7 calls start() without
+    // one. Inject the "default" image from cloudflare.config.ts until the library supports it.
+    const runtime = ctx.container!;
+    (this as unknown as { container: globalThis.Container }).container = new Proxy(runtime, {
+      get(target, prop) {
+        if (prop === "start") {
+          return (options?: Omit<ContainerStartupOptions, "image" | "containerSnapshot">) =>
+            target.start({ enableInternet: true, ...options, image: target.images.default });
+        }
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
     this.envVars = {
       OBJECTSTORE_ENDPOINT: env.OBJECTSTORE_ENDPOINT,
       OBJECTSTORE_BUCKET: env.OBJECTSTORE_BUCKET,
