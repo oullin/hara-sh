@@ -60,16 +60,17 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 
 ## How it works
 
-- **Containers:** `local/compose.yaml` runs `eceasy/cli-proxy-api` inside the network of a Tailscale container. Tailscale serves `https://cliproxy.<tailnet>.ts.net` to it with userspace networking, so no extra privileges are needed. The proxy is also published on `127.0.0.1:8317`, where portless picks it up.
-- **State:** config, OAuth logins and logs (10 MB rotation, 512 MB cap) live in `~/.cli-proxy-api/proxy`, and the Tailscale identity in `~/.cli-proxy-api/tailscale`. `LOCAL_DIR=…` moves both.
+- **Containers:** `local/compose.yaml` runs `eceasy/cli-proxy-api` inside the network of a Tailscale container. The `quota` container (built from `scripts/quota`) shares that network too. Tailscale serves `https://cliproxy.<tailnet>.ts.net` to it with userspace networking, so no extra privileges are needed. The proxy is also published on `127.0.0.1:8317`, where portless picks it up.
+- **State:** config, OAuth logins and logs (10 MB rotation, 512 MB cap) live in `~/.cli-proxy-api/proxy`, the Tailscale identity in `~/.cli-proxy-api/tailscale`, and the `quota` container's copy of the management password in `~/.cli-proxy-api/quota` (owner-only). `LOCAL_DIR=…` moves all three.
 - **Config:** `config.yaml` holds 1Password references only. `make local` renders it into `~/.cli-proxy-api/proxy/config.yaml` and restarts the proxy, which overwrites changes made in the management panel. Copy any panel change into `config.yaml` first.
 - **Secrets:** stored in 1Password, item `op://YOUR_VAULT/YOUR_ITEM`:
     - `claude-api-key` is the only client key.
-    - `management-password` is written to the rendered config only as a bcrypt hash.
+    - `management-password` is written to the rendered config only as a bcrypt hash. The `quota` container gets the plain value as a compose secret file.
     - The `codex-api-key` and `r2-*` fields are no longer used.
 - **Routing:** session affinity keeps each conversation on one account to reuse prompt caches, and fails over when an account hits its limit.
 - **Limits and resets:** Claude and Codex accounts each have a 5-hour window, which starts at the first request after the previous one ends, and a weekly window. When an account is rate-limited, the proxy reads the provider's reset time (Claude response headers, Codex `usage_limit_reached` body), skips that account until then, and returns it to rotation by itself. Without a reset time it backs off from 1 second up to 30 minutes. Cooldowns are kept in memory, so after a restart the proxy relearns them from one 429 per exhausted account.
 - **Unused capacity:** whatever a weekly window has left when it resets is lost. `make quota` reads each account's live usage through the management API, with the token substituted on the server, and lists the weekly windows that reset within 24 hours with capacity left.
+- **Use-it-or-lose-it routing:** the `quota` container starts with the proxy (`make local`) and runs `quota -route` at start and then every hour. It raises the priority of each Claude or Codex account whose weekly window resets within 24 hours with capacity left, the sooner the reset the higher, and returns the others to priority 0. The proxy always serves from the highest-priority accounts that are not cooling down, so expiring capacity is used first and the other accounts take over when a boosted one hits its limit. Its decisions are in `make local-logs`.
 - **Codex:** Codex uses its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
 - **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
 
@@ -80,7 +81,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 | `local/serve.json`   | Tailscale HTTPS serve config                                                        |
 | `scripts/local.sh`   | `make local*`: render the config, start and stop, portless, print the addresses     |
 | `scripts/hara-key`   | Keychain-cached keys from 1Password                                                 |
-| `scripts/quota/`     | `make quota` (Go): per-account usage windows and resets via the management API      |
+| `scripts/quota/`     | `make quota` and the `quota` container (Go): usage, resets, use-it-or-lose-it routing |
 | `scripts/backup-*`   | Copy the Codex and Claude Code client configs into `codex/` and `claude/`           |
 | `scripts/lib/`       | Shared shell helpers, including `render_config`                                     |
 | `web/`               | Landing page on hara.sh                                                             |
@@ -101,6 +102,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 
 ## Gotchas
 
+- **Account priorities:** the `quota` container owns the priority of Claude and Codex accounts. A priority set in the management panel is overwritten within the hour; to stop it, run `docker compose -f local/compose.yaml stop quota`.
 - **Availability:** the proxy is up only while this computer is awake, and requests go out through whatever network it is on.
 - **portless LAN mode:** `.local` names exist only in portless LAN mode, which applies to the whole portless proxy. While it is on, every portless app on this computer is `<name>.local` and reachable from the network you are connected to, and portless keeps LAN mode for later starts. To switch back: `portless proxy stop && PORTLESS_LAN=0 portless proxy start`. `make local-down` removes `hara.local` but leaves the portless proxy running for your other apps.
 - **Certificates:** `hara.local` uses portless's own certificate authority, which this computer trusts. Node-based clients such as Claude Code need `NODE_EXTRA_CA_CERTS=~/.portless/ca.pem` (the alias and `make claude` set it). Other devices must trust that file first. The tailnet address has a public certificate and needs nothing.

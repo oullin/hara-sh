@@ -40,3 +40,26 @@ services:
     depends_on:
       - tailscale
     restart: unless-stopped
+
+  # Steers routing toward weekly capacity that would otherwise expire unused (scripts/quota): on
+  # start and then hourly, it raises the priority of each account whose weekly window resets
+  # within 24h with capacity left, and returns the others to the normal priority.
+  quota:
+    build: ../scripts/quota
+    image: cli-proxy-api-quota:local
+    network_mode: service:tailscale
+    command: ["-route", "-every", "1h"]
+    environment:
+      URL: http://localhost:8317
+      MGMT_KEY_FILE: /run/secrets/management-password
+      TZ: Asia/Singapore
+    secrets:
+      - management-password
+    depends_on:
+      - proxy
+    restart: unless-stopped
+
+secrets:
+  # Written by scripts/local.sh from 1Password (owner-only); read by the quota service.
+  management-password:
+    file: ${LOCAL_DIR:?}/quota/management-password

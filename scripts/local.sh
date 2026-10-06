@@ -3,7 +3,7 @@
 # through portless in LAN mode, as https://hara.local on your network.
 #   scripts/local.sh up       render the config from 1Password, start, print the addresses
 #   scripts/local.sh status   print the addresses and the Tailscale login state
-#   scripts/local.sh logs     follow the proxy and Tailscale logs
+#   scripts/local.sh logs     follow the proxy, Tailscale and quota logs
 #   scripts/local.sh down     stop (OAuth logins and the Tailscale identity are kept)
 # Env: LOCAL_DIR (default ~/.cli-proxy-api), LOCAL_NAME (default hara, for <name>.local),
 #      TS_HOSTNAME (default cliproxy),
@@ -26,6 +26,11 @@ render_local_config() {
   render_config "$config"
   chmod 600 "$config"
   log "rendered $config from 1Password"
+}
+
+# The quota service reads the management password from this file (compose secret).
+write_quota_key() {
+  (umask 077 && mkdir -p "$LOCAL_DIR/quota" && secret management-password >"$LOCAL_DIR/quota/management-password")
 }
 
 wait_for_proxy() {
@@ -93,8 +98,10 @@ up() {
   local was_running
   was_running="$(compose ps -q --status running proxy 2>/dev/null || true)"
   render_local_config
+  write_quota_key
 
-  compose up -d --remove-orphans
+  # --build rebuilds the quota image when scripts/quota changed (cached otherwise).
+  compose up -d --build --remove-orphans
   # A running server keeps its old config until restarted.
   [[ -n "$was_running" ]] && compose restart proxy
   wait_for_proxy
