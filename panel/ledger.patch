@@ -1,0 +1,1731 @@
+diff --git a/src/features/quota/QuotaPage.module.scss b/src/features/quota/QuotaPage.module.scss
+index 053737d..3e4b1ec 100644
+--- a/src/features/quota/QuotaPage.module.scss
++++ b/src/features/quota/QuotaPage.module.scss
+@@ -36,6 +36,11 @@
+   }
+ }
+ 
++.viewMode {
++  flex: 0 0 auto;
++  width: 132px;
++}
++
+ .toolbar {
+   display: flex;
+   align-items: center;
+diff --git a/src/features/quota/QuotaPage.tsx b/src/features/quota/QuotaPage.tsx
+index 1bd1570..b74715c 100644
+--- a/src/features/quota/QuotaPage.tsx
++++ b/src/features/quota/QuotaPage.tsx
+@@ -26,13 +26,16 @@ import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
+ import { QuotaHeader } from './components/QuotaHeader';
+ import { QuotaCard } from './components/QuotaCard';
+ import { QuotaTimeline } from './components/QuotaTimeline';
++import { QuotaLedger } from './components/QuotaLedger';
+ import {
+   CARD_ENTRANCE_BUDGET_MS,
+   QUOTA_PAGE_SIZE,
+   QUOTA_SORT_MODES,
+   QUOTA_TAB_ORDER,
++  QUOTA_VIEW_MODES,
+   type QuotaSortMode,
+   type QuotaTabId,
++  type QuotaViewMode,
+ } from './constants';
+ import {
+   buildTabCounts,
+@@ -74,6 +77,9 @@ export function QuotaPage() {
+   const [sortMode, setSortMode] = useState<QuotaSortMode>(
+     () => readQuotaUiState()?.sortMode ?? 'default'
+   );
++  const [viewMode, setViewMode] = useState<QuotaViewMode>(
++    () => readQuotaUiState()?.viewMode ?? 'ledger'
++  );
+   const [page, setPage] = useState(1);
+   const [search, setSearch] = useState('');
+   const searchInputRef = useRef<HTMLInputElement>(null);
+@@ -199,6 +205,16 @@ export function QuotaPage() {
+     writeQuotaUiState({ sortMode: next as QuotaSortMode });
+   }, []);
+ 
++  const handleViewModeChange = useCallback((next: string) => {
++    setViewMode(next as QuotaViewMode);
++    writeQuotaUiState({ viewMode: next as QuotaViewMode });
++  }, []);
++
++  const viewOptions = useMemo(
++    () => QUOTA_VIEW_MODES.map((mode) => ({ value: mode, label: t(`quota_ledger.view_${mode}`) })),
++    [t]
++  );
++
+   const sortOptions = useMemo(
+     () =>
+       QUOTA_SORT_MODES.map((mode) => ({ value: mode, label: t(`quota_management.sort_${mode}`) })),
+@@ -333,6 +349,15 @@ export function QuotaPage() {
+             resolvedTheme={resolvedTheme}
+             onChange={handleTabChange}
+           />
++          <div className={styles.viewMode}>
++            <Select
++              value={viewMode}
++              options={viewOptions}
++              onChange={handleViewModeChange}
++              ariaLabel={t('quota_ledger.view_label')}
++              size="sm"
++            />
++          </div>
+         </div>
+ 
+         <div className={styles.toolbar}>
+@@ -413,6 +438,16 @@ export function QuotaPage() {
+               )
+             }
+           />
++        ) : viewMode === 'ledger' ? (
++          <QuotaLedger
++            entries={sortedEntries}
++            pageEntries={pageItems}
++            quotaFor={getQuota}
++            resolvedTheme={resolvedTheme}
++            canRefresh={canUseActions}
++            resettingName={resettingQuotaName}
++            onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
++          />
+         ) : (
+           <div className={styles.grid}>
+             {pageItems.map((entry, index) => (
+diff --git a/src/features/quota/components/QuotaLedger.module.scss b/src/features/quota/components/QuotaLedger.module.scss
+new file mode 100644
+index 0000000..05276b1
+--- /dev/null
++++ b/src/features/quota/components/QuotaLedger.module.scss
+@@ -0,0 +1,486 @@
++@use '../../../styles/mixins' as *;
++
++/* ============================================================
++ * Ledger view: provider totals strip + per-credential rows.
++ * Telemetry is mono + tabular-nums, same as the cards.
++ * ============================================================ */
++
++.ledger {
++  display: flex;
++  flex-direction: column;
++  gap: 28px;
++  min-width: 0;
++}
++
++/* ---------- tones (shared by segments and meters) ---------- */
++
++.toneHigh {
++  background: var(--viz-success);
++}
++
++.toneMedium {
++  background: var(--quota-medium-color);
++}
++
++.toneLow {
++  background: var(--viz-failure);
++}
++
++.toneNone {
++  background: transparent;
++}
++
++/* ---------- summary strip ---------- */
++
++.summaryStrip {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
++  border: 1px solid var(--border-color);
++  border-radius: 14px;
++  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
++  overflow: hidden;
++}
++
++.summaryCard {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  min-width: 0;
++  padding: 18px 20px 16px;
++  /* Hairline dividers that still work when the grid wraps. */
++  box-shadow:
++    1px 0 0 0 var(--border-color),
++    0 1px 0 0 var(--border-color);
++}
++
++.summaryHead {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  min-width: 0;
++  margin-bottom: 8px;
++}
++
++.providerIcon {
++  flex-shrink: 0;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  width: 22px;
++  height: 22px;
++  border-radius: 6px;
++
++  img {
++    width: 16px;
++    height: 16px;
++    object-fit: contain;
++    display: block;
++  }
++
++  span {
++    font-size: 11px;
++    font-weight: 700;
++    color: var(--text-secondary);
++  }
++}
++
++.summaryName {
++  flex: 1 1 auto;
++  min-width: 0;
++  font-size: 15px;
++  font-weight: 600;
++  color: var(--text-primary);
++  @include text-ellipsis;
++}
++
++.summaryCount {
++  flex-shrink: 0;
++  font-size: 13px;
++  color: var(--text-tertiary);
++}
++
++.summaryLabel {
++  font-size: 13px;
++  color: var(--text-secondary);
++  @include text-ellipsis;
++}
++
++.summaryFigure {
++  display: flex;
++  align-items: baseline;
++  gap: 8px;
++  min-width: 0;
++}
++
++.summaryTotal {
++  font-size: 28px;
++  font-weight: 650;
++  line-height: 1.15;
++  letter-spacing: -0.01em;
++  color: var(--text-primary);
++  font-variant-numeric: tabular-nums;
++}
++
++.summaryCapacity {
++  font-size: 13px;
++  color: var(--text-tertiary);
++  font-variant-numeric: tabular-nums;
++}
++
++.segments {
++  display: flex;
++  gap: 6px;
++  margin: 6px 0 4px;
++}
++
++.segment {
++  position: relative;
++  flex: 1 1 0;
++  min-width: 0;
++  height: 4px;
++  border-radius: $radius-full;
++  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
++  overflow: hidden;
++}
++
++.segmentFill {
++  position: absolute;
++  inset: 0 auto 0 0;
++  border-radius: inherit;
++  transition: width 360ms var(--ease-out-strong, ease);
++}
++
++.summaryMore {
++  display: flex;
++  align-items: center;
++  flex-wrap: wrap;
++  gap: 6px 14px;
++  margin-top: 10px;
++  padding-top: 12px;
++  border-top: 1px solid var(--border-color);
++}
++
++.summaryMoreRow {
++  display: flex;
++  align-items: baseline;
++  gap: 8px;
++  flex: 1 1 auto;
++  min-width: 0;
++}
++
++.summaryMoreLabel {
++  font-size: 13px;
++  color: var(--text-secondary);
++  @include text-ellipsis;
++}
++
++.summaryMoreValue {
++  font-size: 13px;
++  font-weight: 600;
++  color: var(--text-primary);
++  font-variant-numeric: tabular-nums;
++}
++
++.summaryToggle {
++  @include button-reset;
++  margin-left: auto;
++  font-size: 13px;
++  color: var(--text-tertiary);
++  cursor: pointer;
++
++  &:hover {
++    color: var(--text-primary);
++  }
++
++  &:focus-visible {
++    outline: 2px solid var(--primary-color);
++    outline-offset: 2px;
++    border-radius: 4px;
++  }
++}
++
++/* ---------- reset line ---------- */
++
++.reset {
++  display: inline-flex;
++  align-items: baseline;
++  gap: 0;
++  min-width: 0;
++  font-size: 12.5px;
++  color: var(--text-tertiary);
++  font-variant-numeric: tabular-nums;
++  white-space: nowrap;
++  overflow: hidden;
++  text-overflow: ellipsis;
++}
++
++.resetRelative {
++  color: var(--text-secondary);
++}
++
++.resetAbsolute::before {
++  content: '·';
++  margin: 0 6px;
++}
++
++/* ---------- groups ---------- */
++
++.group {
++  display: flex;
++  flex-direction: column;
++  min-width: 0;
++}
++
++.groupTitle {
++  display: flex;
++  align-items: baseline;
++  gap: 8px;
++  margin: 0 0 6px;
++  font-size: 15px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.groupCount {
++  font-size: 13px;
++  font-weight: 400;
++  color: var(--text-tertiary);
++  font-variant-numeric: tabular-nums;
++}
++
++.rows {
++  display: flex;
++  flex-direction: column;
++}
++
++.row {
++  display: grid;
++  grid-template-columns: minmax(180px, 1.3fr) minmax(0, 3fr) 136px;
++  align-items: center;
++  gap: 16px 28px;
++  padding: 16px 0;
++  border-bottom: 1px solid var(--border-color);
++
++  &:last-child {
++    border-bottom: 0;
++  }
++
++  @media (max-width: #{$breakpoint-tablet}) {
++    grid-template-columns: minmax(0, 1fr) auto;
++
++    .cells {
++      grid-column: 1 / -1;
++      grid-row: 2;
++    }
++  }
++}
++
++.identity {
++  display: flex;
++  flex-direction: column;
++  gap: 4px;
++  min-width: 0;
++}
++
++.fileName {
++  font-family: $font-mono;
++  font-size: 13.5px;
++  font-weight: 600;
++  color: var(--text-primary);
++  @include text-ellipsis;
++}
++
++.plan {
++  font-size: 12.5px;
++  color: var(--text-tertiary);
++}
++
++.cells {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 12px 24px;
++  min-width: 0;
++
++  @include mobile {
++    grid-template-columns: minmax(0, 1fr);
++  }
++}
++
++.cell {
++  display: flex;
++  flex-direction: column;
++  gap: 7px;
++  min-width: 0;
++}
++
++.cellHead {
++  display: flex;
++  align-items: baseline;
++  justify-content: space-between;
++  gap: 8px;
++  min-width: 0;
++}
++
++.cellLabel {
++  font-size: 13px;
++  color: var(--text-secondary);
++  @include text-ellipsis;
++}
++
++.cellPercent {
++  flex-shrink: 0;
++  font-size: 14px;
++  font-weight: 650;
++  color: var(--text-primary);
++  font-variant-numeric: tabular-nums;
++}
++
++.meter {
++  position: relative;
++  height: 4px;
++  border-radius: $radius-full;
++  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
++  overflow: hidden;
++}
++
++.meterFill {
++  position: absolute;
++  inset: 0 auto 0 0;
++  border-radius: inherit;
++  transition: width 360ms var(--ease-out-strong, ease);
++}
++
++.cellSkeleton {
++  display: flex;
++  flex-direction: column;
++  gap: 9px;
++
++  span {
++    display: block;
++    height: 10px;
++    border-radius: 4px;
++    background: color-mix(in srgb, var(--text-primary) 8%, transparent);
++    animation: ledger-pulse 1.2s ease-in-out infinite;
++  }
++
++  span:nth-child(1) {
++    width: 70%;
++  }
++
++  span:nth-child(2) {
++    height: 4px;
++  }
++
++  span:nth-child(3) {
++    width: 55%;
++  }
++}
++
++@keyframes ledger-pulse {
++  50% {
++    opacity: 0.45;
++  }
++}
++
++.idle {
++  @include button-reset;
++  grid-column: 1 / -1;
++  justify-self: start;
++  font-size: 13px;
++  color: var(--text-tertiary);
++  cursor: pointer;
++
++  &:hover:not(:disabled) {
++    color: var(--text-primary);
++  }
++
++  &:disabled {
++    cursor: not-allowed;
++  }
++
++  &:focus-visible {
++    outline: 2px solid var(--primary-color);
++    outline-offset: 2px;
++    border-radius: 4px;
++  }
++}
++
++.error,
++.empty {
++  grid-column: 1 / -1;
++  font-size: 13px;
++  color: var(--text-tertiary);
++}
++
++.error {
++  color: var(--error-color);
++}
++
++.actions {
++  display: flex;
++  justify-content: flex-end;
++  min-width: 0;
++}
++
++.refresh {
++  @include button-reset;
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  padding: 6px 8px;
++  border-radius: 8px;
++  font-size: 13px;
++  color: var(--text-tertiary);
++  white-space: nowrap;
++  cursor: pointer;
++  transition: color var(--dur-hover, 200ms) ease;
++
++  &:hover:not(:disabled) {
++    color: var(--text-primary);
++    background: var(--bg-hover);
++  }
++
++  &:disabled {
++    opacity: 0.5;
++    cursor: not-allowed;
++  }
++
++  &:focus-visible {
++    outline: 2px solid var(--primary-color);
++    outline-offset: 1px;
++  }
++}
++
++.spinning {
++  animation: ledger-spin 0.9s linear infinite;
++}
++
++@keyframes ledger-spin {
++  to {
++    transform: rotate(360deg);
++  }
++}
++
++.srOnly {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  padding: 0;
++  margin: -1px;
++  overflow: hidden;
++  clip: rect(0, 0, 0, 0);
++  white-space: nowrap;
++  border: 0;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .segmentFill,
++  .meterFill {
++    transition: none;
++  }
++
++  .spinning,
++  .cellSkeleton span {
++    animation: none;
++  }
++}
+diff --git a/src/features/quota/components/QuotaLedger.tsx b/src/features/quota/components/QuotaLedger.tsx
+new file mode 100644
+index 0000000..62b6c92
+--- /dev/null
++++ b/src/features/quota/components/QuotaLedger.tsx
+@@ -0,0 +1,412 @@
++/**
++ * Ledger view: provider totals on top, one row per credential below.
++ *
++ * The card grid answers "what does this credential look like"; the ledger
++ * answers "how much is left across the pool, and where". Credentials line up
++ * in columns, binding window first, so a glance down a column compares them.
++ * Loading stays click-to-fetch, same as the cards.
++ */
++
++import { Fragment, useMemo, useState } from 'react';
++import { useTranslation } from 'react-i18next';
++import type { TFunction } from 'i18next';
++import { IconRefreshCw } from '@/components/ui/icons';
++import { useNow } from '@/hooks/useNow';
++import type { ResolvedTheme } from '@/types';
++import { formatInstantShort, formatRelativeInstant, resolveQuotaErrorMessage } from '@/utils/quota';
++import { getQuotaCacheKey, getQuotaDisplayName } from '@/utils/quota/identity';
++import {
++  getAuthFileIcon,
++  getThemeSurfaceIconBackground,
++  getTypeLabel,
++  isThemeSurfaceIconProvider,
++} from '@/features/authFiles/constants';
++import { QUOTA_TAB_ORDER } from '../constants';
++import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
++import {
++  buildLedgerWindows,
++  ledgerPlanLabel,
++  orderRowWindows,
++  summarizeProvider,
++  type LedgerProviderSummary,
++  type LedgerSummaryWindow,
++  type LedgerWindow,
++} from '../ledgerModel';
++import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
++import { QUOTA_PROGRESS_HIGH_THRESHOLD, QUOTA_PROGRESS_MEDIUM_THRESHOLD } from './QuotaMeter';
++import type { QuotaProviderType } from '../providers/types';
++import styles from './QuotaLedger.module.scss';
++
++/** Windows shown per row; anything past this is in the card view. */
++const ROW_WINDOW_LIMIT = 3;
++
++export type QuotaLedgerProps = {
++  /** Every credential in the current tab and search: the totals cover all of them. */
++  entries: QuotaFileEntry[];
++  /** The current page: the rows. */
++  pageEntries: QuotaFileEntry[];
++  quotaFor: (entry: QuotaFileEntry) => QuotaCardState | undefined;
++  resolvedTheme: ResolvedTheme;
++  canRefresh: boolean;
++  resettingName: string | null;
++  onRefresh: (entry: QuotaFileEntry) => void;
++};
++
++const toneClass = (percent: number | null): string => {
++  if (percent === null) return styles.toneNone;
++  if (percent >= QUOTA_PROGRESS_HIGH_THRESHOLD) return styles.toneHigh;
++  if (percent >= QUOTA_PROGRESS_MEDIUM_THRESHOLD) return styles.toneMedium;
++  return styles.toneLow;
++};
++
++const formatPercent = (value: number | null) => (value === null ? '--' : `${Math.round(value)}%`);
++
++function ResetLine({
++  atMs,
++  now,
++  locale,
++  t,
++}: {
++  atMs: number | null;
++  now: number;
++  locale?: string;
++  t: TFunction;
++}) {
++  if (atMs === null || atMs <= now) {
++    return <span className={styles.reset}>{t('quota_ledger.no_reset')}</span>;
++  }
++  return (
++    <span className={styles.reset}>
++      <span className={styles.resetRelative}>{formatRelativeInstant(atMs, now, locale)}</span>
++      <span className={styles.resetAbsolute}>{formatInstantShort(atMs)}</span>
++    </span>
++  );
++}
++
++function ProviderIcon({
++  type,
++  resolvedTheme,
++  t,
++}: {
++  type: QuotaProviderType;
++  resolvedTheme: ResolvedTheme;
++  t: TFunction;
++}) {
++  const src = getAuthFileIcon(type, resolvedTheme);
++  const label = getTypeLabel(t, type);
++  return (
++    <span
++      className={styles.providerIcon}
++      style={
++        isThemeSurfaceIconProvider(type)
++          ? { background: getThemeSurfaceIconBackground(resolvedTheme) }
++          : undefined
++      }
++    >
++      {src ? <img src={src} alt="" /> : <span>{label.slice(0, 1).toUpperCase()}</span>}
++    </span>
++  );
++}
++
++function SummaryCard({
++  summary,
++  resolvedTheme,
++  now,
++}: {
++  summary: LedgerProviderSummary;
++  resolvedTheme: ResolvedTheme;
++  now: number;
++}) {
++  const { t, i18n } = useTranslation();
++  const [expanded, setExpanded] = useState(false);
++  const [lead, ...rest] = summary.windows;
++  const shown = expanded ? rest : rest.slice(0, 1);
++  const hidden = rest.length - 1;
++
++  const capacityLabel = t('quota_ledger.of_capacity', { capacity: summary.credentials * 100 });
++
++  return (
++    <article className={styles.summaryCard}>
++      <header className={styles.summaryHead}>
++        <ProviderIcon type={summary.type} resolvedTheme={resolvedTheme} t={t} />
++        <span className={styles.summaryName}>{getTypeLabel(t, summary.type)}</span>
++        <span className={styles.summaryCount}>
++          {t('quota_ledger.credentials', { count: summary.credentials })}
++        </span>
++      </header>
++
++      {lead ? (
++        <>
++          <div className={styles.summaryLabel}>{lead.label}</div>
++          <div className={styles.summaryFigure}>
++            <span className={styles.summaryTotal}>{formatPercent(lead.total)}</span>
++            <span className={styles.summaryCapacity}>{capacityLabel}</span>
++          </div>
++          <SegmentBar window={lead} />
++          <ResetLine atMs={lead.nextResetAtMs} now={now} locale={i18n.resolvedLanguage} t={t} />
++        </>
++      ) : (
++        <>
++          <div className={styles.summaryLabel}>{t('quota_ledger.not_loaded')}</div>
++          <div className={styles.summaryFigure}>
++            <span className={styles.summaryTotal}>--</span>
++            <span className={styles.summaryCapacity}>{capacityLabel}</span>
++          </div>
++          <SegmentBar window={null} credentials={summary.credentials} />
++        </>
++      )}
++
++      {rest.length > 0 && (
++        <div className={styles.summaryMore}>
++          {shown.map((window) => (
++            <div key={window.key} className={styles.summaryMoreRow}>
++              <span className={styles.summaryMoreLabel}>{window.label}</span>
++              <span className={styles.summaryMoreValue}>{formatPercent(window.total)}</span>
++            </div>
++          ))}
++          {hidden > 0 && (
++            <button
++              type="button"
++              className={styles.summaryToggle}
++              aria-expanded={expanded}
++              onClick={() => setExpanded((value) => !value)}
++            >
++              {expanded ? t('quota_ledger.hide') : t('quota_ledger.show')}
++            </button>
++          )}
++        </div>
++      )}
++    </article>
++  );
++}
++
++function SegmentBar({
++  window,
++  credentials = 0,
++}: {
++  window: LedgerSummaryWindow | null;
++  credentials?: number;
++}) {
++  const segments = window ? window.segments : Array.from({ length: credentials }, () => null);
++  return (
++    <div className={styles.segments} aria-hidden="true">
++      {segments.map((value, index) => (
++        <span key={index} className={styles.segment}>
++          <span
++            className={`${styles.segmentFill} ${toneClass(value)}`}
++            style={{ width: `${value ?? 0}%` }}
++          />
++        </span>
++      ))}
++    </div>
++  );
++}
++
++function WindowCell({
++  window,
++  now,
++  locale,
++  t,
++}: {
++  window: LedgerWindow;
++  now: number;
++  locale?: string;
++  t: TFunction;
++}) {
++  return (
++    <div className={styles.cell}>
++      <div className={styles.cellHead}>
++        <span className={styles.cellLabel} title={window.label}>
++          {window.label}
++        </span>
++        <span className={styles.cellPercent}>{formatPercent(window.remaining)}</span>
++      </div>
++      <div
++        className={styles.meter}
++        role={window.remaining === null ? undefined : 'meter'}
++        aria-label={window.label}
++        aria-valuemin={window.remaining === null ? undefined : 0}
++        aria-valuemax={window.remaining === null ? undefined : 100}
++        aria-valuenow={window.remaining ?? undefined}
++      >
++        <span
++          className={`${styles.meterFill} ${toneClass(window.remaining)}`}
++          style={{ width: `${window.remaining ?? 0}%` }}
++        />
++      </div>
++      <ResetLine atMs={window.resetAtMs} now={now} locale={locale} t={t} />
++    </div>
++  );
++}
++
++export function QuotaLedger({
++  entries,
++  pageEntries,
++  quotaFor,
++  resolvedTheme,
++  canRefresh,
++  resettingName,
++  onRefresh,
++}: QuotaLedgerProps) {
++  const { t, i18n } = useTranslation();
++  const now = useNow();
++  const locale = i18n.resolvedLanguage;
++
++  const summaries = useMemo(() => {
++    const byType = new Map<QuotaProviderType, LedgerWindow[][]>();
++    entries.forEach((entry) => {
++      const list = byType.get(entry.type) ?? [];
++      list.push(buildLedgerWindows(entry.type, quotaFor(entry), t));
++      byType.set(entry.type, list);
++    });
++    return QUOTA_TAB_ORDER.filter((type) => byType.has(type)).map((type) =>
++      summarizeProvider(type, byType.get(type) ?? [], now)
++    );
++  }, [entries, quotaFor, t, now]);
++
++  const leadKeyByType = useMemo(
++    () =>
++      new Map<QuotaProviderType, string | null>(
++        summaries.map((summary) => [summary.type, summary.windows[0]?.key ?? null])
++      ),
++    [summaries]
++  );
++
++  // Rows group by provider in tab order; within a group the incoming order
++  // (default or soonest-recovery) is kept.
++  const groups = useMemo(() => {
++    const byType = new Map<QuotaProviderType, QuotaFileEntry[]>();
++    pageEntries.forEach((entry) => {
++      const list = byType.get(entry.type) ?? [];
++      list.push(entry);
++      byType.set(entry.type, list);
++    });
++    return QUOTA_TAB_ORDER.filter((type) => byType.has(type)).map((type) => ({
++      type,
++      rows: byType.get(type) ?? [],
++      total: entries.filter((entry) => entry.type === type).length,
++    }));
++  }, [entries, pageEntries]);
++
++  return (
++    <div className={styles.ledger}>
++      {summaries.length > 0 && (
++        <section className={styles.summaryStrip} aria-label={t('quota_ledger.summary_label')}>
++          {summaries.map((summary) => (
++            <SummaryCard
++              key={summary.type}
++              summary={summary}
++              resolvedTheme={resolvedTheme}
++              now={now}
++            />
++          ))}
++        </section>
++      )}
++
++      {groups.map((group) => (
++        <section key={group.type} className={styles.group}>
++          <h3 className={styles.groupTitle}>
++            {getTypeLabel(t, group.type)}
++            <span className={styles.groupCount}>{group.total}</span>
++          </h3>
++          <div className={styles.rows}>
++            {group.rows.map((entry) => {
++              const quota = quotaFor(entry);
++              const status = quota?.status ?? 'idle';
++              const adapter = QUOTA_ADAPTERS[entry.type];
++              const name = getQuotaDisplayName(entry.file);
++              const cacheKey = getQuotaCacheKey(entry.file);
++              const resetting = resettingName === cacheKey;
++              const rowCanRefresh = canRefresh && !entry.file.disabled;
++              const windows = orderRowWindows(
++                buildLedgerWindows(entry.type, quota, t),
++                leadKeyByType.get(entry.type) ?? null
++              ).slice(0, ROW_WINDOW_LIMIT);
++              const plan = ledgerPlanLabel(entry.type, quota, t);
++
++              return (
++                <div key={`${entry.type}:${cacheKey}`} className={styles.row}>
++                  <div className={styles.identity}>
++                    <span className={styles.fileName} title={name}>
++                      {name}
++                    </span>
++                    {plan && <span className={styles.plan}>{plan}</span>}
++                  </div>
++
++                  <div className={styles.cells}>
++                    {status === 'idle' ? (
++                      <button
++                        type="button"
++                        className={styles.idle}
++                        onClick={() => onRefresh(entry)}
++                        disabled={!rowCanRefresh}
++                      >
++                        {t(`${adapter.i18nPrefix}.idle`)}
++                      </button>
++                    ) : status === 'loading' ? (
++                      <Fragment>
++                        <span className={styles.srOnly}>{t(`${adapter.i18nPrefix}.loading`)}</span>
++                        {[0, 1, 2].map((index) => (
++                          <div key={index} className={styles.cellSkeleton} aria-hidden="true">
++                            <span />
++                            <span />
++                            <span />
++                          </div>
++                        ))}
++                      </Fragment>
++                    ) : status === 'error' ? (
++                      <div className={styles.error} role="alert">
++                        {t(`${adapter.i18nPrefix}.load_failed`, {
++                          message: resolveQuotaErrorMessage(
++                            t,
++                            quota?.errorStatus,
++                            quota?.error || t('common.unknown_error')
++                          ),
++                        })}
++                      </div>
++                    ) : windows.length === 0 ? (
++                      <div className={styles.empty}>{t('quota_ledger.no_windows')}</div>
++                    ) : (
++                      windows.map((window) => (
++                        <WindowCell
++                          key={window.key}
++                          window={window}
++                          now={now}
++                          locale={locale}
++                          t={t}
++                        />
++                      ))
++                    )}
++                  </div>
++
++                  <div className={styles.actions}>
++                    {status !== 'idle' && (
++                      <button
++                        type="button"
++                        className={styles.refresh}
++                        onClick={() => onRefresh(entry)}
++                        disabled={isQuotaRefreshDisabled(
++                          rowCanRefresh,
++                          status === 'loading',
++                          resetting
++                        )}
++                        title={t('auth_files.quota_refresh_hint')}
++                      >
++                        <IconRefreshCw
++                          size={13}
++                          aria-hidden="true"
++                          className={status === 'loading' ? styles.spinning : undefined}
++                        />
++                        {t('quota_ledger.refresh')}
++                      </button>
++                    )}
++                  </div>
++                </div>
++              );
++            })}
++          </div>
++        </section>
++      ))}
++    </div>
++  );
++}
+diff --git a/src/features/quota/constants.ts b/src/features/quota/constants.ts
+index b5252af..97dad29 100644
+--- a/src/features/quota/constants.ts
++++ b/src/features/quota/constants.ts
+@@ -21,5 +21,10 @@ export const QUOTA_SORT_MODES = ['default', 'soonest'] as const;
+ 
+ export type QuotaSortMode = (typeof QUOTA_SORT_MODES)[number];
+ 
++/** Page layout: ledger = provider totals + credential rows; cards = the card grid. */
++export const QUOTA_VIEW_MODES = ['ledger', 'cards'] as const;
++
++export type QuotaViewMode = (typeof QUOTA_VIEW_MODES)[number];
++
+ /** 与 useRevealGroup 的 GROUP_MAX_TOTAL 一致：卡片级联总预算 360ms。 */
+ export const CARD_ENTRANCE_BUDGET_MS = 360;
+diff --git a/src/features/quota/ledgerModel.ts b/src/features/quota/ledgerModel.ts
+new file mode 100644
+index 0000000..d2bee2b
+--- /dev/null
++++ b/src/features/quota/ledgerModel.ts
+@@ -0,0 +1,314 @@
++/**
++ * Ledger view model: every provider's quota flattened to comparable windows.
++ *
++ * The card grid renders each provider in its own shape. The ledger instead
++ * lines credentials up in columns and sums them per provider, so it needs one
++ * shape for all of them: a labelled window with a remaining percent and a reset
++ * instant. React-free; `t` and `now` are injected so every rule is testable.
++ */
++
++import type { TFunction } from 'i18next';
++import { normalizePlanType, PREMIUM_CODEX_PLAN_TYPES, parseIsoToMs } from '@/utils/quota';
++import type { QuotaProviderType } from './providers/types';
++
++/** One quota window of one credential. */
++export interface LedgerWindow {
++  /** Stable across credentials of a provider, so windows can be summed. */
++  key: string;
++  label: string;
++  /** Remaining percent, 0..100; null when the provider reported no usage. */
++  remaining: number | null;
++  resetAtMs: number | null;
++}
++
++/** A window summed over every credential of a provider. */
++export interface LedgerSummaryWindow {
++  key: string;
++  label: string;
++  /** Sum of remaining percent over the credentials reporting this window. */
++  total: number | null;
++  /** 100 per credential of the provider, loaded or not. */
++  capacity: number;
++  /** One value per credential, in credential order; null = not reported. */
++  segments: (number | null)[];
++  /** Soonest upcoming reset across credentials. */
++  nextResetAtMs: number | null;
++}
++
++export interface LedgerProviderSummary {
++  type: QuotaProviderType;
++  credentials: number;
++  /** Ordered tightest first: the first window is the binding limit. */
++  windows: LedgerSummaryWindow[];
++}
++
++type QuotaLike = { status?: string } | undefined;
++
++const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
++
++const remainingFromUsed = (used: unknown): number | null =>
++  typeof used === 'number' && Number.isFinite(used) ? clampPercent(100 - used) : null;
++
++const finiteMs = (value: unknown): number | null =>
++  typeof value === 'number' && Number.isFinite(value) ? value : null;
++
++interface UsedWindowLike {
++  id: string;
++  label?: string;
++  labelKey?: string;
++  labelParams?: Record<string, string | number>;
++  usedPercent?: number | null;
++  resetAtMs?: number | null;
++}
++
++/**
++ * Normalize one credential's quota state.
++ *
++ * Returns an empty list until the quota has loaded successfully: the ledger
++ * shows idle, loading and failed credentials by status, not by windows.
++ */
++export function buildLedgerWindows(
++  provider: QuotaProviderType,
++  quota: QuotaLike,
++  t: TFunction
++): LedgerWindow[] {
++  if (!quota || quota.status !== 'success') return [];
++
++  if (provider === 'claude' || provider === 'codex') {
++    const windows = (quota as { windows?: UsedWindowLike[] }).windows ?? [];
++    return windows.map((window) => ({
++      key: window.id,
++      label: window.labelKey
++        ? String(t(window.labelKey, window.labelParams ?? {}))
++        : (window.label ?? window.id),
++      remaining: remainingFromUsed(window.usedPercent),
++      resetAtMs: finiteMs(window.resetAtMs),
++    }));
++  }
++
++  if (provider === 'devin') {
++    const windows =
++      (
++        quota as {
++          windows?: { id: string; remainingPercent: number | null; resetAtMs: number | null }[];
++        }
++      ).windows ?? [];
++    return windows.map((window) => ({
++      key: window.id,
++      label: String(t(`devin_quota.${window.id}`)),
++      remaining:
++        typeof window.remainingPercent === 'number' ? clampPercent(window.remainingPercent) : null,
++      resetAtMs: finiteMs(window.resetAtMs),
++    }));
++  }
++
++  if (provider === 'xai') {
++    const billing = (
++      quota as {
++        billing?: {
++          periodType?: string;
++          usagePercent?: number | null;
++          resetAtMs?: number | null;
++          billingPeriodEnd?: string;
++        } | null;
++      }
++    ).billing;
++    if (!billing) return [];
++    const weekly = billing.periodType === 'weekly';
++    return [
++      {
++        key: weekly ? 'weekly' : 'monthly',
++        label: String(t(weekly ? 'xai_quota.weekly_limit' : 'xai_quota.monthly_credits')),
++        remaining: remainingFromUsed(billing.usagePercent),
++        resetAtMs: finiteMs(billing.resetAtMs) ?? parseIsoToMs(billing.billingPeriodEnd),
++      },
++    ];
++  }
++
++  if (provider === 'antigravity') {
++    const groups =
++      (
++        quota as {
++          groups?: {
++            buckets?: {
++              id: string;
++              label: string;
++              remainingFraction?: number | null;
++              resetAtMs?: number | null;
++            }[];
++          }[];
++        }
++      ).groups ?? [];
++    return groups
++      .flatMap((group) => group.buckets ?? [])
++      .map((bucket) => ({
++        key: bucket.id,
++        label: bucket.label,
++        remaining:
++          typeof bucket.remainingFraction === 'number'
++            ? clampPercent(Math.round(bucket.remainingFraction * 100))
++            : null,
++        resetAtMs: finiteMs(bucket.resetAtMs),
++      }));
++  }
++
++  if (provider === 'kimi') {
++    const rows =
++      (
++        quota as {
++          rows?: {
++            id: string;
++            label?: string;
++            labelKey?: string;
++            labelParams?: Record<string, string | number>;
++            used: number;
++            limit: number;
++            resetAtMs?: number | null;
++          }[];
++        }
++      ).rows ?? [];
++    return rows.map((row) => ({
++      key: row.id,
++      label: row.labelKey ? String(t(row.labelKey, row.labelParams ?? {})) : (row.label ?? row.id),
++      remaining:
++        row.limit > 0 ? clampPercent(Math.round(((row.limit - row.used) / row.limit) * 100)) : null,
++      resetAtMs: finiteMs(row.resetAtMs),
++    }));
++  }
++
++  if (provider === 'meta') {
++    const windows =
++      (
++        quota as {
++          data?: {
++            windows?: {
++              id: string;
++              usedPercent: number | null;
++              resetAt?: number;
++              durationMinutes?: number;
++            }[];
++          };
++        }
++      ).data?.windows ?? [];
++    return windows.map((window) => ({
++      key: window.id,
++      label:
++        window.id === 'window' && typeof window.durationMinutes === 'number'
++          ? String(t('meta_quota.window_duration', { minutes: window.durationMinutes }))
++          : String(t(`meta_quota.${window.id}`)),
++      remaining: remainingFromUsed(window.usedPercent),
++      resetAtMs: typeof window.resetAt === 'number' ? window.resetAt * 1000 : null,
++    }));
++  }
++
++  return [];
++}
++
++/** Plan name shown under the credential, when the provider reports one. */
++export function ledgerPlanLabel(
++  provider: QuotaProviderType,
++  quota: QuotaLike,
++  t: TFunction
++): string | null {
++  if (!quota || quota.status !== 'success') return null;
++
++  if (provider === 'claude') {
++    const planType = (quota as { planType?: string | null }).planType;
++    return planType ? String(t(`claude_quota.${planType}`)) : null;
++  }
++
++  if (provider === 'codex') {
++    const raw = (quota as { planType?: string | null }).planType;
++    const normalized = normalizePlanType(raw);
++    if (!normalized) return null;
++    if (normalized === 'self_serve_business_prolite') {
++      return String(t('codex_quota.plan_business_premium'));
++    }
++    if (normalized === 'pro') return String(t('codex_quota.plan_pro'));
++    if (PREMIUM_CODEX_PLAN_TYPES.has(normalized)) return String(t('codex_quota.plan_prolite'));
++    if (['plus', 'team', 'free'].includes(normalized)) {
++      return String(t(`codex_quota.plan_${normalized}`));
++    }
++    return raw || normalized;
++  }
++
++  if (provider === 'xai') {
++    const label = (quota as { billing?: { planLabel?: string } | null }).billing?.planLabel;
++    return label ?? null;
++  }
++
++  return null;
++}
++
++/**
++ * Order one credential's windows for its row: the provider's binding window
++ * first, the rest in the order the provider reported them.
++ */
++export function orderRowWindows(windows: LedgerWindow[], leadKey: string | null): LedgerWindow[] {
++  if (!leadKey) return windows;
++  const lead = windows.filter((window) => window.key === leadKey);
++  return [...lead, ...windows.filter((window) => window.key !== leadKey)];
++}
++
++/**
++ * Sum every window across a provider's credentials.
++ *
++ * `windowsPerCredential` has one entry per credential (empty when not loaded),
++ * so the capacity counts every credential and an unloaded one shows as an
++ * empty segment rather than silently shrinking the denominator.
++ */
++export function summarizeProvider(
++  type: QuotaProviderType,
++  windowsPerCredential: LedgerWindow[][],
++  now: number
++): LedgerProviderSummary {
++  const credentials = windowsPerCredential.length;
++  const order: string[] = [];
++  const labels = new Map<string, string>();
++
++  windowsPerCredential.forEach((windows) =>
++    windows.forEach((window) => {
++      if (!labels.has(window.key)) {
++        labels.set(window.key, window.label);
++        order.push(window.key);
++      }
++    })
++  );
++
++  const windows = order.map((key): LedgerSummaryWindow => {
++    let total: number | null = null;
++    let nextResetAtMs: number | null = null;
++    const segments = windowsPerCredential.map((list) => {
++      const window = list.find((candidate) => candidate.key === key);
++      if (!window) return null;
++      if (window.remaining !== null) total = (total ?? 0) + window.remaining;
++      if (
++        window.resetAtMs !== null &&
++        window.resetAtMs > now &&
++        (nextResetAtMs === null || window.resetAtMs < nextResetAtMs)
++      ) {
++        nextResetAtMs = window.resetAtMs;
++      }
++      return window.remaining;
++    });
++    return {
++      key,
++      label: labels.get(key) ?? key,
++      total,
++      capacity: credentials * 100,
++      segments,
++      nextResetAtMs,
++    };
++  });
++
++  // Tightest first: the lowest share of capacity left is what runs out first.
++  // Windows nobody reported a number for sink; ties keep the provider's order.
++  const share = (window: LedgerSummaryWindow) =>
++    window.total === null || window.capacity === 0 ? Infinity : window.total / window.capacity;
++  const ranked = windows
++    .map((window, index) => ({ window, index }))
++    .sort((a, b) => share(a.window) - share(b.window) || a.index - b.index)
++    .map(({ window }) => window);
++
++  return { type, credentials, windows: ranked };
++}
+diff --git a/src/features/quota/uiState.ts b/src/features/quota/uiState.ts
+index aba0a0e..acfd983 100644
+--- a/src/features/quota/uiState.ts
++++ b/src/features/quota/uiState.ts
+@@ -1,20 +1,24 @@
+ import {
+   QUOTA_SORT_MODES,
+   QUOTA_TAB_ORDER,
++  QUOTA_VIEW_MODES,
+   type QuotaSortMode,
+   type QuotaTabId,
++  type QuotaViewMode,
+ } from './constants';
+ 
+ /** 额度页 UI 偏好：会话级持久化（sessionStorage），跨会话不携带。 */
+ export type QuotaUiState = {
+   tab?: QuotaTabId;
+   sortMode?: QuotaSortMode;
++  viewMode?: QuotaViewMode;
+ };
+ 
+ const QUOTA_UI_STATE_KEY = 'quotaPage.uiState';
+ 
+ const QUOTA_TAB_ID_SET = new Set<string>(['all', ...QUOTA_TAB_ORDER]);
+ const QUOTA_SORT_MODE_SET = new Set<string>(QUOTA_SORT_MODES);
++const QUOTA_VIEW_MODE_SET = new Set<string>(QUOTA_VIEW_MODES);
+ 
+ export const isQuotaTabId = (value: unknown): value is QuotaTabId =>
+   typeof value === 'string' && QUOTA_TAB_ID_SET.has(value);
+@@ -22,6 +26,9 @@ export const isQuotaTabId = (value: unknown): value is QuotaTabId =>
+ export const isQuotaSortMode = (value: unknown): value is QuotaSortMode =>
+   typeof value === 'string' && QUOTA_SORT_MODE_SET.has(value);
+ 
++export const isQuotaViewMode = (value: unknown): value is QuotaViewMode =>
++  typeof value === 'string' && QUOTA_VIEW_MODE_SET.has(value);
++
+ export const readQuotaUiState = (): QuotaUiState | null => {
+   if (typeof window === 'undefined') return null;
+   try {
+@@ -32,6 +39,7 @@ export const readQuotaUiState = (): QuotaUiState | null => {
+     return {
+       tab: isQuotaTabId(parsed.tab) ? parsed.tab : undefined,
+       sortMode: isQuotaSortMode(parsed.sortMode) ? parsed.sortMode : undefined,
++      viewMode: isQuotaViewMode(parsed.viewMode) ? parsed.viewMode : undefined,
+     };
+   } catch {
+     return null;
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index 820a069..7c14dab 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -1538,6 +1538,21 @@
+       }
+     }
+   },
++  "quota_ledger": {
++    "view_label": "View",
++    "view_ledger": "Ledger",
++    "view_cards": "Cards",
++    "summary_label": "Totals by provider",
++    "credentials_one": "{{count}} credential",
++    "credentials_other": "{{count}} credentials",
++    "of_capacity": "of {{capacity}}%",
++    "not_loaded": "Not loaded yet",
++    "no_reset": "No reset pending",
++    "no_windows": "No quota windows reported",
++    "show": "Show",
++    "hide": "Hide",
++    "refresh": "Refresh quota"
++  },
+   "quota_management": {
+     "search_label": "Search accounts",
+     "search_placeholder": "Search by filename or email",
+diff --git a/src/i18n/locales/ru.json b/src/i18n/locales/ru.json
+index e0b6d8b..845385a 100644
+--- a/src/i18n/locales/ru.json
++++ b/src/i18n/locales/ru.json
+@@ -1541,6 +1541,23 @@
+       }
+     }
+   },
++  "quota_ledger": {
++    "view_label": "Вид",
++    "view_ledger": "Реестр",
++    "view_cards": "Карточки",
++    "summary_label": "Итоги по провайдерам",
++    "credentials_one": "{{count}} учётная запись",
++    "credentials_few": "{{count}} учётные записи",
++    "credentials_many": "{{count}} учётных записей",
++    "credentials_other": "{{count}} учётной записи",
++    "of_capacity": "из {{capacity}}%",
++    "not_loaded": "Ещё не загружено",
++    "no_reset": "Сброс не ожидается",
++    "no_windows": "Окна квот не получены",
++    "show": "Показать",
++    "hide": "Скрыть",
++    "refresh": "Обновить квоту"
++  },
+   "quota_management": {
+     "search_label": "Поиск аккаунтов",
+     "search_placeholder": "Поиск по имени файла или электронной почте",
+diff --git a/src/i18n/locales/zh-CN.json b/src/i18n/locales/zh-CN.json
+index d7029c6..927c268 100644
+--- a/src/i18n/locales/zh-CN.json
++++ b/src/i18n/locales/zh-CN.json
+@@ -1536,6 +1536,21 @@
+       }
+     }
+   },
++  "quota_ledger": {
++    "view_label": "视图",
++    "view_ledger": "账本",
++    "view_cards": "卡片",
++    "summary_label": "按提供商汇总",
++    "credentials_one": "{{count}} 个凭证",
++    "credentials_other": "{{count}} 个凭证",
++    "of_capacity": "/ {{capacity}}%",
++    "not_loaded": "尚未加载",
++    "no_reset": "暂无待重置",
++    "no_windows": "未返回额度窗口",
++    "show": "展开",
++    "hide": "收起",
++    "refresh": "刷新额度"
++  },
+   "quota_management": {
+     "search_label": "搜索账号",
+     "search_placeholder": "按文件名或邮箱搜索",
+diff --git a/src/i18n/locales/zh-TW.json b/src/i18n/locales/zh-TW.json
+index ee4918d..1fc160d 100644
+--- a/src/i18n/locales/zh-TW.json
++++ b/src/i18n/locales/zh-TW.json
+@@ -1562,6 +1562,21 @@
+       }
+     }
+   },
++  "quota_ledger": {
++    "view_label": "檢視",
++    "view_ledger": "帳本",
++    "view_cards": "卡片",
++    "summary_label": "按提供商彙總",
++    "credentials_one": "{{count}} 個憑證",
++    "credentials_other": "{{count}} 個憑證",
++    "of_capacity": "/ {{capacity}}%",
++    "not_loaded": "尚未載入",
++    "no_reset": "暫無待重置",
++    "no_windows": "未回傳額度視窗",
++    "show": "展開",
++    "hide": "收合",
++    "refresh": "重新整理額度"
++  },
+   "quota_management": {
+     "search_label": "搜尋帳號",
+     "search_placeholder": "依檔案名稱或電子郵件搜尋",
+diff --git a/tests/quotaLedgerModel.test.ts b/tests/quotaLedgerModel.test.ts
+new file mode 100644
+index 0000000..ec2c005
+--- /dev/null
++++ b/tests/quotaLedgerModel.test.ts
+@@ -0,0 +1,230 @@
++import { describe, expect, test } from 'bun:test';
++import type { TFunction } from 'i18next';
++import {
++  buildLedgerWindows,
++  ledgerPlanLabel,
++  orderRowWindows,
++  summarizeProvider,
++  type LedgerWindow,
++} from '@/features/quota/ledgerModel';
++
++const t = ((key: string) => key) as unknown as TFunction;
++const NOW = Date.UTC(2026, 8, 11, 12, 0, 0);
++const HOUR = 3_600_000;
++
++const claudeQuota = (fable: number | null, fiveHour: number, sevenDay: number) => ({
++  status: 'success',
++  planType: 'plan_max',
++  windows: [
++    {
++      id: 'five-hour',
++      label: '5-hour',
++      labelKey: 'claude_quota.five_hour',
++      usedPercent: fiveHour,
++      resetLabel: '',
++      resetAtMs: NOW + 3 * HOUR,
++    },
++    {
++      id: 'seven-day',
++      label: '7-day',
++      labelKey: 'claude_quota.seven_day',
++      usedPercent: sevenDay,
++      resetLabel: '',
++      resetAtMs: NOW + 48 * HOUR,
++    },
++    {
++      id: 'seven-day-fable',
++      label: 'Fable',
++      labelKey: 'claude_quota.seven_day_fable',
++      usedPercent: fable,
++      resetLabel: '',
++      resetAtMs: NOW + 24 * HOUR,
++    },
++  ],
++});
++
++const win = (
++  key: string,
++  remaining: number | null,
++  resetAtMs: number | null = null
++): LedgerWindow => ({
++  key,
++  label: key,
++  remaining,
++  resetAtMs,
++});
++
++describe('buildLedgerWindows', () => {
++  test('returns nothing until quota has loaded', () => {
++    expect(buildLedgerWindows('claude', undefined, t)).toEqual([]);
++    expect(buildLedgerWindows('claude', { status: 'loading' }, t)).toEqual([]);
++    expect(buildLedgerWindows('claude', { status: 'error' }, t)).toEqual([]);
++  });
++
++  test('turns percent used into percent remaining, clamped', () => {
++    const windows = buildLedgerWindows('claude', claudeQuota(42, -5, 130), t);
++    expect(windows.map((window) => [window.key, window.label, window.remaining])).toEqual([
++      ['five-hour', 'claude_quota.five_hour', 100],
++      ['seven-day', 'claude_quota.seven_day', 0],
++      ['seven-day-fable', 'claude_quota.seven_day_fable', 58],
++    ]);
++  });
++
++  test('keeps an unreported usage as null rather than full', () => {
++    const [, , fable] = buildLedgerWindows('claude', claudeQuota(null, 0, 0), t);
++    expect(fable.remaining).toBeNull();
++  });
++
++  test('antigravity reports the fraction remaining', () => {
++    const windows = buildLedgerWindows(
++      'antigravity',
++      {
++        status: 'success',
++        groups: [
++          { buckets: [{ id: 'g', label: 'Gemini', remainingFraction: 0.256, resetAtMs: NOW }] },
++        ],
++      } as never,
++      t
++    );
++    expect(windows).toEqual([{ key: 'g', label: 'Gemini', remaining: 26, resetAtMs: NOW }]);
++  });
++
++  test('kimi derives remaining from counts', () => {
++    const windows = buildLedgerWindows(
++      'kimi',
++      { status: 'success', rows: [{ id: 'w', label: 'Weekly', used: 25, limit: 100 }] } as never,
++      t
++    );
++    expect(windows[0].remaining).toBe(75);
++    expect(windows[0].resetAtMs).toBeNull();
++  });
++
++  test('xai labels the billing period it reports', () => {
++    const weekly = buildLedgerWindows(
++      'xai',
++      {
++        status: 'success',
++        billing: { periodType: 'weekly', usagePercent: 10, resetAtMs: NOW },
++      } as never,
++      t
++    );
++    expect(weekly).toEqual([
++      { key: 'weekly', label: 'xai_quota.weekly_limit', remaining: 90, resetAtMs: NOW },
++    ]);
++    expect(buildLedgerWindows('xai', { status: 'success', billing: null } as never, t)).toEqual([]);
++  });
++
++  test('meta reset instants are unix seconds', () => {
++    const [window] = buildLedgerWindows(
++      'meta',
++      {
++        status: 'success',
++        data: { windows: [{ id: 'weekly', usedPercent: 40, resetAt: 1000 }] },
++      } as never,
++      t
++    );
++    expect(window).toEqual({
++      key: 'weekly',
++      label: 'meta_quota.weekly',
++      remaining: 60,
++      resetAtMs: 1_000_000,
++    });
++  });
++});
++
++describe('summarizeProvider', () => {
++  test('sums remaining per window over every credential', () => {
++    const summary = summarizeProvider(
++      'claude',
++      [claudeQuota(42, 0, 21), claudeQuota(0, 0, 0), claudeQuota(49, 1, 25)].map((quota) =>
++        buildLedgerWindows('claude', quota, t)
++      ),
++      NOW
++    );
++    const fable = summary.windows.find((window) => window.key === 'seven-day-fable');
++    expect(summary.credentials).toBe(3);
++    expect(fable?.total).toBe(58 + 100 + 51);
++    expect(fable?.capacity).toBe(300);
++    expect(fable?.segments).toEqual([58, 100, 51]);
++  });
++
++  test('puts the tightest window first', () => {
++    const summary = summarizeProvider(
++      'claude',
++      [claudeQuota(42, 0, 21), claudeQuota(49, 1, 25)].map((quota) =>
++        buildLedgerWindows('claude', quota, t)
++      ),
++      NOW
++    );
++    expect(summary.windows.map((window) => window.key)).toEqual([
++      'seven-day-fable',
++      'seven-day',
++      'five-hour',
++    ]);
++  });
++
++  test('counts unloaded credentials in capacity as empty segments', () => {
++    const summary = summarizeProvider('codex', [[win('weekly', 17)], [], []], NOW);
++    expect(summary.windows[0]).toMatchObject({
++      total: 17,
++      capacity: 300,
++      segments: [17, null, null],
++    });
++  });
++
++  test('reports no windows when nothing has loaded', () => {
++    const summary = summarizeProvider('xai', [[]], NOW);
++    expect(summary).toEqual({ type: 'xai', credentials: 1, windows: [] });
++  });
++
++  test('a window nobody reported a number for sinks below measured ones', () => {
++    const summary = summarizeProvider('kimi', [[win('a', null), win('b', 90)]], NOW);
++    expect(summary.windows.map((window) => [window.key, window.total])).toEqual([
++      ['b', 90],
++      ['a', null],
++    ]);
++  });
++
++  test('next reset is the soonest one still ahead', () => {
++    const summary = summarizeProvider(
++      'codex',
++      [
++        [win('weekly', 50, NOW - HOUR)],
++        [win('weekly', 50, NOW + 5 * HOUR)],
++        [win('weekly', 50, NOW + 2 * HOUR)],
++      ],
++      NOW
++    );
++    expect(summary.windows[0].nextResetAtMs).toBe(NOW + 2 * HOUR);
++  });
++});
++
++describe('orderRowWindows', () => {
++  test('moves the binding window first and keeps the rest in order', () => {
++    const windows = [win('a', 1), win('b', 2), win('c', 3)];
++    expect(orderRowWindows(windows, 'c').map((window) => window.key)).toEqual(['c', 'a', 'b']);
++    expect(orderRowWindows(windows, null)).toBe(windows);
++    expect(orderRowWindows(windows, 'missing').map((window) => window.key)).toEqual([
++      'a',
++      'b',
++      'c',
++    ]);
++  });
++});
++
++describe('ledgerPlanLabel', () => {
++  test('names claude and codex plans', () => {
++    expect(ledgerPlanLabel('claude', claudeQuota(0, 0, 0), t)).toBe('claude_quota.plan_max');
++    expect(ledgerPlanLabel('codex', { status: 'success', planType: 'plus' } as never, t)).toBe(
++      'codex_quota.plan_plus'
++    );
++    expect(ledgerPlanLabel('codex', { status: 'success', planType: 'pro' } as never, t)).toBe(
++      'codex_quota.plan_pro'
++    );
++  });
++
++  test('stays empty without loaded quota or a plan', () => {
++    expect(ledgerPlanLabel('claude', { status: 'idle' }, t)).toBeNull();
++    expect(ledgerPlanLabel('kimi', { status: 'success' }, t)).toBeNull();
++  });
++});

@@ -33,10 +33,13 @@ services:
     command: ["./CLIProxyAPI", "-config", "/data/config.yaml"]
     environment:
       WRITABLE_PATH: /data
+      # Serve this repo's panel build (scripts/build-panel.sh) instead of downloading upstream's.
+      MANAGEMENT_STATIC_PATH: /panel/management.html
       # Singapore time (SGT) for log timestamps. The Tailscale image ships no zone data.
       TZ: Asia/Singapore
     volumes:
       - ${LOCAL_DIR:?}/proxy:/data
+      - ../panel/management.html:/panel/management.html:ro
     depends_on:
       - tailscale
     restart: unless-stopped
