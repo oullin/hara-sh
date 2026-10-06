@@ -6,6 +6,8 @@ SHELL      := /bin/bash
 URL        ?= https://hara.local
 OP_ACCOUNT ?= my.1password.com
 MODEL      ?= claude-haiku-4-5-20251001
+# Codex model for `make bench`.
+CODEX_MODEL ?= gpt-5.5
 
 export OP_ACCOUNT
 
@@ -18,7 +20,7 @@ PORTLESS_CA = $(HOME)/.portless/ca.pem
 
 .DEFAULT_GOAL := help
 .PHONY: help local local-status local-logs local-down panel claude codex codex-profile codex-smoke alias keys-refresh codex-backup claude-backup \
-        health models accounts quota quota-test smoke ws-smoke ws-smoke-test logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
+        health models accounts quota quota-test smoke ws-smoke ws-smoke-test bench bench-test logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -89,6 +91,14 @@ quota: ## Usage per account: % used, reset times, weekly capacity expiring unuse
 quota-test: ## Run the scripts/quota Go tests (vet first)
 	cd scripts/quota && go vet ./... && go test ./...
 
+# Real requests: N per API per address (about 5k prompt tokens each, mostly cached). The first of
+# each series is cold, the rest should hit the prompt cache. CODEX_MODEL= skips Codex, MODEL= Claude.
+bench: ## Time to first token and prompt-cache hits, Claude and Codex, per address (N=5, URL, MODEL, CODEX_MODEL)
+	@cd scripts/bench && API_KEY="$(API_KEY)" go run . -n $${N:-5} -claude-model "$(MODEL)" -codex-model "$(CODEX_MODEL)" http://localhost:8317 $(URL)
+
+bench-test: ## Run the scripts/bench Go tests (vet first)
+	cd scripts/bench && go vet ./... && go test ./...
+
 smoke: ## Send a test message through the proxy (MODEL=... to override)
 	@curl -fsS $(URL)/v1/messages -H "x-api-key: $(API_KEY)" -H 'anthropic-version: 2023-06-01' \
 	  -H 'content-type: application/json' \
@@ -125,10 +135,11 @@ web-deploy: ## Type-check, test at 100% and deploy the landing page to www.hara.
 	cd web && npm run deploy
 
 # Go is formatted from its module directory, so fmtkit also runs go vet there.
-format-all: ## Format every TS/JS file and the Go in scripts/quota and scripts/wssmoke with fmtkit
+format-all: ## Format every TS/JS file and the Go in scripts/quota, scripts/wssmoke and scripts/bench with fmtkit
 	fmtkit format-all --ts
 	cd scripts/quota && fmtkit format-all --go
 	cd scripts/wssmoke && fmtkit format-all --go
+	cd scripts/bench && fmtkit format-all --go
 
 lint: ## Lint the landing page TS with fmtkit (oxlint), writing nothing
 	fmtkit lint web/src web/worker web/cloudflare.config.ts
@@ -137,3 +148,4 @@ complexity: ## Report TS and Go functions over fmtkit's complexity limits
 	fmtkit complexity --ts web/src web/worker
 	cd scripts/quota && fmtkit complexity --go .
 	cd scripts/wssmoke && fmtkit complexity --go .
+	cd scripts/bench && fmtkit complexity --go .
