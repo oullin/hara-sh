@@ -17,7 +17,7 @@ MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
 .PHONY: help install types check deploy deploy-dry config-push \
-        claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf
+        claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -96,6 +96,16 @@ smoke: ## Send a test message through the proxy (MODEL=... to override)
 logs: ## Show the last LINES lines of the server log (default 200)
 	@curl -fsS "$(URL)/v0/management/logs?limit=$${LINES:-200}" -H "Authorization: Bearer $(MGMT_KEY)" \
 	  | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("lines",[])))'
+
+# Live logs use wrangler (cf has no tail command yet) with the personal Cloudflare login,
+# kept apart from the default (work) wrangler login.
+WRANGLER = XDG_CONFIG_HOME=$(HOME)/.claude/work/wrangler-personal CLOUDFLARE_ACCOUNT_ID=YOUR_ACCOUNT_ID npx wrangler
+
+tail: ## Stream live Worker logs (Ctrl-C to stop)
+	@$(WRANGLER) tail cli-proxy-api --format pretty
+
+tail-codex: ## Stream only Codex request lines: model, tier, effort (Ctrl-C to stop)
+	@$(WRANGLER) tail cli-proxy-api --format pretty | grep --line-buffered 'codex request'
 
 logs-cf: ## Show Worker/container stdout from Cloudflare observability (MINUTES=... to override)
 	@NOW=$$(($$(date +%s)*1000)); FROM=$$((NOW-$${MINUTES:-15}*60*1000)); \
