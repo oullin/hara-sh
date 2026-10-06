@@ -48,27 +48,34 @@ Run `make` for every target.
 
 ```bash
 make install       # dependencies
+make dev           # run the Worker locally (Vite + workerd)
 make check         # tsc for src/, test/ and the Node tooling config
 make coverage      # vitest, fails under 100%
 make format-all    # fmtkit (oxlint --fix, oxfmt, structural passes)
 make lint          # fmtkit lint, read-only
-make deploy-dry    # build and validate without uploading
+make deploy-dry    # build with Vite and validate without uploading
 ```
 
-Imports use aliases: `@/…` for `src/`, `@test/…` for `test/`.
+- **Stack:** [Hono](https://hono.dev) handles routing and middleware, [Effect](https://effect.website) runs side effects as services with tagged errors, and [better-result](https://better-result.dev) handles pure policy decisions as `Result`s. [Vite](https://vite.dev) with `@cloudflare/vite-plugin` bundles the Worker for `cf dev` and `cf deploy`.
+- **Imports:** `@/…` refers to `src/`, and `@test/…` refers to `test/`.
 
-| Path                              | Concern                                                                       |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `src/index.ts`                    | Worker entry: Codex key goes to the guard, everything else to the container   |
-| `src/upstream.ts`                 | The single `CliProxy` Durable Object, pinned to Western Europe                |
-| `src/container/cli-proxy.ts`      | The Durable Object that owns the container: port, idle timeout, environment   |
-| `src/container/explicit-image.ts` | Passes the image to `start()` (workaround for `@cloudflare/containers` 0.3.7) |
-| `src/auth/client-key.ts`          | Reads the client key; constant-time comparison                                |
-| `src/codex/policy.ts`             | Models, paths and default tier allowed for the Codex key                      |
-| `src/codex/guard.ts`              | Enforces the policy and filters both model-list formats                       |
-| `src/http/errors.ts`              | JSON error responses                                                          |
-| `scripts/`                        | deploy, config push, key cache, config backups (`lib/common.sh` shared)       |
-| `test/`                           | Vitest suite, one file per module                                             |
+| Path                     | Concern                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `src/index.ts`           | Worker entry: exports the Hono app and the `CliProxy` Durable Object                      |
+| `src/app.ts`             | Main router: Codex key → `codexRoutes`, everything else → container                       |
+| `src/codex/routes.ts`    | Codex-key router: `/v1/models`, `/v1/responses`, `/v1/chat/completions`, else 403/405     |
+| `src/codex/authorize.ts` | Pure policy (better-result): parse body, allow Codex models, default tier, filter lists   |
+| `src/codex/errors.ts`    | Policy failures as tagged errors carrying their HTTP status                               |
+| `src/codex/program.ts`   | Side effects (Effect): read body, audit log, forward, list models                         |
+| `src/effect/run.ts`      | Hono → Effect bridge: provides `Upstream` and maps every typed error to a response        |
+| `src/upstream.ts`        | `Upstream` Effect service: the single `CliProxy` Durable Object, pinned to Western Europe |
+| `src/http/env.ts`        | Hono bindings/variables and the middleware that provides `Upstream` per request           |
+| `src/http/errors.ts`     | JSON error responses                                                                      |
+| `src/auth/client-key.ts` | Reads the client key; constant-time comparison                                            |
+| `src/codex/policy.ts`    | Codex model pattern, allowed paths, default service tier                                  |
+| `src/container/*`        | The Durable Object that owns the container, plus the explicit-image workaround            |
+| `scripts/`               | deploy, config push, key cache, config backups (`lib/common.sh` shared)                   |
+| `test/`                  | Vitest suite, one file per module                                                         |
 
 ## How it works
 
