@@ -43,10 +43,45 @@ routing:
   # parallelism). false spreads them across the pool.
   session-affinity-subagents: true
 
+  retry:
+    # When every account is cooling down, wait at most this many seconds between retry rounds
+    # (upstream default 30). Claude and Codex limits reset in hours, so a long wait rarely ends
+    # in an answer; failing fast lets the client report it. Rounds without a wait are unchanged.
+    max-retry-interval: 5
+
+  cooldown:
+    # Persist each account's cooldown next to its auth file (~/.cli-proxy-api/proxy/auths/*.cds),
+    # so a restart does not send one request per exhausted account just to relearn its limit.
+    save-cooldown-status: true
+
+requests:
+  payload:
+    # Fast mode for every Codex request ("2x speed, increased usage"). The Codex app sends no
+    # service_tier to a custom provider. The proxy drops any client tier other than "priority"
+    # before this rule runs, so a client cannot opt out per request: use plain `codex` (its own
+    # ChatGPT login) or remove this rule for standard speed.
+    default:
+      - models:
+          - name: "gpt-*"
+            protocol: "codex"
+          - name: "codex-*"
+            protocol: "codex"
+        params:
+          service_tier: "priority"
+
 upstream:
   codex:
-    # Upstream recommends 20s when the server sits behind another proxy (portless, Tailscale).
+    # Off (the upstream default), explicit: buffering holds the first token back to fail over
+    # transparently on overload. First token now beats a silent retry.
+    stream-bootstrap-buffering: false
+    # Bounds that hold if buffering is ever turned on. Upstream recommends 20s behind another
+    # proxy (portless, Tailscale).
     stream-bootstrap-timeout: "20s"
+    # A usage limit cools down only the model that hit it, not every model on the account.
+    model-level-cooling: true
+  claude:
+    # Same for Claude: an exhausted Opus weekly window leaves Sonnet on that account in rotation.
+    model-level-cooling: true
 
 oauth:
   # ~/.cli-proxy-api/proxy/auths on this computer (mounted at /data).
