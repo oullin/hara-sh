@@ -11,7 +11,7 @@ export default defineConfig({
 		coverage: {
 			// shadcn-vue components under ui/ are vendored; main.ts only mounts the app.
 			exclude: ['src/components/ui/**', 'src/main.ts'],
-			include: ['src/**/*.{ts,vue}'],
+			include: ['src/**/*.{ts,vue}', 'worker/**/*.ts'],
 			provider: 'v8',
 			reporter: ['text', 'json-summary'],
 			thresholds: { 100: true },
