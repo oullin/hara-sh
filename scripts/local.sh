@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Run the proxy on this computer in Docker (local/compose.yaml), reachable on your tailnet and,
 # through portless in LAN mode, as https://hara.local on your network.
-#   scripts/local.sh up       render the config from 1Password, start, print the addresses
-#   scripts/local.sh status   print the addresses and the Tailscale login state
-#   scripts/local.sh logs     follow the proxy, Tailscale and quota logs
-#   scripts/local.sh down     stop (OAuth logins and the Tailscale identity are kept)
+#   scripts/local.sh up              render the config from 1Password, start, print the addresses
+#   scripts/local.sh status          print the addresses and the Tailscale login state
+#   scripts/local.sh logs [service]  follow the proxy, Tailscale and quota logs (or one service's)
+#   scripts/local.sh down            stop (OAuth logins and the Tailscale identity are kept)
 # Env: LOCAL_DIR (default ~/.cli-proxy-api), LOCAL_NAME (default hara, for <name>.local),
 #      TS_HOSTNAME (default cliproxy),
 #      TS_AUTHKEY (optional; without it, the first start prints a Tailscale login link).
@@ -38,7 +38,7 @@ wait_for_proxy() {
     curl -fsS --max-time 2 "$LOCAL_URL/healthz" >/dev/null 2>&1 && return 0
     sleep 1
   done
-  die "the proxy did not answer on $LOCAL_URL; run: make local-logs"
+  die "the proxy did not answer on $LOCAL_URL; run: make logs"
 }
 
 # portless serves https://<LOCAL_NAME>.local on this computer and announces it on the network
@@ -85,9 +85,9 @@ print_addresses() {
   case "$state" in
     Running) log "your tailnet:   https://$dns  (base URL for other tools: https://$dns/v1)" ;;
     NeedsLogin) log "your tailnet:   not signed in yet. Open this link to add '$TS_HOSTNAME' to your tailnet,"
-                log "                then run: make local-status"
+                log "                then run: make status"
                 log "                $auth_url" ;;
-    *) log "your tailnet:   Tailscale is $state; run: make local-logs" ;;
+    *) log "your tailnet:   Tailscale is $state; run: make logs" ;;
   esac
 }
 
@@ -119,7 +119,7 @@ down() {
 case "${1:-up}" in
   up) up ;;
   status) print_addresses ;;
-  logs) compose logs -f --tail=100 ;;
+  logs) compose logs -f --tail=100 "${@:2}" ;;
   down) down ;;
-  *) die "usage: scripts/local.sh [up|status|logs|down]" ;;
+  *) die "usage: scripts/local.sh [up|status|logs [service]|down]" ;;
 esac

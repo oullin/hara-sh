@@ -1,6 +1,6 @@
 # CLIProxyAPI config template (v8 layout).
 #
-# Contains 1Password references only. `make local` renders it into
+# Contains 1Password references only. `make up` renders it into
 # ~/.cli-proxy-api/proxy/config.yaml, which the local server reads.
 # Full option reference: upstream config.example.yaml.
 config-version: 8
@@ -91,7 +91,7 @@ observability:
   logs:
     debug: false
     # Logs go to rotating 10 MB files under /data/logs (~/.cli-proxy-api/proxy/logs)
-    # instead of stdout, so they are viewable in the panel and via `make logs`.
+    # instead of stdout, so they are viewable in the panel and via `make ops logs`.
     logging-to-file: true
     # Retention: delete the oldest log files once the directory exceeds this size.
     # Upstream default is 0 (unbounded); rotation alone never deletes anything.
