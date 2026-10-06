@@ -17,7 +17,7 @@ MGMT_KEY = $$($(HARA_KEY) management-password)
 PORTLESS_CA = $(HOME)/.portless/ca.pem
 
 .DEFAULT_GOAL := help
-.PHONY: help local local-status local-logs local-down claude alias keys-refresh codex-backup claude-backup \
+.PHONY: help local local-status local-logs local-down panel claude alias keys-refresh codex-backup claude-backup \
         health models accounts quota quota-test smoke logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
 
 help: ## Show this help
@@ -38,6 +38,9 @@ local-logs: ## Follow the proxy and Tailscale logs (Ctrl-C to stop)
 
 local-down: ## Stop the proxy and remove hara.local (logins and Tailscale identity kept)
 	./scripts/local.sh down
+
+panel: ## Rebuild panel/management.html (upstream panel + panel/ledger.patch; needs bun)
+	./scripts/build-panel.sh
 
 ## --- Clients ---------------------------------------------------------------
 # Codex is not routed through the proxy: it uses its own ChatGPT login (~/.codex/config.toml).
