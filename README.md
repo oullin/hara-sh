@@ -1,128 +1,111 @@
 # cli-proxy-api
 
-Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Cloudflare Containers at **https://proxy.hara.sh**, managed with the [`cf` CLI](https://blog.cloudflare.com/cloudflare-cf-cli-launch/).
+[CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Cloudflare Containers at **https://proxy.hara.sh**. It pools several Claude and Codex subscriptions behind one OpenAI/Anthropic-compatible API, for use from Claude Code and Codex.
 
-- **Runtime:** a Worker (`src/index.ts`) forwards every request to a single container running `eceasy/cli-proxy-api` (`Dockerfile`). The container is managed by the `CliProxy` Durable Object, as configured in `cloudflare.config.ts`.
-- **State:** `config.yaml` and the OAuth token files live in the R2 bucket `cli-proxy-api`, under `config/config.yaml` and `auths/*.json`. The server uses its built-in object store (`OBJECTSTORE_*`) to read and write them. The container disk is only a cache.
-- **Secrets:** 1Password, account `my.1password.com`, vault `cloudflare`, item `cli-proxy-api`.
-  - `claude-api-key`: the main client API key (Claude Code, scripts), which can reach every provider.
-  - `codex-api-key`: the Codex CLI key. The Worker limits it to Codex/GPT models, so it only uses the Codex accounts.
-  - `management-password`: the password for the management API and panel.
-  - `r2-endpoint`, `r2-bucket`, `r2-access-key-id`, `r2-secret-access-key`: the R2 S3 credentials.
-- **Account:** the personal Cloudflare account "Ollin" (`accountId` in `cloudflare.config.ts`). The `cf` auth profile `personal` is bound to this directory with `cf auth activate personal .`.
+## Use it
 
-## Source layout
+| Client        | Command                                                      | Uses                |
+| ------------- | ------------------------------------------------------------ | ------------------- |
+| Claude Code   | `claude-hara` (alias in `~/.zshrc`), or `make claude`        | all Claude accounts |
+| Codex         | `codex` (the proxy is the default provider), or `make codex` | Codex accounts only |
+| Codex, direct | `codex --profile openai`, or `make codex-direct`             | your ChatGPT login  |
+| Anything else | base URL `https://proxy.hara.sh/v1`, key `claude-api-key`    | all accounts        |
 
-| File | Concern |
-|---|---|
-| `src/index.ts` | Worker entry: sends Codex-key requests to the guard and everything else straight to the container |
-| `src/upstream.ts` | The single `CliProxy` Durable Object instance, pinned to Western Europe |
-| `src/container/cli-proxy.ts` | The Durable Object that owns the container: port, sleep timeout, environment |
-| `src/container/explicit-image.ts` | Workaround that makes start() pass the image explicitly (`@cloudflare/containers` 0.3.7) |
-| `src/auth/client-key.ts` | Reads the client key from `Authorization` or `x-api-key`, with a constant-time comparison |
-| `src/codex/policy.ts` | Which models and paths the Codex key may use |
-| `src/codex/guard.ts` | Enforces that policy and filters `/v1/models` |
-| `src/http/errors.ts` | JSON error responses |
+Keys come from `scripts/hara-key`, which caches them in the macOS Keychain and asks 1Password at most once every 30 days.
 
-| Script | Purpose |
-|---|---|
-| `scripts/deploy.sh` | Renders `secrets.env.tpl` from 1Password and runs `cf deploy` (`make deploy`) |
-| `scripts/push-config.sh` | Renders `config.yaml`, hashes the management password, uploads to R2 and reloads the live server (`make config-push`) |
-| `scripts/hara-key` | Keychain-cached secrets (standalone; used by Codex `auth.command`) |
-| `scripts/backup-codex.sh` / `backup-claude.sh` | Copy `~/.codex` and `~/.claude` config into `codex/` and `claude/` |
-| `scripts/lib/common.sh` | Shared settings (1Password account, proxy URL, bucket) and helpers (`temp_file`, `secret`, `log`, `die`) |
-| `scripts/lib/redact_claude_settings.py` | Redacts `autoMode.environment` from the Claude settings backup |
-
-## Requirements
-
-Node, Docker Desktop (running), the 1Password CLI (`op`), and `cf` (installed as a dev dependency). `wrangler` stays installed because `cf` uses it as the bundler (`wrangler.config.ts`).
-
-## Keys on this Mac
-
-`scripts/hara-key [claude-api-key|codex-api-key|management-password]` prints a secret from the 1Password item.
-
-- It caches the value in the macOS login Keychain (service `cli-proxy-api`) for 30 days, so 1Password prompts at most once a month.
-- Codex (`auth.command`), the `claude-hara` alias and every `make` target use it.
-- After rotating a key in 1Password, run `make keys-refresh`.
-- To remove the cached values, run `scripts/hara-key --clear claude-api-key` and `scripts/hara-key --clear management-password`.
-- Override the cache lifetime with `HARA_KEY_MAX_AGE_DAYS`.
-
-## Common tasks
-
-Run `make` to list every target. Secrets are read from 1Password when a target runs.
+## Everyday commands
 
 ```bash
-make install       # npm dependencies
-make deploy        # type-check, build the image, deploy (secrets from 1Password)
-make deploy-dry    # build and validate without uploading
-make config-push   # render config.yaml from 1Password and upload it to R2
-make claude        # run Claude Code through the proxy (ARGS="..." for flags)
-make codex         # run Codex CLI (proxy is the default provider; ARGS="..." for flags)
-make codex-direct  # run Codex CLI with the direct ChatGPT login
-make codex-smoke   # one non-interactive Codex turn through the proxy
-make codex-backup  # copy ~/.codex/config.toml + openai.config.toml into codex/
-make claude-backup # copy ~/.claude settings into claude/ (Omniyat section redacted)
-make alias         # print the claude-hara alias for ~/.zshrc
-make keys-refresh  # re-fetch the Keychain-cached keys from 1Password now
-make health        # /healthz
+make health        # is it up?
 make accounts      # connected provider accounts
-make models        # models available through the proxy
-make smoke         # send a test message (MODEL=... to override)
-make logs          # last server log lines (LINES=... to override)
-make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to override)
+make smoke         # one Claude request
+make codex-smoke   # one Codex turn
+make tail-codex    # live: model, tier and effort of each Codex request
+make logs          # last server log lines (LINES=500)
 ```
 
-- **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `make deploy`.
-- **Change config:** edit `config.yaml`, then run `make config-push`. It uploads the file to R2 and reloads the running server through the management API. Changes made in the management panel are written straight to R2, and `config-push` overwrites them.
-- **Logs:** `make logs` reads the server log files (rotated at 10 MB, capped at 512 MB in total, lost on container restart). `make logs-cf` shows Worker request logs from Cloudflare observability.
+Run `make` for every target.
 
-## Codex CLI
+## Change things
 
-Plain `codex` goes through the proxy:
+| Task                         | Do this                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| Deploy code                  | `make deploy` (runs type-check and 100% coverage first)                                   |
+| Change proxy config          | edit `config.yaml`, then `make config-push` (uploads to R2 and reloads the live server)   |
+| Upgrade CLIProxyAPI          | bump the image tag in `Dockerfile`, then `make deploy`                                    |
+| Add a provider account       | see [Add an account](#add-an-account)                                                     |
+| Rotate a key                 | change it in 1Password, then `make keys-refresh` (and `make config-push` for client keys) |
+| Back up local client configs | `make codex-backup` / `make claude-backup`, then commit                                   |
 
-- `~/.codex/config.toml` sets `model_provider = "hara"` and defines the `hara` provider (`https://proxy.hara.sh/v1`, Responses API).
-- Codex gets its own key, `codex-api-key`, from `scripts/hara-key` (`auth.command`), so no environment variable is needed.
-- **Codex accounts only:** with that key, the Worker (`src/index.ts`):
-  - allows only `/v1/responses`, `/v1/chat/completions` and `/v1/models`;
-  - rejects any model that does not match `gpt-*`, `codex-*` or `o<digit>*` with a 403;
-  - removes non-Codex models from `/v1/models`;
-  - blocks WebSockets, whose model names it cannot inspect.
+### Add an account
 
-  The proxy serves those models only from the Codex OAuth accounts, so Codex never uses a Claude account.
-- `codex --profile openai` (or `make codex-direct`) bypasses the proxy and uses the direct ChatGPT login. The profile lives in `~/.codex/openai.config.toml` and uses `gpt-5.5`, because `gpt-6.1-sol` is rejected for that login when used directly.
-- Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`.
-- Backups of both files live in `codex/`. Refresh them with `make codex-backup`, then commit.
+1. Open a **private window** signed in to only that account. Otherwise the browser's current login is connected, usually the wrong one.
+2. In https://proxy.hara.sh/management.html (password: `management-password`), start the provider's OAuth flow and **Copy Link** into that window.
+3. The browser ends on a failed `localhost:…/callback?code=…` page. Paste that URL into the panel's **Callback URL** field and submit it once.
+4. Check that `make accounts` shows the new file.
 
-## Claude Code config backup
-
-`claude/` holds copies of `~/.claude/settings.json`, `settings.local.json`, `CLAUDE.md` and `.claude.json`, refreshed with `make claude-backup`.
-
-- **Redaction:** `settings.json` is identical to the original, except that `autoMode.environment` is replaced by a placeholder. That section describes Omniyat-internal systems and stays only in `~/.claude/settings.json`.
-- **Restoring:** keep the existing `autoMode.environment` block when you restore the file.
-- **No secrets:** none of these files holds a key or token.
-
-## Logging in to providers
-
-1. Open https://proxy.hara.sh/management.html and sign in with `management-password`.
-2. Start the OAuth flow for a provider (Claude, Codex, Antigravity, ...).
-3. After you sign in, the browser lands on a `localhost` URL that fails to load. Paste that URL back into the panel. Device-code providers do not need this step.
-4. The tokens are saved to R2 under `auths/`.
-
-### Accounts in the pool
-
-| Provider | Accounts | Login flow |
-|---|---|---|
-| Claude | 2 | Claude OAuth, done once per account. Sign out of claude.ai (or use a private window) before adding the second, otherwise the same account is authorised again. |
-| Codex | 1 | Codex OAuth, or the device-code login |
-
-`routing.session-affinity` keeps each conversation on one account, so prompt caches are reused. The proxy fails over to the other account when one is rate-limited.
-
-Cursor is **not** an upstream provider. CLIProxyAPI has no built-in support, and the only plugin is a third-party native library that would run with access to every stored token. Cursor can still use this proxy as a client: set the OpenAI base URL to `https://proxy.hara.sh/v1` with the `claude-api-key`.
-
-## Using the proxy
+## Develop
 
 ```bash
-curl https://proxy.hara.sh/v1/models -H "Authorization: Bearer $(op read --account my.1password.com op://cloudflare/cli-proxy-api/claude-api-key)"
+make install       # dependencies
+make dev           # Worker + container locally against the dev R2 bucket (secrets from 1Password)
+make check         # tsc for src/, test/ and the Node tooling config
+make coverage      # vitest, fails under 100%
+make format-all    # fmtkit (oxlint --fix, oxfmt, structural passes)
+make lint          # fmtkit lint, read-only
+make deploy-dry    # build with Vite and validate without uploading
 ```
 
-The container sleeps after 30 minutes idle. The first request after that takes a few seconds while it starts.
+- **Stack:** [Hono](https://hono.dev) handles routing and middleware, [Effect](https://effect.website) runs side effects as services with tagged errors, and [better-result](https://better-result.dev) handles pure policy decisions as `Result`s. [Vite](https://vite.dev) with `@cloudflare/vite-plugin` bundles the Worker for `cf dev` and `cf deploy`.
+- **Imports:** `@/…` refers to `src/`, and `@test/…` refers to `test/`.
+- **Local dev:** `make dev` (`scripts/dev.sh`) runs the Worker, Hono and the container locally:
+    1. It pushes the config to the separate R2 bucket `cli-proxy-api-dev`.
+    2. It renders `.dev.vars` from 1Password (`dev.vars.tpl`, owner-only permissions).
+    3. It serves at `http://localhost:5173`.
+    4. On exit it deletes `.dev.vars` and stops the local container.
+
+    It never touches the production bucket, because both servers would rotate the same OAuth tokens. The dev bucket has no provider logins, so add an account through the local panel if you need one.
+
+| Path                     | Concern                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `src/index.ts`           | Worker entry: exports the Hono app and the `CliProxy` Durable Object                      |
+| `src/app.ts`             | Main router: Codex key → `codexRoutes`, everything else → container                       |
+| `src/codex/routes.ts`    | Codex-key router: `/v1/models`, `/v1/responses`, `/v1/chat/completions`, else 403/405     |
+| `src/codex/authorize.ts` | Pure policy (better-result): parse body, allow Codex models, default tier, filter lists   |
+| `src/codex/errors.ts`    | Policy failures as tagged errors carrying their HTTP status                               |
+| `src/codex/program.ts`   | Side effects (Effect): read body, audit log, forward, list models                         |
+| `src/effect/run.ts`      | Hono → Effect bridge: provides `Upstream` and maps every typed error to a response        |
+| `src/upstream.ts`        | `Upstream` Effect service: the single `CliProxy` Durable Object, pinned to Western Europe |
+| `src/http/env.ts`        | Hono bindings/variables and the middleware that provides `Upstream` per request           |
+| `src/http/errors.ts`     | JSON error responses                                                                      |
+| `src/auth/client-key.ts` | Reads the client key; constant-time comparison                                            |
+| `src/codex/policy.ts`    | Codex model pattern, allowed paths, default service tier                                  |
+| `src/container/*`        | The Durable Object that owns the container, plus the explicit-image workaround            |
+| `scripts/`               | deploy, config push, key cache, config backups (`lib/common.sh` shared)                   |
+| `test/`                  | Vitest suite, one file per module                                                         |
+
+## How it works
+
+- **Runtime:** a Worker forwards requests to a single container running `eceasy/cli-proxy-api`. The container sleeps after 30 minutes idle, so the first request after that takes a few seconds.
+- **State:** the config and OAuth tokens live in the R2 bucket `cli-proxy-api`, and the container disk is only a cache. Server log files (10 MB rotation, 512 MB cap) are lost on restart.
+- **Secrets:** stored in 1Password, item `op://cloudflare/cli-proxy-api`:
+    - `claude-api-key` is the main client key.
+    - `codex-api-key` is restricted to Codex.
+    - `management-password` is stored in R2 only as a bcrypt hash.
+    - The `r2-*` fields hold the R2 S3 credentials.
+- **Codex isolation:** the Worker restricts the Codex key:
+    - It allows only `gpt-*`, `codex-*` and `o<n>` models.
+    - It allows only `/v1/responses`, `/v1/chat/completions` and `/v1/models`, and no WebSockets.
+    - It filters model lists, so Codex never draws from the Claude accounts.
+- **Fast mode:** Codex-key requests without a `service_tier` are sent as `priority`; an explicit tier is left as sent. OpenAI always reports `default` in its responses, so `make tail-codex` is the way to verify the tier.
+- **Routing:** session affinity keeps each conversation on one account to reuse prompt caches, and fails over when an account hits its limit.
+- **Cloudflare account:** personal account "Ollin". The `cf` profile `personal` is bound to this directory. Live logs use wrangler with the personal login kept in `~/.claude/work/wrangler-personal`.
+
+## Gotchas
+
+- **Region:** Anthropic's OAuth rejects the default container region with a 403, which is why the container is pinned to Western Europe (`src/upstream.ts`).
+- **No Fast toggle:** the Codex desktop app shows no Fast toggle for custom providers. Fast mode is still applied, by the Worker.
+- **Panel changes:** `make config-push` overwrites changes made in the management panel. Copy any panel change into `config.yaml` first.
+- **Nested Claude Code:** `claude-hara` run inside a Claude desktop session uses the app's own login, gets a 401 from the proxy, and appears to hang. Run it from a normal terminal.
+- **Redacted backup:** `claude/settings.json` has `autoMode.environment` redacted (Omniyat-internal). Keep your local block when you restore it.
+- **No Cursor provider:** Cursor is not an upstream provider, because the only plugin is an untrusted native library. Cursor works as a client through the base URL above.

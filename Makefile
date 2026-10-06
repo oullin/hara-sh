@@ -16,8 +16,8 @@ API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
-.PHONY: help install types check deploy deploy-dry config-push \
-        claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf
+.PHONY: help install types check dev test coverage format-all lint complexity deploy deploy-dry config-push \
+        claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -30,12 +30,31 @@ install: ## Install npm dependencies (cf, wrangler, containers)
 types: ## Regenerate Worker types from cloudflare.config.ts
 	npx cf workers types >/dev/null
 
-check: types ## Type-check the Worker
+check: types ## Type-check the Worker, tests and Node tooling config
 	npx tsc -p .
+	npx tsc -p tsconfig.node.json
+
+dev: ## Run the Worker + container locally against the dev R2 bucket (secrets from 1Password)
+	./scripts/dev.sh
+
+test: ## Run the Vitest suite
+	npx vitest run
+
+coverage: ## Run the Vitest suite with coverage (fails under 100%)
+	npx vitest run --coverage
+
+format-all: ## Format every TS/JS file with fmtkit (oxlint --fix, oxfmt, structural passes)
+	fmtkit format-all --ts
+
+lint: ## Lint TS/JS with fmtkit (oxlint), writing nothing
+	fmtkit lint src cloudflare.config.ts
+
+complexity: ## Report TS functions over fmtkit's complexity limits
+	fmtkit complexity --ts src
 
 ## --- Deployment ------------------------------------------------------------
 
-deploy: check ## Build the image and deploy (secrets injected from 1Password)
+deploy: check coverage ## Build the image and deploy (secrets injected from 1Password)
 	./scripts/deploy.sh
 
 deploy-dry: check ## Build and validate without uploading
@@ -96,6 +115,16 @@ smoke: ## Send a test message through the proxy (MODEL=... to override)
 logs: ## Show the last LINES lines of the server log (default 200)
 	@curl -fsS "$(URL)/v0/management/logs?limit=$${LINES:-200}" -H "Authorization: Bearer $(MGMT_KEY)" \
 	  | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("lines",[])))'
+
+# Live logs use wrangler (cf has no tail command yet) with the personal Cloudflare login,
+# kept apart from the default (work) wrangler login.
+WRANGLER = XDG_CONFIG_HOME=$(HOME)/.claude/work/wrangler-personal CLOUDFLARE_ACCOUNT_ID=60bada38ab19d58ec34f53af74bfa796 npx wrangler
+
+tail: ## Stream live Worker logs (Ctrl-C to stop)
+	@$(WRANGLER) tail cli-proxy-api --format pretty
+
+tail-codex: ## Stream only Codex request lines: model, tier, effort (Ctrl-C to stop)
+	@$(WRANGLER) tail cli-proxy-api --format pretty | grep --line-buffered 'codex request'
 
 logs-cf: ## Show Worker/container stdout from Cloudflare observability (MINUTES=... to override)
 	@NOW=$$(($$(date +%s)*1000)); FROM=$$((NOW-$${MINUTES:-15}*60*1000)); \

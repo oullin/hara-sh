@@ -3,17 +3,18 @@
 // the runtime container so start() always passes the "default" image from cloudflare.config.ts.
 // Remove once the library supports the new runtime.
 
-type StartOptions = Omit<ContainerStartupOptions, "image" | "containerSnapshot">;
+type StartOptions = Omit<ContainerStartupOptions, 'image' | 'containerSnapshot'>;
 
-export function withExplicitImage(runtime: Container, imageName = "default"): Container {
-  return new Proxy(runtime, {
-    get(target, prop) {
-      if (prop === "start") {
-        return (options?: StartOptions) =>
-          target.start({ enableInternet: true, ...options, image: target.images[imageName] });
-      }
-      const value = Reflect.get(target, prop, target);
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  });
+export function withExplicitImage(runtime: Container, imageName = 'default'): Container {
+	return new Proxy(runtime, {
+		get(target, prop) {
+			if (prop === 'start') {
+				return (options?: StartOptions) => target.start({ enableInternet: true, ...options, image: target.images[imageName] });
+			}
+
+			const value = Reflect.get(target, prop, target);
+
+			return typeof value === 'function' ? value.bind(target) : value;
+		},
+	});
 }
