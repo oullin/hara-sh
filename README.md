@@ -32,6 +32,7 @@ make local         # start, or apply config.yaml changes
 make local-status  # addresses and Tailscale login state
 make health        # is it up?
 make accounts      # connected provider accounts
+make quota         # usage, reset times and capacity about to expire, per account
 make smoke         # one Claude request
 make logs          # last server log lines (LINES=500)
 make local-logs    # follow the container logs
@@ -67,6 +68,8 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
     - `management-password` is written to the rendered config only as a bcrypt hash.
     - The `codex-api-key` and `r2-*` fields are no longer used.
 - **Routing:** session affinity keeps each conversation on one account to reuse prompt caches, and fails over when an account hits its limit.
+- **Limits and resets:** Claude and Codex accounts each have a 5-hour window, which starts at the first request after the previous one ends, and a weekly window. When an account is rate-limited, the proxy reads the provider's reset time (Claude response headers, Codex `usage_limit_reached` body), skips that account until then, and returns it to rotation by itself. Without a reset time it backs off from 1 second up to 30 minutes. Cooldowns are kept in memory, so after a restart the proxy relearns them from one 429 per exhausted account.
+- **Unused capacity:** whatever a weekly window has left when it resets is lost. `make quota` reads each account's live usage through the management API, with the token substituted on the server, and lists the weekly windows that reset within 24 hours with capacity left.
 - **Codex:** Codex uses its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
 - **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
 
@@ -77,6 +80,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 | `local/serve.json`   | Tailscale HTTPS serve config                                                        |
 | `scripts/local.sh`   | `make local*`: render the config, start and stop, portless, print the addresses     |
 | `scripts/hara-key`   | Keychain-cached keys from 1Password                                                 |
+| `scripts/quota.py`   | `make quota`: per-account usage windows and resets through the management API      |
 | `scripts/backup-*`   | Copy the Codex and Claude Code client configs into `codex/` and `claude/`           |
 | `scripts/lib/`       | Shared shell helpers, including `render_config`                                     |
 | `web/`               | Landing page on hara.sh                                                             |
