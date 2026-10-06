@@ -17,7 +17,7 @@ API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
-.PHONY: help install types check dev test coverage format-all lint complexity deploy deploy-dry config-push \
+.PHONY: help install types check dev test web-install web-dev web-test web-coverage web-deploy coverage format-all lint complexity deploy deploy-dry config-push \
         local local-status local-logs local-down local-claude \
         claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
@@ -53,6 +53,23 @@ lint: ## Lint TS/JS with fmtkit (oxlint), writing nothing
 
 complexity: ## Report TS functions over fmtkit's complexity limits
 	fmtkit complexity --ts src
+
+## --- Landing page (web/: Vue + shadcn-vue + Tailwind CSS v4, served on www.hara.sh) ---
+
+web-install: ## Install the landing page dependencies
+	cd web && npm install
+
+web-dev: ## Run the landing page locally (Vite)
+	cd web && npm run dev
+
+web-test: ## Run the landing page tests
+	cd web && npm test
+
+web-coverage: ## Landing page tests with coverage (fails under 100%)
+	cd web && npm run coverage
+
+web-deploy: ## Type-check, test at 100% and deploy the landing page to www.hara.sh
+	cd web && npm run deploy
 
 ## --- Deployment ------------------------------------------------------------
 
