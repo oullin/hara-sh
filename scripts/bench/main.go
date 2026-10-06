@@ -1,4 +1,4 @@
-// Command bench measures the proxy the way the clients feel it (`make bench`): for each address
+// Command bench measures the proxy the way the clients feel it (`make ops bench`): for each address
 // and for Claude (Messages API) and Codex (Responses API), it sends N streaming requests that share
 // a large prompt prefix and reports time to first token, total time and prompt-cache hits. The
 // first request of a run starts cold; the others should be served from the provider's cache.
@@ -43,7 +43,7 @@ func main() {
 	key := os.Getenv("API_KEY")
 
 	if key == "" || *n < 1 {
-		fmt.Fprintln(os.Stderr, "error: API_KEY must hold the client key and -n must be at least 1 (run it through `make bench`)")
+		fmt.Fprintln(os.Stderr, "error: API_KEY must hold the client key and -n must be at least 1 (run it through `make ops bench`)")
 		os.Exit(1)
 	}
 

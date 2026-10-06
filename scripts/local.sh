@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Run the proxy on this computer in Docker (local/compose.yaml), reachable on your tailnet and,
 # through portless in LAN mode, as https://hara.local on your network.
-#   scripts/local.sh up       render the config from 1Password, start, print the addresses
-#   scripts/local.sh status   print the addresses and the Tailscale login state
-#   scripts/local.sh logs     follow the proxy, Tailscale and quota logs
-#   scripts/local.sh down     stop (OAuth logins and the Tailscale identity are kept)
+#   scripts/local.sh up              render the config from 1Password, start, print the addresses
+#   scripts/local.sh status          check every link and print the addresses (scripts/ops)
+#   scripts/local.sh logs [service]  follow the proxy, Tailscale and quota logs (or one service's)
+#   scripts/local.sh down            stop (OAuth logins and the Tailscale identity are kept)
 # Env: LOCAL_DIR (default ~/.cli-proxy-api), LOCAL_NAME (default hara, for <name>.local),
 #      TS_HOSTNAME (default cliproxy),
 #      TS_AUTHKEY (optional; without it, the first start prints a Tailscale login link).
@@ -38,7 +38,7 @@ wait_for_proxy() {
     curl -fsS --max-time 2 "$LOCAL_URL/healthz" >/dev/null 2>&1 && return 0
     sleep 1
   done
-  die "the proxy did not answer on $LOCAL_URL; run: make local-logs"
+  die "the proxy did not answer on $LOCAL_URL; run: make logs"
 }
 
 # portless serves https://<LOCAL_NAME>.local on this computer and announces it on the network
@@ -58,37 +58,23 @@ start_portless() {
   portless alias "$LOCAL_NAME" "$LOCAL_PORT" --force >/dev/null
 }
 
-# Prints "<BackendState> <DNSName or -> <AuthURL or ->" once tailscaled has settled.
-tailscale_state() {
-  local state
+# Right after a start, Tailscale needs a few seconds before it is up or has a login link.
+wait_for_tailscale() {
   for _ in {1..20}; do
-    state="$(compose exec -T tailscale tailscale status --json 2>/dev/null | python3 -c '
-import json, sys
-d = json.load(sys.stdin)
-print(d.get("BackendState", "NoState"), (d.get("Self") or {}).get("DNSName", "").rstrip(".") or "-", d.get("AuthURL") or "-")
-' 2>/dev/null || echo "NoState - -")"
-    case "$state" in
-      NoState* | Starting*" - -" | NeedsLogin*" - -") sleep 1 ;;
-      *) break ;;
-    esac
+    compose exec -T tailscale tailscale status --json --peers=false 2>/dev/null \
+      | grep -qE '"BackendState": "Running"|"AuthURL": "https' && return 0
+    sleep 1
   done
-  printf '%s\n' "$state"
+  return 0
 }
 
-print_addresses() {
-  local state dns auth_url lan_url
-  read -r state dns auth_url < <(tailscale_state)
-
-  log "this computer:  $LOCAL_URL"
-  lan_url="$(portless list 2>/dev/null | grep -Eo "https?://$LOCAL_NAME\.local(:[0-9]+)?( |$)" | head -1 | tr -d ' ' || true)"
-  [[ -n "$lan_url" ]] && log "your network:   $lan_url  (other devices need the portless certificate, ~/.portless/ca.pem)"
-  case "$state" in
-    Running) log "your tailnet:   https://$dns  (base URL for other tools: https://$dns/v1)" ;;
-    NeedsLogin) log "your tailnet:   not signed in yet. Open this link to add '$TS_HOSTNAME' to your tailnet,"
-                log "                then run: make local-status"
-                log "                $auth_url" ;;
-    *) log "your tailnet:   Tailscale is $state; run: make local-logs" ;;
-  esac
+# Checks every link, from the containers to the accounts, and says how to fix what is broken
+# (scripts/ops). Exits 1 when a check fails.
+status() {
+  local bin="$LOCAL_DIR/bin/ops"
+  (cd "$SCRIPTS_DIR/ops" && go build -o "$bin" .)
+  API_KEY="$(secret claude-api-key)" MGMT_KEY="$(secret management-password)" \
+    "$bin" status -local "$LOCAL_URL" -network "https://$LOCAL_NAME.local"
 }
 
 up() {
@@ -106,7 +92,8 @@ up() {
   [[ -n "$was_running" ]] && compose restart proxy
   wait_for_proxy
   start_portless
-  print_addresses
+  wait_for_tailscale
+  status
 }
 
 down() {
@@ -118,8 +105,8 @@ down() {
 
 case "${1:-up}" in
   up) up ;;
-  status) print_addresses ;;
-  logs) compose logs -f --tail=100 ;;
+  status) status ;;
+  logs) compose logs -f --tail=100 "${@:2}" ;;
   down) down ;;
-  *) die "usage: scripts/local.sh [up|status|logs|down]" ;;
+  *) die "usage: scripts/local.sh [up|status|logs [service]|down]" ;;
 esac
