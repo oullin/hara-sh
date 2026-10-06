@@ -14,6 +14,9 @@ management:
   # Replaced with a bcrypt hash of the 1Password value by render_config (scripts/lib/common.sh).
   secret-key: "__MANAGEMENT_PASSWORD_BCRYPT__"
   disable-control-panel: false
+  # The panel is this repo's build (panel/management.html, mounted by local/compose.yaml);
+  # never replace it with upstream's.
+  disable-auto-update-panel: true
 
 access:
   api-keys:
