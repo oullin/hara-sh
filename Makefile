@@ -16,7 +16,7 @@ API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
-.PHONY: help install types check test coverage format-all lint complexity deploy deploy-dry config-push \
+.PHONY: help install types check dev test coverage format-all lint complexity deploy deploy-dry config-push \
         claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
 help: ## Show this help
@@ -33,6 +33,9 @@ types: ## Regenerate Worker types from cloudflare.config.ts
 check: types ## Type-check the Worker, tests and Node tooling config
 	npx tsc -p .
 	npx tsc -p tsconfig.node.json
+
+dev: ## Run the Worker locally with Vite + workerd (cf dev)
+	npx cf dev
 
 test: ## Run the Vitest suite
 	npx vitest run
