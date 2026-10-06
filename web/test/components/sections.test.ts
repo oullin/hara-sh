@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import App from '@/App.vue';
 import CallToAction from '@/components/sections/CallToAction.vue';
 import HeroSection from '@/components/sections/HeroSection.vue';
-import MeaningSection from '@/components/sections/MeaningSection.vue';
 import ProvidersSection from '@/components/sections/ProvidersSection.vue';
 import SiteFooter from '@/components/sections/SiteFooter.vue';
 import SiteHeader from '@/components/sections/SiteHeader.vue';
@@ -103,6 +102,17 @@ describe('HeroSection', () => {
 		).toBe('Copy failed');
 	});
 
+	it('explains 腹 (hara) beside the headline', () => {
+		const meaning = mount(HeroSection).find('aside#meaning');
+
+		expect(
+			meaning.text(),
+		).toContain('腹');
+		expect(
+			meaning.text(),
+		).toContain("the body's center of gravity");
+	});
+
 	it('falls back to the first command for an unknown selection', async () => {
 		const wrapper = mount(HeroSection);
 		const tabs = wrapper.findComponent({ name: 'Tabs' });
@@ -114,15 +124,6 @@ describe('HeroSection', () => {
 		expect(
 			wrapper.find('code').text(),
 		).toBe(clients[0].command);
-	});
-});
-
-describe('MeaningSection', () => {
-	it('explains 腹 (hara)', () => {
-		const text = mount(MeaningSection).text();
-
-		expect(text).toContain('腹');
-		expect(text).toContain("the body's center of gravity");
 	});
 });
 
@@ -228,7 +229,7 @@ describe('App', () => {
 		).toBe(true);
 		expect(
 			wrapper.findAll('section'),
-		).toHaveLength(5);
+		).toHaveLength(4);
 		expect(
 			wrapper.find('footer').exists(),
 		).toBe(true);
