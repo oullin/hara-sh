@@ -44,6 +44,29 @@ Run `make` for every target.
 3. The browser ends on a failed `localhost:…/callback?code=…` page. Paste that URL into the panel's **Callback URL** field and submit it once.
 4. Check that `make accounts` shows the new file.
 
+## Run it locally (Tailscale)
+
+`make local` runs the same CLIProxyAPI image on this computer in Docker, next to a Tailscale container, and gives it the name `hara.local` through [portless](https://github.com/vercel-labs/portless). Upstream requests then leave from this computer's internet connection, not from Cloudflare. It is independent of `proxy.hara.sh`, which keeps running.
+
+| Address                             | Reachable from                                                |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `http://localhost:8317`             | this computer                                                 |
+| `https://hara.local`                | this computer and devices on the same network (mDNS)          |
+| `https://cliproxy.<tailnet>.ts.net` | your devices on the tailnet, anywhere (`/v1` for other tools) |
+
+1. In the Tailscale admin console, enable **MagicDNS** and **HTTPS certificates** (DNS page).
+2. Run `make local`. It renders the config from 1Password, starts both containers, and registers `hara.local` with portless. Starting portless on port 443 asks for your password (sudo). The first time, it prints a Tailscale link that adds the device `cliproxy` to your tailnet; open it, then run `make local-status` for the tailnet address.
+3. Sign in each provider account through `http://localhost:8317/management.html`, as in [Add an account](#add-an-account). The local server has its own logins: never copy the Cloudflare server's OAuth files, because both servers would rotate the same tokens.
+4. Use it: `make local-claude`, or `ANTHROPIC_BASE_URL=https://cliproxy.<tailnet>.ts.net` with `claude-api-key` from another device. The operations targets work with `URL=http://localhost:8317`, for example `make accounts URL=http://localhost:8317`.
+
+- **Main key only:** the local server accepts only `claude-api-key`. The Codex restrictions live in the Worker, so the Codex key is left out rather than given access to the Claude accounts.
+- **State:** config, logins and logs live in `~/.cli-proxy-api/proxy`, and the Tailscale identity in `~/.cli-proxy-api/tailscale` (`LOCAL_DIR=…` to move them). `make local-down` stops the containers and keeps both.
+- **Config changes:** edit `config.yaml` and run `make local` again. Like `make config-push`, it overwrites changes made in the panel.
+- **Availability:** the proxy is up only while this computer is awake, and requests go out through whatever network it is on.
+- **portless LAN mode:** `.local` names exist only in portless LAN mode, which applies to the whole portless proxy. While it is on, every portless app on this computer is `<name>.local` and reachable from the network you are connected to, and portless keeps LAN mode for later starts. To switch back: `portless proxy stop && PORTLESS_LAN=0 portless proxy start`. `make local-down` removes `hara.local` but leaves the portless proxy running for your other apps.
+- **Certificates:** `hara.local` uses portless's own certificate authority, which this computer already trusts. Other devices must trust `~/.portless/ca.pem` first; Node-based clients such as Claude Code can use `NODE_EXTRA_CA_CERTS=/path/to/ca.pem`. The tailnet address has a public certificate and needs nothing.
+- **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
+
 ## Develop
 
 ```bash
@@ -81,7 +104,8 @@ make deploy-dry    # build with Vite and validate without uploading
 | `src/auth/client-key.ts` | Reads the client key; constant-time comparison                                            |
 | `src/codex/policy.ts`    | Codex model pattern, allowed paths, default service tier                                  |
 | `src/container/*`        | The Durable Object that owns the container, plus the explicit-image workaround            |
-| `scripts/`               | deploy, config push, key cache, config backups (`lib/common.sh` shared)                   |
+| `scripts/`               | deploy, config push, local proxy, key cache, config backups (`lib/common.sh` shared)      |
+| `local/`                 | Docker Compose stack and Tailscale serve config for `make local`                          |
 | `test/`                  | Vitest suite, one file per module                                                         |
 
 ## How it works

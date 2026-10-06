@@ -3,6 +3,7 @@
 
 SHELL      := /bin/bash
 URL        := https://proxy.hara.sh
+LOCAL_URL  := http://localhost:8317
 OP_ACCOUNT ?= my.1password.com
 OP_ITEM    := op://YOUR_VAULT/YOUR_ITEM
 BUCKET     := cli-proxy-api
@@ -17,6 +18,7 @@ MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
 .PHONY: help install types check dev test coverage format-all lint complexity deploy deploy-dry config-push \
+        local local-status local-logs local-down local-claude \
         claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
 help: ## Show this help
@@ -62,6 +64,26 @@ deploy-dry: check ## Build and validate without uploading
 
 config-push: ## Render config.yaml from 1Password and upload it to R2
 	./scripts/push-config.sh
+
+## --- Local proxy (Docker + Tailscale) ------------------------------------
+# Runs the proxy on this computer (local/compose.yaml), reachable on your tailnet and as
+# https://hara.local on your network (portless in LAN mode). The operations targets below
+# work against it with URL=$(LOCAL_URL).
+
+local: ## Run the proxy locally in Docker: https://hara.local + your tailnet (config from 1Password)
+	./scripts/local.sh up
+
+local-status: ## Print the local and tailnet addresses and the Tailscale login state
+	@./scripts/local.sh status
+
+local-logs: ## Follow the local proxy and Tailscale logs (Ctrl-C to stop)
+	./scripts/local.sh logs
+
+local-down: ## Stop the local proxy and remove hara.local (logins and Tailscale identity kept)
+	./scripts/local.sh down
+
+local-claude: ## Run Claude Code through the local proxy (pass flags with ARGS="...")
+	@ANTHROPIC_BASE_URL=$(LOCAL_URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
 
 ## --- Claude Code -----------------------------------------------------------
 

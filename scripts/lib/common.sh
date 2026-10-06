@@ -32,3 +32,21 @@ temp_file() {
 
 # secret FIELD: print a secret from the Keychain cache (1Password at most every 30 days).
 secret() { "$SCRIPTS_DIR/hara-key" "$1"; }
+
+# render_config OUT [IN]: inject 1Password secrets into IN (default config.yaml) and write OUT,
+# replacing the management password placeholder with its bcrypt hash.
+render_config() {
+  local out="$1" in="${2:-$REPO_ROOT/config.yaml}" placeholder="__MANAGEMENT_PASSWORD_BCRYPT__" hash
+  op inject -f -i "$in" -o "$out" >/dev/null
+  hash="$(_management_password_hash)"
+  sed -i '' "s|$placeholder|$hash|" "$out"
+  grep -q "$placeholder" "$out" && die "management password placeholder was not replaced"
+  return 0
+}
+
+# Only a bcrypt hash of the management password is stored. htpasswd emits $2y$; Go's bcrypt
+# and the server's "already hashed" check both accept the equivalent $2a$ prefix.
+_management_password_hash() {
+  # shellcheck disable=SC2016 # literal $2y$/$2a$ prefixes
+  secret management-password | htpasswd -niBC 10 "" | tr -d ':\n' | sed 's/^\$2y\$/$2a$/'
+}

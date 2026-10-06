@@ -6,24 +6,6 @@
 source "$(dirname "$0")/lib/common.sh"
 cd "$REPO_ROOT" || exit 1
 
-PLACEHOLDER="__MANAGEMENT_PASSWORD_BCRYPT__"
-
-# Only a bcrypt hash of the management password is stored. htpasswd emits $2y$; Go's bcrypt
-# and the server's "already hashed" check both accept the equivalent $2a$ prefix.
-management_password_hash() {
-  # shellcheck disable=SC2016 # literal $2y$/$2a$ prefixes
-  secret management-password | htpasswd -niBC 10 "" | tr -d ':\n' | sed 's/^\$2y\$/$2a$/'
-}
-
-render_config() {
-  local out="$1" hash
-  op inject -f -i config.yaml -o "$out" >/dev/null
-  hash="$(management_password_hash)"
-  sed -i '' "s|$PLACEHOLDER|$hash|" "$out"
-  grep -q "$PLACEHOLDER" "$out" && die "management password placeholder was not replaced"
-  return 0
-}
-
 upload_to_r2() {
   npx cf r2 objects put config/config.yaml --bucket-name "$R2_BUCKET" \
     --file "$1" --content-type text/yaml -q >/dev/null
