@@ -1,0 +1,21 @@
+{
+	"globals": {
+		"defineEmits": "readonly",
+		"defineExpose": "readonly",
+		"defineModel": "readonly",
+		"defineOptions": "readonly",
+		"defineProps": "readonly",
+		"defineSlots": "readonly",
+		"withDefaults": "readonly"
+	},
+	"ignorePatterns": [
+		"src/components/ui/**",
+		"dist/**",
+		".cloudflare/**",
+		"coverage/**"
+	],
+	"rules": {
+		"react-hooks/exhaustive-deps": "off",
+		"react-hooks/rules-of-hooks": "off"
+	}
+}
