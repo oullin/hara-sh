@@ -1,7 +1,5 @@
 personality = "pragmatic"
 model = "gpt-6.1-sol"
-# Default: route through CLIProxyAPI (proxy.hara.sh). Direct OpenAI login: codex --profile openai
-model_provider = "hara"
 model_reasoning_effort = "high"
 approval_policy = "never"
 default_permissions = ":danger-full-access"
@@ -372,16 +370,10 @@ NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "9230e2bd8b24b7ac7a0ba6774c64bf0d78ec
 command = "executor"
 args = ["mcp"]
 
-# CLIProxyAPI on Cloudflare (https://proxy.hara.sh) - Codex pool: 2 Codex accounts (Pro + Team).
-# Default provider (see model_provider above). The key comes from scripts/hara-key in
-# oullin/cli-proxy-api: cached in the macOS Keychain, re-read from 1Password every 30 days.
-# Switch back to the direct ChatGPT login with: codex --profile openai
+# Threads started while Codex went through the old proxy remember the provider "hara".
+# Keep that name as an alias of the direct ChatGPT login so those threads can still reopen.
 [model_providers.hara]
-name = "hara proxy"
-base_url = "https://proxy.hara.sh/v1"
+name = "OpenAI (ChatGPT login)"
+base_url = "https://chatgpt.com/backend-api/codex"
 wire_api = "responses"
-auth.command = "/Users/gocanto/Sites/CLIProxyAPI/scripts/hara-key"
-# Dedicated key: the proxy Worker limits it to Codex/GPT models (Codex accounts only).
-auth.args = ["codex-api-key"]
-auth.timeout_ms = 60000
-auth.refresh_interval_ms = 86400000
+requires_openai_auth = true

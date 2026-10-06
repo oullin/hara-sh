@@ -14,7 +14,8 @@ export const providers: Array<Provider> = [
 	{ glyph: '..#..|..#..|#####|..#..|..#..', name: 'Plugins', via: 'Copilot, Kiro and more' },
 ];
 
-export const PROXY_URL = 'https://proxy.hara.sh';
+// Served by portless on this computer and announced on the local network (mDNS).
+export const PROXY_URL = 'https://hara.local';
 
 export const DOCS_URL = 'https://github.com/router-for-me/CLIProxyAPI';
 
@@ -39,7 +40,7 @@ export type Step = {
 // "How it works": each step's code is shown in the sticky panel while the step is in view.
 export const steps: Array<Step> = [
 	{
-		body: 'Sign in to each subscription once, or add an API key. Tokens live in object storage and refresh on their own.',
+		body: 'Sign in to each subscription once, or add an API key. Tokens stay on your own computer and refresh on their own.',
 		code: 'auths/\n  claude-personal.json\n  claude-work.json\n  codex-pro.json\n  codex-team.json\n  gemini.key',
 		file: 'auths/',
 		id: 'connect',
@@ -63,11 +64,11 @@ export const steps: Array<Step> = [
 		token: 'session',
 	},
 	{
-		body: "Give a client a key that only reaches one provider's models. It is checked at the edge, before anything is forwarded.",
-		code: 'codex key  →  gpt-6.1-sol      200\ncodex key  →  claude-opus-4-8  403\n  "codex key is limited to Codex models"',
-		file: 'keys',
-		id: 'scope',
-		title: 'Scope every',
-		token: 'key',
+		body: 'The proxy runs in Docker on your computer. Devices on your network use hara.local; your other devices reach it over Tailscale, wherever they are.',
+		code: `make local\n\nthis computer:  http://localhost:8317\nyour network:   ${PROXY_URL}\nyour tailnet:   https://cliproxy.[TAILNET].ts.net`,
+		file: 'make local',
+		id: 'reach',
+		title: 'Reach it from',
+		token: 'anywhere',
 	},
 ];

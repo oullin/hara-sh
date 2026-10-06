@@ -1,0 +1,42 @@
+# Local proxy: CLIProxyAPI on this computer, reachable on your tailnet over HTTPS.
+# Started by scripts/local.sh (`make local`), which sets LOCAL_DIR (default ~/.cli-proxy-api)
+# and renders $LOCAL_DIR/proxy/config.yaml first.
+# Upgrade CLIProxyAPI by bumping the proxy image tag below, then run `make local`.
+name: cli-proxy-api-local
+
+services:
+  # Joins the tailnet as its own device and serves https://<TS_HOSTNAME>.<tailnet>.ts.net
+  # to the proxy. Userspace networking needs no extra privileges.
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: ${TS_HOSTNAME:-cliproxy}
+    environment:
+      TS_HOSTNAME: ${TS_HOSTNAME:-cliproxy}
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+    volumes:
+      - ${LOCAL_DIR:?}/tailscale:/var/lib/tailscale
+      - ./serve.json:/config/serve.json:ro
+    # The proxy shares this container's network, so its port is published here, on this
+    # computer only. portless (on the host) forwards https://hara.local to it; Docker Desktop
+    # offers no other way for a host process to reach a container.
+    ports:
+      - "127.0.0.1:8317:8317"
+    restart: unless-stopped
+
+  # Config, OAuth logins and logs live in $LOCAL_DIR/proxy.
+  proxy:
+    image: eceasy/cli-proxy-api:v8.0.15
+    network_mode: service:tailscale
+    command: ["./CLIProxyAPI", "-config", "/data/config.yaml"]
+    environment:
+      WRITABLE_PATH: /data
+      # Singapore time (SGT) for log timestamps. The Tailscale image ships no zone data.
+      TZ: Asia/Singapore
+    volumes:
+      - ${LOCAL_DIR:?}/proxy:/data
+    depends_on:
+      - tailscale
+    restart: unless-stopped
