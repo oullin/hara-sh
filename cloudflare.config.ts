@@ -1,39 +1,39 @@
-import { bindings, defineConfig, defineContainer, defineWorker, exports } from "cf/config";
+import { bindings, defineConfig, defineContainer, defineWorker, exports } from 'cf/config';
 
 const cliProxy = defineContainer({
-	name: "cli-proxy-api",
-	// Lifecycle is driven by the CliProxy Durable Object (src/index.ts).
-	schedulingPolicy: "durable-object",
 	images: {
-		default: { dockerfile: "./Dockerfile" },
+		default: { dockerfile: './Dockerfile' },
 	},
+	name: 'cli-proxy-api',
 	observability: { enabled: true, logs: { enabled: true } },
+	// Lifecycle is driven by the CliProxy Durable Object (src/container/cli-proxy.ts).
+	schedulingPolicy: 'durable-object',
 });
 
 const worker = defineWorker({
-	name: "cli-proxy-api",
-	compatibilityDate: "2026-10-01",
-	entrypoint: "src/index.ts",
-	workersDev: false,
-	domains: ["proxy.hara.sh"],
-	observability: { enabled: true },
+	compatibilityDate: '2026-10-01',
+	domains: ['proxy.hara.sh'],
+	entrypoint: 'src/index.ts',
 	env: {
-		OBJECTSTORE_ENDPOINT: bindings.secret(),
-		OBJECTSTORE_BUCKET: bindings.secret(),
-		OBJECTSTORE_ACCESS_KEY: bindings.secret(),
-		OBJECTSTORE_SECRET_KEY: bindings.secret(),
-		MANAGEMENT_PASSWORD: bindings.secret(),
-		// Client key restricted to Codex models by the Worker (src/index.ts).
+		// Client key restricted to Codex models by the Worker (src/codex/guard.ts).
 		CODEX_API_KEY: bindings.secret(),
+		MANAGEMENT_PASSWORD: bindings.secret(),
+		OBJECTSTORE_ACCESS_KEY: bindings.secret(),
+		OBJECTSTORE_BUCKET: bindings.secret(),
+		OBJECTSTORE_ENDPOINT: bindings.secret(),
+		OBJECTSTORE_SECRET_KEY: bindings.secret(),
 	},
 	exports: {
-		CliProxy: exports.durableObject({ storage: "sqlite", container: cliProxy }),
+		CliProxy: exports.durableObject({ container: cliProxy, storage: 'sqlite' }),
 	},
+	name: 'cli-proxy-api',
+	observability: { enabled: true },
+	workersDev: false,
 });
 
 export default defineConfig({
 	// Personal account "Ollin" (5246059+gocanto@users.noreply.github.com).
-	accountId: "YOUR_ACCOUNT_ID",
-	worker,
+	accountId: 'YOUR_ACCOUNT_ID',
 	containers: [cliProxy],
+	worker,
 });

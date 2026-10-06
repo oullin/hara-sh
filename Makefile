@@ -16,7 +16,7 @@ API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
-.PHONY: help install types check deploy deploy-dry config-push \
+.PHONY: help install types check format-all lint complexity deploy deploy-dry config-push \
         claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
 help: ## Show this help
@@ -32,6 +32,15 @@ types: ## Regenerate Worker types from cloudflare.config.ts
 
 check: types ## Type-check the Worker
 	npx tsc -p .
+
+format-all: ## Format every TS/JS file with fmtkit (oxlint --fix, oxfmt, structural passes)
+	fmtkit format-all --ts
+
+lint: ## Lint TS/JS with fmtkit (oxlint), writing nothing
+	fmtkit lint src cloudflare.config.ts
+
+complexity: ## Report TS functions over fmtkit's complexity limits
+	fmtkit complexity --ts src
 
 ## --- Deployment ------------------------------------------------------------
 

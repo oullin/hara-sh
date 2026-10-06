@@ -1,7 +1,9 @@
-import { defineWranglerConfig } from "wrangler/experimental-config";
+import { defineWranglerConfig } from 'wrangler/experimental-config';
 
-export default defineWranglerConfig({
-	types: {
-		generate: false,
+export default defineWranglerConfig(
+	{
+		types: {
+			generate: false,
+		},
 	},
-});
+);

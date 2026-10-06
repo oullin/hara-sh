@@ -5,33 +5,33 @@ Deployment of [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) on Clo
 - **Runtime:** a Worker (`src/index.ts`) forwards every request to a single container running `eceasy/cli-proxy-api` (`Dockerfile`). The container is managed by the `CliProxy` Durable Object, as configured in `cloudflare.config.ts`.
 - **State:** `config.yaml` and the OAuth token files live in the R2 bucket `cli-proxy-api`, under `config/config.yaml` and `auths/*.json`. The server uses its built-in object store (`OBJECTSTORE_*`) to read and write them. The container disk is only a cache.
 - **Secrets:** 1Password, account `my.1password.com`, vault `cloudflare`, item `cli-proxy-api`.
-  - `claude-api-key`: the main client API key (Claude Code, scripts), which can reach every provider.
-  - `codex-api-key`: the Codex CLI key. The Worker limits it to Codex/GPT models, so it only uses the Codex accounts.
-  - `management-password`: the password for the management API and panel.
-  - `r2-endpoint`, `r2-bucket`, `r2-access-key-id`, `r2-secret-access-key`: the R2 S3 credentials.
+    - `claude-api-key`: the main client API key (Claude Code, scripts), which can reach every provider.
+    - `codex-api-key`: the Codex CLI key. The Worker limits it to Codex/GPT models, so it only uses the Codex accounts.
+    - `management-password`: the password for the management API and panel.
+    - `r2-endpoint`, `r2-bucket`, `r2-access-key-id`, `r2-secret-access-key`: the R2 S3 credentials.
 - **Account:** the personal Cloudflare account "Ollin" (`accountId` in `cloudflare.config.ts`). The `cf` auth profile `personal` is bound to this directory with `cf auth activate personal .`.
 
 ## Source layout
 
-| File | Concern |
-|---|---|
-| `src/index.ts` | Worker entry: sends Codex-key requests to the guard and everything else straight to the container |
-| `src/upstream.ts` | The single `CliProxy` Durable Object instance, pinned to Western Europe |
-| `src/container/cli-proxy.ts` | The Durable Object that owns the container: port, sleep timeout, environment |
-| `src/container/explicit-image.ts` | Workaround that makes start() pass the image explicitly (`@cloudflare/containers` 0.3.7) |
-| `src/auth/client-key.ts` | Reads the client key from `Authorization` or `x-api-key`, with a constant-time comparison |
-| `src/codex/policy.ts` | Which models and paths the Codex key may use |
-| `src/codex/guard.ts` | Enforces that policy and filters `/v1/models` |
-| `src/http/errors.ts` | JSON error responses |
+| File                              | Concern                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                    | Worker entry: sends Codex-key requests to the guard and everything else straight to the container |
+| `src/upstream.ts`                 | The single `CliProxy` Durable Object instance, pinned to Western Europe                           |
+| `src/container/cli-proxy.ts`      | The Durable Object that owns the container: port, sleep timeout, environment                      |
+| `src/container/explicit-image.ts` | Workaround that makes start() pass the image explicitly (`@cloudflare/containers` 0.3.7)          |
+| `src/auth/client-key.ts`          | Reads the client key from `Authorization` or `x-api-key`, with a constant-time comparison         |
+| `src/codex/policy.ts`             | Which models and paths the Codex key may use                                                      |
+| `src/codex/guard.ts`              | Enforces that policy and filters `/v1/models`                                                     |
+| `src/http/errors.ts`              | JSON error responses                                                                              |
 
-| Script | Purpose |
-|---|---|
-| `scripts/deploy.sh` | Renders `secrets.env.tpl` from 1Password and runs `cf deploy` (`make deploy`) |
-| `scripts/push-config.sh` | Renders `config.yaml`, hashes the management password, uploads to R2 and reloads the live server (`make config-push`) |
-| `scripts/hara-key` | Keychain-cached secrets (standalone; used by Codex `auth.command`) |
-| `scripts/backup-codex.sh` / `backup-claude.sh` | Copy `~/.codex` and `~/.claude` config into `codex/` and `claude/` |
-| `scripts/lib/common.sh` | Shared settings (1Password account, proxy URL, bucket) and helpers (`temp_file`, `secret`, `log`, `die`) |
-| `scripts/lib/redact_claude_settings.py` | Redacts `autoMode.environment` from the Claude settings backup |
+| Script                                         | Purpose                                                                                                               |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `scripts/deploy.sh`                            | Renders `secrets.env.tpl` from 1Password and runs `cf deploy` (`make deploy`)                                         |
+| `scripts/push-config.sh`                       | Renders `config.yaml`, hashes the management password, uploads to R2 and reloads the live server (`make config-push`) |
+| `scripts/hara-key`                             | Keychain-cached secrets (standalone; used by Codex `auth.command`)                                                    |
+| `scripts/backup-codex.sh` / `backup-claude.sh` | Copy `~/.codex` and `~/.claude` config into `codex/` and `claude/`                                                    |
+| `scripts/lib/common.sh`                        | Shared settings (1Password account, proxy URL, bucket) and helpers (`temp_file`, `secret`, `log`, `die`)              |
+| `scripts/lib/redact_claude_settings.py`        | Redacts `autoMode.environment` from the Claude settings backup                                                        |
 
 ## Requirements
 
@@ -72,6 +72,9 @@ make logs          # last server log lines (LINES=... to override)
 make logs-cf       # Worker request logs from Cloudflare (MINUTES=... to override)
 make tail          # stream live Worker logs (wrangler tail, personal login; Ctrl-C to stop)
 make tail-codex    # stream only Codex request lines: model, tier, effort
+make format-all    # fmtkit: oxlint --fix, oxfmt and structural passes on all TS/JS
+make lint          # fmtkit lint (oxlint), writes nothing
+make complexity    # fmtkit complexity report for src/
 ```
 
 - **Upgrade upstream:** bump the image tag in `Dockerfile`, then run `make deploy`.
@@ -85,12 +88,13 @@ Plain `codex` goes through the proxy:
 - `~/.codex/config.toml` sets `model_provider = "hara"` and defines the `hara` provider (`https://proxy.hara.sh/v1`, Responses API).
 - Codex gets its own key, `codex-api-key`, from `scripts/hara-key` (`auth.command`), so no environment variable is needed.
 - **Codex accounts only:** with that key, the Worker (`src/index.ts`):
-  - allows only `/v1/responses`, `/v1/chat/completions` and `/v1/models`;
-  - rejects any model that does not match `gpt-*`, `codex-*` or `o<digit>*` with a 403;
-  - removes non-Codex models from `/v1/models`;
-  - blocks WebSockets, whose model names it cannot inspect.
+    - allows only `/v1/responses`, `/v1/chat/completions` and `/v1/models`;
+    - rejects any model that does not match `gpt-*`, `codex-*` or `o<digit>*` with a 403;
+    - removes non-Codex models from `/v1/models`;
+    - blocks WebSockets, whose model names it cannot inspect.
 
-  The proxy serves those models only from the Codex OAuth accounts, so Codex never uses a Claude account. The guard filters both model-list formats: the OpenAI `data` list and the `models` catalog the Codex app reads.
+    The proxy serves those models only from the Codex OAuth accounts, so Codex never uses a Claude account. The guard filters both model-list formats: the OpenAI `data` list and the `models` catalog the Codex app reads.
+
 - **No Fast toggle in the desktop app:** the closed-source desktop app appears to show its Fast toggle only for providers that use ChatGPT sign-in, and Codex refuses to combine `requires_openai_auth` with a provider `auth.command`. Fast mode is still applied by the Worker (below). In the open-source Codex CLI, the toggle depends only on the `fast_mode` feature and a "Fast" tier in the model catalog, and both are present here.
 - **Fast mode by default:** the Codex app hides its Fast toggle for custom providers and sends no `service_tier`. The Worker therefore adds `service_tier: "priority"` to Codex-key requests that have no tier (`DEFAULT_SERVICE_TIER` in `src/codex/policy.ts`). An explicit tier, including `"default"`, is left as sent.
 - **Checking the tier:** OpenAI always reports `service_tier: "default"` in its responses, so check the requested tier with `make logs-cf`. Each Codex request logs a line such as `codex request model=gpt-6.1-sol tier=priority (default) effort=high`, with no prompt content.
@@ -115,10 +119,10 @@ Plain `codex` goes through the proxy:
 
 ### Accounts in the pool
 
-| Provider | Accounts | Login flow |
-|---|---|---|
-| Claude | 2 | Claude OAuth, done once per account. Sign out of claude.ai (or use a private window) before adding the second, otherwise the same account is authorised again. |
-| Codex | 1 | Codex OAuth, or the device-code login |
+| Provider | Accounts | Login flow                                                                                                                                                     |
+| -------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude   | 2        | Claude OAuth, done once per account. Sign out of claude.ai (or use a private window) before adding the second, otherwise the same account is authorised again. |
+| Codex    | 1        | Codex OAuth, or the device-code login                                                                                                                          |
 
 `routing.session-affinity` keeps each conversation on one account, so prompt caches are reused. The proxy fails over to the other account when one is rate-limited.
 
