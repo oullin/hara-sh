@@ -48,7 +48,7 @@ Run `make` for every target.
 
 ```bash
 make install       # dependencies
-make dev           # run the Worker locally (Vite + workerd)
+make dev           # run the Worker locally (Vite + workerd); see the note below
 make check         # tsc for src/, test/ and the Node tooling config
 make coverage      # vitest, fails under 100%
 make format-all    # fmtkit (oxlint --fix, oxfmt, structural passes)
@@ -58,6 +58,7 @@ make deploy-dry    # build with Vite and validate without uploading
 
 - **Stack:** [Hono](https://hono.dev) handles routing and middleware, [Effect](https://effect.website) runs side effects as services with tagged errors, and [better-result](https://better-result.dev) handles pure policy decisions as `Result`s. [Vite](https://vite.dev) with `@cloudflare/vite-plugin` bundles the Worker for `cf dev` and `cf deploy`.
 - **Imports:** `@/…` refers to `src/`, and `@test/…` refers to `test/`.
+- **`make dev` scope:** it runs the Worker and Hono routes locally. The local container does not start, because no secrets are provided locally. Pointing it at the real secrets would run a second server against the production R2 bucket, so it is deliberately not wired up. Use the tests for logic and `make deploy-dry` for the build.
 
 | Path                     | Concern                                                                                   |
 | ------------------------ | ----------------------------------------------------------------------------------------- |
