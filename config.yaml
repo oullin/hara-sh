@@ -22,11 +22,23 @@ access:
 
 # Credential pool: the provider accounts signed in through the management panel.
 routing:
+  # Picks the account for a session's first request only; affinity keeps it there afterwards.
   strategy: "round-robin"
-  # Keep each conversation on one account so Claude/Codex prompt caches are reused;
-  # fails over to the other account automatically when one is rate-limited.
+  # Keep each conversation on one account, because prompt caches are per account:
+  #   - Claude: keyed by the Claude Code session (X-Claude-Code-Session-Id / metadata.user_id).
+  #     Native Claude Code keeps its own cache_control markers; the proxy only adds them for
+  #     other clients (1h TTL on OAuth accounts).
+  #   - Codex: keyed by prompt_cache_key, passed through from the client or derived from the
+  #     session when absent, and sent upstream as Session-Id.
+  # Fails over to another account when the bound one is rate-limited; the first turn there
+  # rebuilds the cache. A bound session outranks priority, so `quota -route` boosts only
+  # steer new sessions and failovers, never move a warm one.
   session-affinity: true
+  # Matches Claude's 1h OAuth cache TTL; longer keeps bindings, not cache hits.
   session-affinity-ttl: "1h"
+  # Upstream default, explicit: subagents run on the parent's account (cache reuse over
+  # parallelism). false spreads them across the pool.
+  session-affinity-subagents: true
 
 upstream:
   codex:
