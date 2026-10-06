@@ -1,3 +1,3 @@
 module github.com/oullin/cli-proxy-api/scripts/quota
 
-go 1.24
+go 1.27
