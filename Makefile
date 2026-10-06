@@ -2,11 +2,9 @@
 # Secrets are read from 1Password at run time and never echoed.
 
 SHELL      := /bin/bash
-URL        := https://proxy.hara.sh
-LOCAL_URL  := http://localhost:8317
+# portless serves the local proxy here (scripts/local.sh); URL=http://localhost:8317 skips it.
+URL        ?= https://hara.local
 OP_ACCOUNT ?= my.1password.com
-OP_ITEM    := op://cloudflare/cli-proxy-api
-BUCKET     := cli-proxy-api
 MODEL      ?= claude-haiku-4-5-20251001
 
 export OP_ACCOUNT
@@ -15,107 +13,43 @@ export OP_ACCOUNT
 HARA_KEY = $(CURDIR)/scripts/hara-key
 API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
+# hara.local uses the portless certificate authority; Node-based clients need it named.
+PORTLESS_CA = $(HOME)/.portless/ca.pem
 
 .DEFAULT_GOAL := help
-.PHONY: help install types check dev test web-install web-dev web-test web-coverage web-deploy coverage format-all lint complexity deploy deploy-dry config-push \
-        local local-status local-logs local-down local-claude \
-        claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
+.PHONY: help local local-status local-logs local-down claude alias keys-refresh codex-backup claude-backup \
+        health models accounts smoke logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-## --- Development -----------------------------------------------------------
+## --- Local proxy (Docker + Tailscale + portless) ---------------------------
+# Runs the proxy on this computer (local/compose.yaml): https://hara.local on your network
+# (portless in LAN mode) and https://cliproxy.<tailnet>.ts.net on your tailnet.
 
-install: ## Install npm dependencies (cf, wrangler, containers)
-	npm install
-
-types: ## Regenerate Worker types from cloudflare.config.ts
-	npx cf workers types >/dev/null
-
-check: types ## Type-check the Worker, tests and Node tooling config
-	npx tsc -p .
-	npx tsc -p tsconfig.node.json
-
-dev: ## Run the Worker + container locally against the dev R2 bucket (secrets from 1Password)
-	./scripts/dev.sh
-
-test: ## Run the Vitest suite
-	npx vitest run
-
-coverage: ## Run the Vitest suite with coverage (fails under 100%)
-	npx vitest run --coverage
-
-format-all: ## Format every TS/JS file with fmtkit (oxlint --fix, oxfmt, structural passes)
-	fmtkit format-all --ts
-
-lint: ## Lint TS/JS with fmtkit (oxlint), writing nothing
-	fmtkit lint src cloudflare.config.ts
-
-complexity: ## Report TS functions over fmtkit's complexity limits
-	fmtkit complexity --ts src
-
-## --- Landing page (web/: Vue + shadcn-vue + Tailwind CSS v4, served on www.hara.sh) ---
-
-web-install: ## Install the landing page dependencies
-	cd web && npm install
-
-web-dev: ## Run the landing page locally (Vite)
-	cd web && npm run dev
-
-web-test: ## Run the landing page tests
-	cd web && npm test
-
-web-coverage: ## Landing page tests with coverage (fails under 100%)
-	cd web && npm run coverage
-
-web-deploy: ## Type-check, test at 100% and deploy the landing page to www.hara.sh
-	cd web && npm run deploy
-
-## --- Deployment ------------------------------------------------------------
-
-deploy: check coverage ## Build the image and deploy (secrets injected from 1Password)
-	./scripts/deploy.sh
-
-deploy-dry: check ## Build and validate without uploading
-	npx cf deploy --dry-run
-
-config-push: ## Render config.yaml from 1Password and upload it to R2
-	./scripts/push-config.sh
-
-## --- Local proxy (Docker + Tailscale) ------------------------------------
-# Runs the proxy on this computer (local/compose.yaml), reachable on your tailnet and as
-# https://hara.local on your network (portless in LAN mode). The operations targets below
-# work against it with URL=$(LOCAL_URL).
-
-local: ## Run the proxy locally in Docker: https://hara.local + your tailnet (config from 1Password)
+local: ## Start the proxy: https://hara.local + your tailnet (config from 1Password)
 	./scripts/local.sh up
 
-local-status: ## Print the local and tailnet addresses and the Tailscale login state
+local-status: ## Print the local, network and tailnet addresses and the Tailscale login state
 	@./scripts/local.sh status
 
-local-logs: ## Follow the local proxy and Tailscale logs (Ctrl-C to stop)
+local-logs: ## Follow the proxy and Tailscale logs (Ctrl-C to stop)
 	./scripts/local.sh logs
 
-local-down: ## Stop the local proxy and remove hara.local (logins and Tailscale identity kept)
+local-down: ## Stop the proxy and remove hara.local (logins and Tailscale identity kept)
 	./scripts/local.sh down
 
-local-claude: ## Run Claude Code through the local proxy (pass flags with ARGS="...")
-	@ANTHROPIC_BASE_URL=$(LOCAL_URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
-
-## --- Claude Code -----------------------------------------------------------
+## --- Clients ---------------------------------------------------------------
+# Codex is not routed through the proxy: it uses its own ChatGPT login (~/.codex/config.toml).
 
 claude: ## Run Claude Code through the proxy (pass flags with ARGS="...")
-	@ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
+	@NODE_EXTRA_CA_CERTS=$(PORTLESS_CA) ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
 
-## --- Codex CLI -------------------------------------------------------------
-# ~/.codex/config.toml routes Codex through the proxy by default (provider `hara`,
-# key fetched from 1Password via auth.command). Backups live in codex/.
+alias: ## Print the claude-hara shell alias for ~/.zshrc
+	@echo "alias claude-hara='NODE_EXTRA_CA_CERTS=\$$HOME/.portless/ca.pem ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
 
-codex: ## Run Codex CLI (proxy is the default provider; pass flags with ARGS="...")
-	@codex $(ARGS)
-
-codex-direct: ## Run Codex CLI with the direct ChatGPT login (profile `openai`)
-	@codex --profile openai $(ARGS)
+keys-refresh: ## Re-fetch the cached keys from 1Password now (e.g. after rotating them)
+	@for f in claude-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
 
 codex-backup: ## Copy ~/.codex/config.toml and openai.config.toml into codex/ (then commit)
 	./scripts/backup-codex.sh
@@ -123,19 +57,10 @@ codex-backup: ## Copy ~/.codex/config.toml and openai.config.toml into codex/ (t
 claude-backup: ## Copy ~/.claude settings into claude/ (Omniyat auto-mode section redacted), then commit
 	./scripts/backup-claude.sh
 
-codex-smoke: ## Run one non-interactive Codex turn through the proxy
-	@codex exec --skip-git-repo-check "Reply with exactly: pong" </dev/null
-
-alias: ## Print the claude-hara shell alias for ~/.zshrc
-	@echo "alias claude-hara='ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
-
-keys-refresh: ## Re-fetch the cached keys from 1Password now (e.g. after rotating them)
-	@for f in claude-api-key codex-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
-
 ## --- Operations ------------------------------------------------------------
 
 health: ## Check the proxy health endpoint
-	@curl -fsS --max-time 60 $(URL)/healthz && echo
+	@curl -fsS --max-time 10 $(URL)/healthz && echo
 
 models: ## List models available through the proxy
 	@curl -fsS $(URL)/v1/models -H "Authorization: Bearer $(API_KEY)" \
@@ -155,17 +80,28 @@ logs: ## Show the last LINES lines of the server log (default 200)
 	@curl -fsS "$(URL)/v0/management/logs?limit=$${LINES:-200}" -H "Authorization: Bearer $(MGMT_KEY)" \
 	  | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("lines",[])))'
 
-# Live logs use wrangler (cf has no tail command yet) with the personal Cloudflare login,
-# kept apart from the default (work) wrangler login.
-WRANGLER = XDG_CONFIG_HOME=$(HOME)/.claude/work/wrangler-personal CLOUDFLARE_ACCOUNT_ID=60bada38ab19d58ec34f53af74bfa796 npx wrangler
+## --- Landing page (web/: Vue + shadcn-vue + Tailwind CSS v4, served on www.hara.sh) ---
 
-tail: ## Stream live Worker logs (Ctrl-C to stop)
-	@$(WRANGLER) tail cli-proxy-api --format pretty
+web-install: ## Install the landing page dependencies
+	cd web && npm install
 
-tail-codex: ## Stream only Codex request lines: model, tier, effort (Ctrl-C to stop)
-	@$(WRANGLER) tail cli-proxy-api --format pretty | grep --line-buffered 'codex request'
+web-dev: ## Run the landing page locally (Vite)
+	cd web && npm run dev
 
-logs-cf: ## Show Worker/container stdout from Cloudflare observability (MINUTES=... to override)
-	@NOW=$$(($$(date +%s)*1000)); FROM=$$((NOW-$${MINUTES:-15}*60*1000)); \
-	npx cf observability telemetry query --body "{\"queryId\":\"make-logs\",\"view\":\"events\",\"limit\":500,\"timeframe\":{\"from\":$$FROM,\"to\":$$NOW},\"parameters\":{}}" \
-	  | python3 -c 'import json,sys; ev=sorted(json.load(sys.stdin)["events"]["events"],key=lambda e:e.get("timestamp",0)); [print(e.get("$$metadata",{}).get("message","")) for e in ev]'
+web-test: ## Run the landing page tests
+	cd web && npm test
+
+web-coverage: ## Landing page tests with coverage (fails under 100%)
+	cd web && npm run coverage
+
+web-deploy: ## Type-check, test at 100% and deploy the landing page to www.hara.sh
+	cd web && npm run deploy
+
+format-all: ## Format every TS/JS file with fmtkit (oxlint --fix, oxfmt, structural passes)
+	fmtkit format-all --ts
+
+lint: ## Lint the landing page TS with fmtkit (oxlint), writing nothing
+	fmtkit lint web/src web/worker web/cloudflare.config.ts
+
+complexity: ## Report landing page TS functions over fmtkit's complexity limits
+	fmtkit complexity --ts web/src web/worker

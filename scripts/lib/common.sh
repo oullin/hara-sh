@@ -11,10 +11,6 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(dirname "$SCRIPTS_DIR")"
 
 export OP_ACCOUNT="${OP_ACCOUNT:-my.1password.com}"
-# shellcheck disable=SC2034
-PROXY_URL="${PROXY_URL:-https://proxy.hara.sh}"
-# shellcheck disable=SC2034
-R2_BUCKET="${R2_BUCKET:-cli-proxy-api}"
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }

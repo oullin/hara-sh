@@ -7,7 +7,7 @@
 #   hara-key --refresh [field]     # fetch from 1Password now and re-cache
 #   hara-key --clear [field]       # drop the cached value
 #
-# Fields: claude-api-key, codex-api-key, management-password.
+# Fields: claude-api-key, management-password.
 set -euo pipefail
 
 OP_ACCOUNT="${OP_ACCOUNT:-my.1password.com}"

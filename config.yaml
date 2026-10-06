@@ -1,8 +1,7 @@
 # CLIProxyAPI config template (v8 layout).
 #
-# Contains 1Password references only. Render and upload it to R2 with:
-#   make config-push
-# The server reads config/config.yaml from the R2 bucket, not this file.
+# Contains 1Password references only. `make local` renders it into
+# ~/.cli-proxy-api/proxy/config.yaml, which the local server reads.
 # Full option reference: upstream config.example.yaml.
 config-version: 8
 
@@ -12,18 +11,16 @@ server:
 
 management:
   allow-remote: true
-  # Replaced with a bcrypt hash of the 1Password value by scripts/push-config.sh.
+  # Replaced with a bcrypt hash of the 1Password value by render_config (scripts/lib/common.sh).
   secret-key: "__MANAGEMENT_PASSWORD_BCRYPT__"
   disable-control-panel: false
 
 access:
   api-keys:
-    # Main key: every provider (Claude Code, scripts, ...).
+    # The only client key (Claude Code, scripts, ...). Codex uses its own ChatGPT login.
     - "{{ op://cloudflare/cli-proxy-api/claude-api-key }}"
-    # Codex CLI key: the Worker limits it to Codex/GPT models, i.e. the Codex accounts only.
-    - "{{ op://cloudflare/cli-proxy-api/codex-api-key }}"
 
-# Credential pool: 2x Claude OAuth + 1x Codex OAuth (logged in via the management panel).
+# Credential pool: the provider accounts signed in through the management panel.
 routing:
   strategy: "round-robin"
   # Keep each conversation on one account so Claude/Codex prompt caches are reused;
@@ -33,19 +30,18 @@ routing:
 
 upstream:
   codex:
-    # Cloudflare cuts idle proxied responses at 100s; upstream recommends 20s behind a proxy.
+    # Upstream recommends 20s when the server sits behind another proxy (portless, Tailscale).
     stream-bootstrap-timeout: "20s"
 
 oauth:
-  # Overridden by the object store (R2 auths/ prefix); kept for clarity.
+  # ~/.cli-proxy-api/proxy/auths on this computer (mounted at /data).
   auth-dir: "/data/auths"
 
 observability:
   logs:
     debug: false
-    # Logs go to rotating 10 MB files under /data/logs (container disk, 4 GB on "basic")
+    # Logs go to rotating 10 MB files under /data/logs (~/.cli-proxy-api/proxy/logs)
     # instead of stdout, so they are viewable in the panel and via `make logs`.
-    # The disk is ephemeral: logs are lost when the container sleeps or restarts.
     logging-to-file: true
     # Retention: delete the oldest log files once the directory exceeds this size.
     # Upstream default is 0 (unbounded); rotation alone never deletes anything.
@@ -55,7 +51,7 @@ observability:
     request-log: false
 
 # Plugin runtime (enabled from the management panel). Plugin binaries are installed
-# into plugins.dir on the container disk, which is NOT persisted to R2.
+# into plugins.dir inside the container and are lost when it is recreated.
 plugins:
   enabled: true
   dir: "plugins"

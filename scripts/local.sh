@@ -17,24 +17,15 @@ TS_HOSTNAME="${TS_HOSTNAME:-cliproxy}"
 LOCAL_NAME="${LOCAL_NAME:-hara}"
 LOCAL_PORT=8317
 LOCAL_URL="http://localhost:$LOCAL_PORT"
-
-# The same image the Cloudflare container runs, so `make deploy` upgrades and local stay in step.
-PROXY_IMAGE="$(awk '/^FROM /{print $2; exit}' Dockerfile)"
-export LOCAL_DIR TS_HOSTNAME PROXY_IMAGE
+export LOCAL_DIR TS_HOSTNAME
 
 compose() { docker compose -f "$REPO_ROOT/local/compose.yaml" "$@"; }
 
-# Without the Worker in front, the Codex key would reach the Claude accounts too,
-# so the local server accepts only the main client key.
 render_local_config() {
-  local template="" config="$LOCAL_DIR/proxy/config.yaml"
-  temp_file template
-  grep -v 'codex-api-key' config.yaml >"$template"
-  grep -q 'claude-api-key' "$template" || die "config.yaml has no claude-api-key entry"
-
-  render_config "$config" "$template"
+  local config="$LOCAL_DIR/proxy/config.yaml"
+  render_config "$config"
   chmod 600 "$config"
-  log "rendered $config from 1Password (main key only)"
+  log "rendered $config from 1Password"
 }
 
 wait_for_proxy() {

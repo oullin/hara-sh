@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copy the Codex CLI config (~/.codex/config.toml and the openai profile) into codex/.
-# Neither file holds a secret: the proxy key comes from scripts/hara-key at run time.
+# Neither file holds a secret: Codex uses its own ChatGPT login.
 #   scripts/backup-codex.sh
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"

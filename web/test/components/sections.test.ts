@@ -164,7 +164,7 @@ describe('StepsSection', () => {
 		const wrapper = mount(StepsSection);
 
 		report?.(
-			[{ isIntersecting: true, target: wrapper.find('[data-step="scope"]').element }],
+			[{ isIntersecting: true, target: wrapper.find('[data-step="reach"]').element }],
 		);
 
 		await flushPromises();
