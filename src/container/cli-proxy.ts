@@ -1,5 +1,5 @@
 import { Container } from '@cloudflare/containers';
-import { withExplicitImage } from './explicit-image';
+import { withExplicitImage } from '@/container/explicit-image';
 
 // Durable Object that owns the CLIProxyAPI container (eceasy/cli-proxy-api, see Dockerfile).
 // `Env` is generated from cloudflare.config.ts by `cf workers types`.

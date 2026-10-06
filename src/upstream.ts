@@ -1,4 +1,4 @@
-import type { CliProxy } from './container/cli-proxy';
+import type { CliProxy } from '@/container/cli-proxy';
 
 export type Upstream = (request: Request) => Promise<Response>;
 

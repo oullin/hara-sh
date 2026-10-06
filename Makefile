@@ -16,7 +16,7 @@ API_KEY  = $$($(HARA_KEY) claude-api-key)
 MGMT_KEY = $$($(HARA_KEY) management-password)
 
 .DEFAULT_GOAL := help
-.PHONY: help install types check format-all lint complexity deploy deploy-dry config-push \
+.PHONY: help install types check test coverage format-all lint complexity deploy deploy-dry config-push \
         claude codex codex-direct codex-backup claude-backup codex-smoke alias keys-refresh health models accounts smoke logs logs-cf tail tail-codex
 
 help: ## Show this help
@@ -30,8 +30,15 @@ install: ## Install npm dependencies (cf, wrangler, containers)
 types: ## Regenerate Worker types from cloudflare.config.ts
 	npx cf workers types >/dev/null
 
-check: types ## Type-check the Worker
+check: types ## Type-check the Worker, tests and Node tooling config
 	npx tsc -p .
+	npx tsc -p tsconfig.node.json
+
+test: ## Run the Vitest suite
+	npx vitest run
+
+coverage: ## Run the Vitest suite with coverage (fails under 100%)
+	npx vitest run --coverage
 
 format-all: ## Format every TS/JS file with fmtkit (oxlint --fix, oxfmt, structural passes)
 	fmtkit format-all --ts
@@ -44,7 +51,7 @@ complexity: ## Report TS functions over fmtkit's complexity limits
 
 ## --- Deployment ------------------------------------------------------------
 
-deploy: check ## Build the image and deploy (secrets injected from 1Password)
+deploy: check coverage ## Build the image and deploy (secrets injected from 1Password)
 	./scripts/deploy.sh
 
 deploy-dry: check ## Build and validate without uploading

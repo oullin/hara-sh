@@ -1,9 +1,9 @@
-import { clientKey, sameKey } from './auth/client-key';
-import { codexOnly } from './codex/guard';
-import { cliProxyUpstream } from './upstream';
+import { clientKey, sameKey } from '@/auth/client-key';
+import { codexOnly } from '@/codex/guard';
+import { cliProxyUpstream } from '@/upstream';
 
 // The Durable Object class must be exported from the Worker's main module.
-export { CliProxy } from './container/cli-proxy';
+export { CliProxy } from '@/container/cli-proxy';
 
 export default {
 	fetch(request, env, ctx): Promise<Response> {

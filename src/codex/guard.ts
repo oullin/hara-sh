@@ -1,6 +1,6 @@
-import { deny } from '../http/errors';
-import type { Upstream } from '../upstream';
-import { CODEX_PATHS, DEFAULT_SERVICE_TIER, isCodexModel } from './policy';
+import { deny } from '@/http/errors';
+import type { Upstream } from '@/upstream';
+import { CODEX_PATHS, DEFAULT_SERVICE_TIER, isCodexModel } from '@/codex/policy';
 
 // Forwards a request made with the Codex key only if it targets a Codex model.
 export async function codexOnly(request: Request, upstream: Upstream): Promise<Response> {
