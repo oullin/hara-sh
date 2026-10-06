@@ -16,7 +16,7 @@ const copyLabel = computed(() => (copied.value ? 'Copied' : failed.value ? 'Copy
 </script>
 
 <template>
-	<section aria-labelledby="hero-title" class="page-container pt-24 pb-28">
+	<section aria-labelledby="hero-title" class="page-container grid items-center gap-x-16 gap-y-20 pt-24 pb-28 lg:grid-cols-[minmax(0,1fr)_auto]">
 		<div class="flex max-w-3xl min-w-0 flex-col gap-7">
 			<h1 id="hero-title" class="text-5xl leading-[1.02] font-medium tracking-[-0.045em] text-balance sm:text-6xl lg:text-7xl">One center for every model</h1>
 			<Tabs v-model="selected" class="gap-0">
@@ -47,5 +47,10 @@ const copyLabel = computed(() => (copied.value ? 'Copied' : failed.value ? 'Copy
 				A self-hosted proxy for your AI subscriptions. One OpenAI- and Anthropic-compatible endpoint, every account behind it, and limits that fail over on their own.
 			</p>
 		</div>
+		<aside id="meaning" aria-labelledby="meaning-title" class="flex max-w-xs flex-col gap-4 lg:items-end lg:text-right">
+			<p lang="ja" aria-hidden="true" class="font-kanji text-[9rem] leading-none font-semibold text-primary lg:text-[11rem]">腹</p>
+			<p id="meaning-title" class="font-mono text-xs tracking-[0.2em] text-muted-foreground">HARA · <span lang="ja">はら</span> · NOUN</p>
+			<p class="leading-relaxed text-muted-foreground">The belly, and the body's center of gravity, where calm and focus come from. Every request here starts from one steady center.</p>
+		</aside>
 	</section>
 </template>
