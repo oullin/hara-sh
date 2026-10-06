@@ -23,7 +23,7 @@ Keys come from `scripts/hara-key`, which caches them in the macOS Keychain and a
 1. In the Tailscale admin console, enable **MagicDNS** and **HTTPS certificates** (DNS page).
 2. Run `make local`. It renders the config from 1Password, starts the proxy and a Tailscale container, and registers `hara.local` with [portless](https://github.com/vercel-labs/portless). Starting portless on port 443 asks for your password (sudo). The first time, it prints a Tailscale link that adds the device `cliproxy` to your tailnet; open it, then run `make local-status` for the tailnet address.
 3. Sign in each provider account, as in [Add an account](#add-an-account).
-4. Check it: `make health`, `make accounts`, `make smoke`.
+4. Check it: `make health`, `make accounts`, `make smoke`, `make ws-smoke`.
 
 ## Everyday commands
 
@@ -34,6 +34,7 @@ make health        # is it up?
 make accounts      # connected provider accounts
 make quota         # usage, reset times and capacity about to expire, per account
 make smoke         # one Claude request
+make ws-smoke      # WebSockets through each address (IDLE=2m, TS_URL=https://cliproxy.<tailnet>.ts.net)
 make logs          # last server log lines (LINES=500)
 make local-logs    # follow the container logs
 make local-down    # stop (logins and Tailscale identity kept)
@@ -76,6 +77,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 - **Unused capacity:** whatever a weekly window has left when it resets is lost. `make quota` reads each account's live usage through the management API, with the token substituted on the server, and lists the weekly windows that reset within 24 hours with capacity left.
 - **Use-it-or-lose-it routing:** the `quota` container starts with the proxy (`make local`) and runs `quota -route` at start and then every hour. It raises the priority of each Claude or Codex account whose weekly window resets within 24 hours with capacity left, the sooner the reset the higher, and returns the others to priority 0. The proxy always serves from the highest-priority accounts that are not cooling down, so expiring capacity is used first and the other accounts take over when a boosted one hits its limit. Its decisions are in `make local-logs`.
 - **Management panel:** the proxy serves this repo's build of the Management Center, `panel/management.html`: upstream `v1.25.3` plus `panel/ledger.patch`, which adds the quota **Ledger** view (provider totals, then one row per credential; the card grid stays under **Cards**). `local/compose.yaml` mounts it read-only and `config.yaml` turns off the panel auto-update. To move to a newer upstream panel, bump `PANEL_TAG` in `scripts/build-panel.sh` and run `make panel`; if the patch no longer applies, rebase it on the new tag.
+- **WebSockets:** the proxy serves the Codex Responses socket on `/v1/responses` (and `/backend-api/codex/responses`) and the AI Studio relay on `/v1/ws`. Both require the client key and answer 401 without it; v8 enables the relay's `ws-auth` by default, so `config.yaml` does not set it. `make ws-smoke` checks the handshake, a ping/pong round trip, an optional idle hold, the closing handshake and the 401, through `localhost:8317`, `hara.local` and, with `TS_URL`, the tailnet. The proxy answers pings itself, so it needs no provider account. A `response.create` that no account can serve gets no error frame: the proxy closes the socket.
 - **Codex:** Codex uses its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
 - **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
 
@@ -87,6 +89,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 | `panel/`             | The management panel build and `ledger.patch`; `make panel` (`scripts/build-panel.sh`) |
 | `scripts/local.sh`   | `make local*`: render the config, start and stop, portless, print the addresses     |
 | `scripts/hara-key`   | Keychain-cached keys from 1Password                                                 |
+| `scripts/wssmoke/`   | `make ws-smoke` (Go, standard library): WebSocket checks per address; `make ws-smoke-test` |
 | `scripts/quota/`     | `make quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make quota-test` |
 | `scripts/backup-*`   | Copy the Codex and Claude Code client configs into `codex/` and `claude/`           |
 | `scripts/lib/`       | Shared shell helpers, including `render_config`                                     |

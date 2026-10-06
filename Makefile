@@ -18,7 +18,7 @@ PORTLESS_CA = $(HOME)/.portless/ca.pem
 
 .DEFAULT_GOAL := help
 .PHONY: help local local-status local-logs local-down panel claude alias keys-refresh codex-backup claude-backup \
-        health models accounts quota quota-test smoke logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
+        health models accounts quota quota-test smoke ws-smoke ws-smoke-test logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -85,6 +85,14 @@ smoke: ## Send a test message through the proxy (MODEL=... to override)
 	  -d '{"model":"$(MODEL)","max_tokens":16,"messages":[{"role":"user","content":"Reply with exactly: pong"}]}' \
 	  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["content"][0]["text"] if d.get("content") else d)'
 
+# The proxy answers WebSocket pings itself, so ws-smoke needs no provider account. TS_URL adds the
+# tailnet address (from `make local-status`); IDLE=2m holds each socket idle, then pings again.
+ws-smoke: ## WebSocket checks per address: handshake, ping/pong, close, 401 without a key (IDLE, TS_URL)
+	@cd scripts/wssmoke && API_KEY="$(API_KEY)" go run . -idle $${IDLE:-0s} http://localhost:8317 $(URL) $(TS_URL)
+
+ws-smoke-test: ## Run the scripts/wssmoke Go tests (vet first)
+	cd scripts/wssmoke && go vet ./... && go test ./...
+
 logs: ## Show the last LINES lines of the server log (default 200)
 	@curl -fsS "$(URL)/v0/management/logs?limit=$${LINES:-200}" -H "Authorization: Bearer $(MGMT_KEY)" \
 	  | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("lines",[])))'
@@ -107,9 +115,10 @@ web-deploy: ## Type-check, test at 100% and deploy the landing page to www.hara.
 	cd web && npm run deploy
 
 # Go is formatted from its module directory, so fmtkit also runs go vet there.
-format-all: ## Format every TS/JS file and the Go in scripts/quota with fmtkit
+format-all: ## Format every TS/JS file and the Go in scripts/quota and scripts/wssmoke with fmtkit
 	fmtkit format-all --ts
 	cd scripts/quota && fmtkit format-all --go
+	cd scripts/wssmoke && fmtkit format-all --go
 
 lint: ## Lint the landing page TS with fmtkit (oxlint), writing nothing
 	fmtkit lint web/src web/worker web/cloudflare.config.ts
@@ -117,3 +126,4 @@ lint: ## Lint the landing page TS with fmtkit (oxlint), writing nothing
 complexity: ## Report TS and Go functions over fmtkit's complexity limits
 	fmtkit complexity --ts web/src web/worker
 	cd scripts/quota && fmtkit complexity --go .
+	cd scripts/wssmoke && fmtkit complexity --go .
