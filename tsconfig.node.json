@@ -7,26 +7,14 @@
       "es2022"
     ],
     "types": [
-      "./.cloudflare/types/index.d.ts"
+      "node"
     ],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "src/*"
-      ],
-      "@test/*": [
-        "test/*"
-      ]
-    },
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true
   },
   "include": [
-    "src",
-    "test"
-  ],
-  "exclude": [
+    "vitest.config.ts",
     "test/setup.ts"
   ]
 }
