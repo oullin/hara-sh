@@ -1,3 +1,5 @@
+| `.github/workflows/` | CI: `make code check` and the quota image build, on every pull request |        |      |                                                                                  |
+| `scripts/ops/`       | `make status` and `make ops accounts                                   | models | logs | smoke` (Go, standard library): every link checked, with the fix for each failure |
 # cli-proxy-api
 
 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) running in Docker on this computer at **https://hara.local**. It pools several Claude subscriptions behind one OpenAI/Anthropic-compatible API, for use from Claude Code and other clients. Upstream requests leave from this computer's own internet connection.
@@ -21,28 +23,42 @@ Keys come from `scripts/hara-key`, which caches them in the macOS Keychain and a
 ## Start it
 
 1. In the Tailscale admin console, enable **MagicDNS** and **HTTPS certificates** (DNS page).
-2. Run `make up`. It renders the config from 1Password, starts the proxy and a Tailscale container, and registers `hara.local` with [portless](https://github.com/vercel-labs/portless). Starting portless on port 443 asks for your password (sudo). The first time, it prints a Tailscale link that adds the device `cliproxy` to your tailnet; open it, then run `make status` for the tailnet address.
+2. Run `make up`. It renders the config from 1Password, starts the proxy and a Tailscale container, and registers `hara.local` with [portless](https://github.com/vercel-labs/portless). Starting portless on port 443 asks for your password (sudo). It ends with `make status`. The first time, that prints a Tailscale link that adds the device `cliproxy` to your tailnet; open it, then run `make status` again for the tailnet address.
 3. Sign in each provider account, as in [Add an account](#add-an-account).
-4. Check it: `make ops health`, `make ops accounts`, `make ops smoke`, `make ops ws-smoke`. For Codex, run `make codex profile` once, then `make codex smoke`.
+4. Check it: `make status` should show no `✗`; then `make ops smoke` and `make ops ws-smoke`. For Codex, run `make codex profile` once, then `make codex smoke`.
 
 ## Everyday commands
 
 ```bash
 make up                # start, or apply config.yaml changes
-make status            # addresses and Tailscale login state
+make status            # check every link, containers to accounts, with the fix for each failure
 make logs [service]    # follow the container logs: all, or proxy, tailscale, quota
 make down              # stop (logins and Tailscale identity kept)
-make ops health        # is it up?
+make ops               # usage, reset times and capacity about to expire, per account (ops quota)
 make ops accounts      # connected provider accounts
-make ops quota         # usage, reset times and capacity about to expire, per account
 make ops smoke         # one Claude request
 make codex smoke       # one Codex turn; fails if it fell back from WebSockets to HTTP
 make ops ws-smoke      # WebSockets through each address (IDLE=2m, TS_URL=https://cliproxy.<tailnet>.ts.net)
 make ops bench         # time to first token and prompt-cache hits, Claude and Codex (N=5)
 make ops logs          # last server log lines (LINES=500)
+make code check        # what CI runs: shellcheck, gofmt, Go tests, web type-check and coverage
 ```
 
-Run `make` for every command: `up`, `down`, `status` and `logs` run the proxy, and the rest are grouped as `make <area> [action]` (`claude`, `codex`, `ops`, `web`, `code`). The `ops` actions use `https://hara.local`; pass `URL=http://localhost:8317` to skip portless.
+Run `make` for every command: `up`, `down`, `status` and `logs` run the proxy, and the rest are grouped as `make <area> [action]` (`claude`, `codex`, `ops`, `web`, `code`). An unknown action fails with the list of choices. The `ops` actions use `https://hara.local`; pass `URL=http://localhost:8317` to skip portless.
+
+`make status` explains a failure instead of a 502:
+
+```text
+✗ proxy container     exited; run: make up, then make logs proxy
+✓ tailscale container running
+✓ quota container     running
+✗ this computer       http://localhost:8317  the proxy does not answer; run: make logs proxy
+✗ your network        https://hara.local  502; portless does not reach the proxy; run: make up
+! your tailnet        not signed in: open https://login.tailscale.com/a/... to add this device, then run: make status
+- panel               not checked: your network fails
+- client key          not checked: this computer fails
+- accounts            not checked: this computer fails
+```
 
 ## Change things
 
@@ -64,7 +80,7 @@ Run `make` for every command: `up`, `down`, `status` and `logs` run the proxy, a
 
 ## How it works
 
-- **Containers:** `local/compose.yaml` runs `eceasy/cli-proxy-api` on its own Docker network, published on `127.0.0.1:8317`, where portless picks it up. A Tailscale container serves `https://cliproxy.<tailnet>.ts.net` to `http://proxy:8317` with userspace networking, so no extra privileges are needed. The `quota` container (built from `scripts/quota`) reaches the proxy the same way. Until Tailscale is signed in it restarts every minute; the proxy does not share its network, so `localhost:8317` and `hara.local` stay up meanwhile.
+- **Containers:** `local/compose.yaml` runs `eceasy/cli-proxy-api` on its own Docker network, published on `127.0.0.1:8317`, where portless picks it up, with a health check on `/healthz` (`make status` reports it). A Tailscale container serves `https://cliproxy.<tailnet>.ts.net` to `http://proxy:8317` with userspace networking, so no extra privileges are needed; `localhost:8317` and `hara.local` never depend on it. Until it is signed in it waits for the login (`TS_BOOT_TIMEOUT`), keeping one login link, instead of restarting every minute with a new one. The `quota` container (built from `scripts/quota`) starts once the proxy is healthy and reaches it at `http://proxy:8317`.
 - **State:** config, OAuth logins and logs (10 MB rotation, 512 MB cap) live in `~/.cli-proxy-api/proxy`, the Tailscale identity in `~/.cli-proxy-api/tailscale`, and the `quota` container's copy of the management password in `~/.cli-proxy-api/quota` (owner-only). `LOCAL_DIR=…` moves all three.
 - **Config:** `config.yaml` holds 1Password references only. `make up` renders it into `~/.cli-proxy-api/proxy/config.yaml` and restarts the proxy, which overwrites changes made in the management panel. Copy any panel change into `config.yaml` first.
 - **Secrets:** stored in 1Password, item `op://YOUR_VAULT/YOUR_ITEM`:
@@ -88,22 +104,24 @@ Run `make` for every command: `up`, `down`, `status` and `logs` run the proxy, a
 - **Codex without the proxy:** plain `codex` keeps its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
 - **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
 
-| Path                     | Concern                                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `config.yaml`            | CLIProxyAPI config template (1Password references)                                                                   |
-| `local/compose.yaml`     | The proxy and Tailscale containers                                                                                   |
-| `local/serve.json`       | Tailscale HTTPS serve config                                                                                         |
-| `panel/`                 | The management panel build and `ledger.patch`; `make code panel` (`scripts/build-panel.sh`)                          |
-| `scripts/local.sh`       | `make up`, `make down`, `make status`, `make logs`: render the config, start and stop, portless, print the addresses |
-| `scripts/hara-key`       | Keychain-cached keys from 1Password                                                                                  |
-| `codex/`                 | Backups of `~/.codex` config; `proxy.config.toml` is the Codex profile for the proxy (`make codex profile`)          |
-| `scripts/codex-smoke.sh` | `make codex smoke`: one Codex turn, fails on the HTTP fallback                                                       |
-| `scripts/wssmoke/`       | `make ops ws-smoke` (Go, standard library): WebSocket checks per address; `make code test`                           |
-| `scripts/bench/`         | `make ops bench` (Go, standard library): first-token latency and prompt-cache hits; `make code test`                 |
-| `scripts/quota/`         | `make ops quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make code test`     |
-| `scripts/backup-*`       | Copy the Codex and Claude Code client configs into `codex/` and `claude/`                                            |
-| `scripts/lib/`           | Shared shell helpers, including `render_config`                                                                      |
-| `web/`                   | Landing page on hara.sh                                                                                              |
+| Path                     | Concern                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `config.yaml`            | CLIProxyAPI config template (1Password references)                                                                                         |
+| `local/compose.yaml`     | The proxy and Tailscale containers                                                                                                         |
+| `local/serve.json`       | Tailscale HTTPS serve config                                                                                                               |
+| `panel/`                 | The management panel build and `ledger.patch`; `make code panel` (`scripts/build-panel.sh`)                                                |
+| `scripts/local.sh`       | `make up`, `make down`, `make status`, `make logs`: render the config, start and stop, portless                                            |
+| `scripts/hara-key`       | Keychain-cached keys from 1Password                                                                                                        |
+| `codex/`                 | Backups of `~/.codex` config; `proxy.config.toml` is the Codex profile for the proxy (`make codex profile`)                                |
+| `scripts/codex-smoke.sh` | `make codex smoke`: one Codex turn, fails on the HTTP fallback                                                                             |
+| `scripts/wssmoke/`       | `make ops ws-smoke` (Go, standard library): WebSocket checks per address; `make code test`                                                 |
+| `scripts/bench/`         | `make ops bench` (Go, standard library): first-token latency and prompt-cache hits; `make code test`                                       |
+| `scripts/quota/`         | `make ops quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make code test`                           |
+| `scripts/ops/`           | `make status` and `make ops accounts`, `models`, `logs`, `smoke` (Go, standard library): every link checked, with the fix for each failure |
+| `scripts/backup-*`       | Copy the Codex and Claude Code client configs into `codex/` and `claude/`                                                                  |
+| `scripts/lib/`           | Shared shell helpers, including `render_config`                                                                                            |
+| `web/`                   | Landing page on hara.sh                                                                                                                    |
+| `.github/workflows/`     | CI on every pull request: `make code check` and the quota image build                                                                      |
 
 ## Landing page (`web/`)
 
