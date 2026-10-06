@@ -1,12 +1,14 @@
-import { defineConfig, defineWorker } from 'cf/config';
+import { bindings, defineConfig, defineWorker } from 'cf/config';
 
-// Static landing page: Vite builds the assets, Cloudflare serves them on www.hara.sh.
-// The apex (hara.sh) belongs to another service and must not be attached here.
+// Landing page on the apex. worker/index.ts redirects www.hara.sh to hara.sh and serves the
+// static assets Vite built for everything else.
 const worker = defineWorker(
 	{
-		assets: { notFoundHandling: 'single-page-application' },
+		assets: { notFoundHandling: 'none', runWorkerFirst: true },
 		compatibilityDate: '2026-10-01',
-		domains: ['www.hara.sh'],
+		domains: ['hara.sh', 'www.hara.sh'],
+		entrypoint: 'worker/index.ts',
+		env: { ASSETS: bindings.assets() },
 		name: 'hara-web',
 		observability: { enabled: true },
 		workersDev: false,

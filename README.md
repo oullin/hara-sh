@@ -86,7 +86,7 @@ make deploy-dry    # build with Vite and validate without uploading
 
 ## Landing page (`web/`)
 
-[www.hara.sh](https://www.hara.sh) is a separate, static Worker named `hara-web`. The apex `hara.sh` belongs to another service (the Alloy npm/Go registry), so never attach this site to it.
+[hara.sh](https://hara.sh) is served by the Worker `hara-web`. `web/worker/index.ts` 301-redirects `www.hara.sh` to the apex and serves the static assets Vite built. The earlier Alloy registry Workers (`hara`, `hara-staging`) are deleted.
 
 - **Stack:**
     - Vite, Vue 3 and TypeScript.
@@ -94,6 +94,7 @@ make deploy-dry    # build with Vite and validate without uploading
     - Tailwind CSS v4.
     - Design tokens ported from the Geist design system in `web/src/styles/tokens.css`: gray, alpha-gray and purple scales, border shadows, radius and the centered 1448px page column. The primary color is purple-900.
 - **Commands:** `make web-dev`, `make web-test`, `make web-coverage` (100% enforced), and `make web-deploy` (type-check, coverage, then `cf deploy`).
+- **SEO:** canonical `https://hara.sh/`, Open Graph and Twitter cards (`public/og.png`, rendered from `og/og.svg`), JSON-LD, `robots.txt`, `sitemap.xml`, and real 404s. Lighthouse SEO scores 100.
 - **Content:** lives in `web/src/lib/content.ts`. The dot-matrix motion (`web/src/lib/dots.ts` and `style.css`) respects reduced-motion settings.
 
 ## How it works

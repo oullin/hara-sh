@@ -12,8 +12,8 @@ import { Card, CardContent } from '@/components/ui/card';
 				<h2 id="cta-title" class="max-w-xl font-display text-4xl leading-tight font-extrabold sm:text-5xl">Find your center.</h2>
 				<p class="max-w-md text-muted-foreground">Connect an account, point a client, send a request. A few minutes, start to finish.</p>
 				<div class="flex flex-wrap justify-center gap-3">
-					<Button as="a" href="[PANEL URL]" size="lg" class="h-12 px-6 text-base">Open the panel</Button>
-					<Button as="a" href="[DOCS URL]" variant="outline" size="lg" class="h-12 px-6 text-base">Read the docs</Button>
+					<Button as="a" href="#setup" size="lg" class="h-12 px-6 text-base">Get started</Button>
+					<Button as="a" href="https://github.com/router-for-me/CLIProxyAPI" variant="outline" size="lg" class="h-12 px-6 text-base">Read the CLIProxyAPI docs</Button>
 				</div>
 			</CardContent>
 		</Card>
