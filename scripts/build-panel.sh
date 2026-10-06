@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the management panel the proxy serves at /management.html: the upstream
 # Management Center at PANEL_TAG plus panel/ledger.patch (the quota Ledger view).
-# Writes panel/management.html; commit it, then `make local` (local/compose.yaml mounts it).
+# Writes panel/management.html; commit it, then `make up` (local/compose.yaml mounts it).
 #   scripts/build-panel.sh
 # Needs git and bun. To move to a newer upstream panel, bump PANEL_TAG; if the patch
 # no longer applies, rebase it on the new tag and regenerate panel/ledger.patch.

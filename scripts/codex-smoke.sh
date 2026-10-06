@@ -10,8 +10,8 @@ source "$(dirname "$0")/lib/common.sh"
 PROFILE="${CODEX_PROFILE:-proxy}"
 PROXY_URL="${PROXY_URL:-http://localhost:8317}"
 
-[[ -f "${CODEX_HOME:-$HOME/.codex}/$PROFILE.config.toml" ]] || die "no Codex profile '$PROFILE'; run: make codex-profile"
-curl -fsS --max-time 5 "$PROXY_URL/healthz" >/dev/null 2>&1 || die "the proxy does not answer on $PROXY_URL; run: make local"
+[[ -f "${CODEX_HOME:-$HOME/.codex}/$PROFILE.config.toml" ]] || die "no Codex profile '$PROFILE'; run: make codex profile"
+curl -fsS --max-time 5 "$PROXY_URL/healthz" >/dev/null 2>&1 || die "the proxy does not answer on $PROXY_URL; run: make up"
 
 temp_file out
 codex exec --profile "$PROFILE" --skip-git-repo-check "Reply with exactly: pong" </dev/null >"$out" 2>&1 || {
@@ -21,7 +21,7 @@ codex exec --profile "$PROFILE" --skip-git-repo-check "Reply with exactly: pong"
 
 if grep -q "Falling back from WebSockets" "$out"; then
   grep "Falling back from WebSockets" "$out" >&2
-  die "Codex answered over HTTP: the WebSocket failed (see make logs)"
+  die "Codex answered over HTTP: the WebSocket failed (see make ops logs)"
 fi
 
 grep -qx "pong" "$out" || { cat "$out" >&2; die "Codex did not answer pong"; }

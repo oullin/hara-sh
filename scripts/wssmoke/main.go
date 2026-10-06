@@ -1,4 +1,4 @@
-// Command wssmoke checks that WebSockets work through each address of the proxy (`make ws-smoke`):
+// Command wssmoke checks that WebSockets work through each address of the proxy (`make ops ws-smoke`):
 // the handshake, a ping/pong round trip, an optional idle hold, the closing handshake, and that a
 // socket without the client key is refused. Ping/pong is answered by the proxy itself, so the
 // checks need no provider account and send nothing upstream.
@@ -44,7 +44,7 @@ func main() {
 	key := os.Getenv("API_KEY")
 
 	if key == "" {
-		fmt.Fprintln(os.Stderr, "error: API_KEY must hold the client key (run it through `make ws-smoke`)")
+		fmt.Fprintln(os.Stderr, "error: API_KEY must hold the client key (run it through `make ops ws-smoke`)")
 		os.Exit(1)
 	}
 

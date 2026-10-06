@@ -1,5 +1,5 @@
 // Command quota reads each pooled account's usage windows from the proxy and either prints them
-// (`make quota`) or steers routing toward weekly capacity that would otherwise expire unused
+// (`make ops quota`) or steers routing toward weekly capacity that would otherwise expire unused
 // (-route, run by the quota service in local/compose.yaml whenever the proxy runs).
 //
 // The provider usage endpoints are called through the proxy's /v0/management/api-call, which
@@ -100,7 +100,7 @@ func managementKey() (string, error) {
 		}
 	}
 
-	return "", errors.New("MGMT_KEY or MGMT_KEY_FILE must hold the management password (run it through `make quota`)")
+	return "", errors.New("MGMT_KEY or MGMT_KEY_FILE must hold the management password (run it through `make ops quota`)")
 }
 
 // newClient trusts portless's own certificate authority, which signs https://hara.local.
