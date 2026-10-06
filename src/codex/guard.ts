@@ -1,6 +1,6 @@
 import { deny } from "../http/errors";
 import type { Upstream } from "../upstream";
-import { CODEX_PATHS, isCodexModel } from "./policy";
+import { CODEX_PATHS, DEFAULT_SERVICE_TIER, isCodexModel } from "./policy";
 
 // Forwards a request made with the Codex key only if it targets a Codex model.
 export async function codexOnly(request: Request, upstream: Upstream): Promise<Response> {
@@ -24,12 +24,15 @@ export async function codexOnly(request: Request, upstream: Upstream): Promise<R
   if (!isCodexModel(payload.model)) {
     return deny(403, `codex key is limited to Codex models; "${String(payload.model)}" is not allowed`);
   }
-  // The upstream response always reports service_tier "default", so the requested tier is the
-  // only way to confirm Fast mode (`make logs-cf`). Metadata only; no prompt content.
+  const requestedTier = payload.service_tier;
+  const body = requestedTier === undefined ? JSON.stringify({ ...payload, service_tier: DEFAULT_SERVICE_TIER }) : text;
+
+  // The upstream response always reports service_tier "default", so this line is the only way
+  // to confirm Fast mode (`make logs-cf`). Metadata only; no prompt content.
   console.log(
-    `codex request model=${payload.model} tier=${String(payload.service_tier ?? "unset")} effort=${String(payload.reasoning?.effort ?? "unset")}`,
+    `codex request model=${payload.model} tier=${String(requestedTier ?? `${DEFAULT_SERVICE_TIER} (default)`)} effort=${String(payload.reasoning?.effort ?? "unset")}`,
   );
-  return upstream(new Request(request, { body: text }));
+  return upstream(new Request(request, { body }));
 }
 
 type ModelEntry = { id?: string; slug?: string };
