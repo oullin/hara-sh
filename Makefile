@@ -71,7 +71,7 @@ accounts: ## List connected provider accounts
 	  | python3 -c 'import json,sys; [print("%-8s %-8s %s" % (f.get("provider"), f.get("status"), f.get("name"))) for f in json.load(sys.stdin).get("files",[])]'
 
 quota: ## Usage per account: % used, reset times, weekly capacity expiring unused within 24h
-	@MGMT_KEY="$(MGMT_KEY)" URL=$(URL) python3 scripts/quota.py
+	@cd scripts/quota && MGMT_KEY="$(MGMT_KEY)" URL=$(URL) go run .
 
 smoke: ## Send a test message through the proxy (MODEL=... to override)
 	@curl -fsS $(URL)/v1/messages -H "x-api-key: $(API_KEY)" -H 'anthropic-version: 2023-06-01' \
