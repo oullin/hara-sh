@@ -88,7 +88,9 @@ Plain `codex` goes through the proxy:
   - removes non-Codex models from `/v1/models`;
   - blocks WebSockets, whose model names it cannot inspect.
 
-  The proxy serves those models only from the Codex OAuth accounts, so Codex never uses a Claude account.
+  The proxy serves those models only from the Codex OAuth accounts, so Codex never uses a Claude account. The guard filters both model-list formats: the OpenAI `data` list and the `models` catalog the Codex app reads.
+- **Fast mode by default:** the Codex app hides its Fast toggle for custom providers and sends no `service_tier`. The Worker therefore adds `service_tier: "priority"` to Codex-key requests that have no tier (`DEFAULT_SERVICE_TIER` in `src/codex/policy.ts`). An explicit tier, including `"default"`, is left as sent.
+- **Checking the tier:** OpenAI always reports `service_tier: "default"` in its responses, so check the requested tier with `make logs-cf`. Each Codex request logs a line such as `codex request model=gpt-6.1-sol tier=priority (default) effort=high`, with no prompt content.
 - `codex --profile openai` (or `make codex-direct`) bypasses the proxy and uses the direct ChatGPT login. The profile lives in `~/.codex/openai.config.toml` and uses `gpt-5.5`, because `gpt-6.1-sol` is rejected for that login when used directly.
 - Codex 0.134+ no longer supports `[profiles.*]` tables inside `config.toml`.
 - Backups of both files live in `codex/`. Refresh them with `make codex-backup`, then commit.
