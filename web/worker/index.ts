@@ -1,10 +1,10 @@
+import { CANONICAL_HOST } from './host.ts';
+
 // Front Worker for the landing page: www.hara.sh redirects permanently to the apex, and every
 // other request is served from the static assets Vite built.
-export type AssetsEnv = {
+type AssetsEnv = {
 	ASSETS: { fetch(request: Request): Promise<Response> };
 };
-
-export const CANONICAL_HOST = 'hara.sh';
 
 export default {
 	fetch(request: Request, env: AssetsEnv): Promise<Response> | Response {
