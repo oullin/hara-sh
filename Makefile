@@ -17,8 +17,8 @@ MGMT_KEY = $$($(HARA_KEY) management-password)
 PORTLESS_CA = $(HOME)/.portless/ca.pem
 
 .DEFAULT_GOAL := help
-.PHONY: help local local-status local-logs local-down panel claude alias keys-refresh codex-backup claude-backup \
-        health models accounts quota quota-test smoke logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
+.PHONY: help local local-status local-logs local-down panel claude codex codex-profile codex-smoke alias keys-refresh codex-backup claude-backup \
+        health models accounts quota quota-test smoke ws-smoke ws-smoke-test logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -43,10 +43,20 @@ panel: ## Rebuild panel/management.html (upstream panel + panel/ledger.patch; ne
 	./scripts/build-panel.sh
 
 ## --- Clients ---------------------------------------------------------------
-# Codex is not routed through the proxy: it uses its own ChatGPT login (~/.codex/config.toml).
+# Claude Code speaks HTTP (with SSE streaming) to the proxy. Codex goes through it with the `proxy`
+# profile (codex/proxy.config.toml) over the Responses WebSocket; plain `codex` keeps its ChatGPT login.
 
 claude: ## Run Claude Code through the proxy (pass flags with ARGS="...")
 	@NODE_EXTRA_CA_CERTS=$(PORTLESS_CA) ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
+
+codex: ## Run Codex through the local proxy over WebSockets (profile proxy; pass flags with ARGS="...")
+	@codex --profile proxy $(ARGS)
+
+codex-profile: ## Install codex/proxy.config.toml as ~/.codex/proxy.config.toml
+	install -m 644 codex/proxy.config.toml $(HOME)/.codex/proxy.config.toml
+
+codex-smoke: ## One Codex turn through the proxy; fails if Codex fell back from WebSockets to HTTP
+	./scripts/codex-smoke.sh
 
 alias: ## Print the claude-hara shell alias for ~/.zshrc
 	@echo "alias claude-hara='NODE_EXTRA_CA_CERTS=\$$HOME/.portless/ca.pem ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
@@ -54,7 +64,7 @@ alias: ## Print the claude-hara shell alias for ~/.zshrc
 keys-refresh: ## Re-fetch the cached keys from 1Password now (e.g. after rotating them)
 	@for f in claude-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
 
-codex-backup: ## Copy ~/.codex/config.toml and openai.config.toml into codex/ (then commit)
+codex-backup: ## Copy ~/.codex/config.toml and the openai and proxy profiles into codex/ (then commit)
 	./scripts/backup-codex.sh
 
 claude-backup: ## Copy ~/.claude settings into claude/ (Omniyat auto-mode section redacted), then commit
@@ -85,6 +95,14 @@ smoke: ## Send a test message through the proxy (MODEL=... to override)
 	  -d '{"model":"$(MODEL)","max_tokens":16,"messages":[{"role":"user","content":"Reply with exactly: pong"}]}' \
 	  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["content"][0]["text"] if d.get("content") else d)'
 
+# The proxy answers WebSocket pings itself, so ws-smoke needs no provider account. TS_URL adds the
+# tailnet address (from `make local-status`); IDLE=2m holds each socket idle, then pings again.
+ws-smoke: ## WebSocket checks per address: handshake, ping/pong, close, 401 without a key (IDLE, TS_URL)
+	@cd scripts/wssmoke && API_KEY="$(API_KEY)" go run . -idle $${IDLE:-0s} http://localhost:8317 $(URL) $(TS_URL)
+
+ws-smoke-test: ## Run the scripts/wssmoke Go tests (vet first)
+	cd scripts/wssmoke && go vet ./... && go test ./...
+
 logs: ## Show the last LINES lines of the server log (default 200)
 	@curl -fsS "$(URL)/v0/management/logs?limit=$${LINES:-200}" -H "Authorization: Bearer $(MGMT_KEY)" \
 	  | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("lines",[])))'
@@ -107,9 +125,10 @@ web-deploy: ## Type-check, test at 100% and deploy the landing page to www.hara.
 	cd web && npm run deploy
 
 # Go is formatted from its module directory, so fmtkit also runs go vet there.
-format-all: ## Format every TS/JS file and the Go in scripts/quota with fmtkit
+format-all: ## Format every TS/JS file and the Go in scripts/quota and scripts/wssmoke with fmtkit
 	fmtkit format-all --ts
 	cd scripts/quota && fmtkit format-all --go
+	cd scripts/wssmoke && fmtkit format-all --go
 
 lint: ## Lint the landing page TS with fmtkit (oxlint), writing nothing
 	fmtkit lint web/src web/worker web/cloudflare.config.ts
@@ -117,3 +136,4 @@ lint: ## Lint the landing page TS with fmtkit (oxlint), writing nothing
 complexity: ## Report TS and Go functions over fmtkit's complexity limits
 	fmtkit complexity --ts web/src web/worker
 	cd scripts/quota && fmtkit complexity --go .
+	cd scripts/wssmoke && fmtkit complexity --go .
