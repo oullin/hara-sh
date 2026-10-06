@@ -18,7 +18,7 @@ PORTLESS_CA = $(HOME)/.portless/ca.pem
 
 .DEFAULT_GOAL := help
 .PHONY: help local local-status local-logs local-down claude alias keys-refresh codex-backup claude-backup \
-        health models accounts smoke logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
+        health models accounts quota smoke logs web-install web-dev web-test web-coverage web-deploy format-all lint complexity
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -69,6 +69,9 @@ models: ## List models available through the proxy
 accounts: ## List connected provider accounts
 	@curl -fsS $(URL)/v0/management/auth-files -H "Authorization: Bearer $(MGMT_KEY)" \
 	  | python3 -c 'import json,sys; [print("%-8s %-8s %s" % (f.get("provider"), f.get("status"), f.get("name"))) for f in json.load(sys.stdin).get("files",[])]'
+
+quota: ## Usage per account: % used, reset times, weekly capacity expiring unused within 24h
+	@MGMT_KEY="$(MGMT_KEY)" URL=$(URL) python3 scripts/quota.py
 
 smoke: ## Send a test message through the proxy (MODEL=... to override)
 	@curl -fsS $(URL)/v1/messages -H "x-api-key: $(API_KEY)" -H 'anthropic-version: 2023-06-01' \
