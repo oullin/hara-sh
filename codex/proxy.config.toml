@@ -1,0 +1,18 @@
+# Codex profile: route Codex through the local CLIProxyAPI (`make local`) over WebSockets.
+# Select with: codex --profile proxy (or make codex). Install with: make codex-profile
+# Plain HTTP on localhost: the proxy runs on this computer, and hara.local would need the portless
+# certificate (CODEX_CA_CERTIFICATE), which the Codex app does not get when started from the Dock.
+model_provider = "hara-proxy"
+
+[model_providers.hara-proxy]
+name = "hara local proxy"
+base_url = "http://localhost:8317/v1"
+wire_api = "responses"
+# Open the Responses WebSocket (GET /v1/responses). When it fails, Codex prints
+# "Falling back from WebSockets to HTTPS transport" and continues over HTTP; `make codex-smoke` fails on that.
+supports_websockets = true
+# The proxy's client key, from the Keychain cache (1Password at most every 30 days).
+auth.command = "/Users/gocanto/Sites/CLIProxyAPI/scripts/hara-key"
+auth.args = ["claude-api-key"]
+auth.timeout_ms = 60000
+auth.refresh_interval_ms = 86400000

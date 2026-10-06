@@ -10,11 +10,11 @@
 
 ## Use it
 
-| Client        | Command                                                                       |
-| ------------- | ----------------------------------------------------------------------------- |
-| Claude Code   | `claude-hara` (alias in `~/.zshrc`; `make alias` prints it), or `make claude` |
-| Anything else | base URL `https://hara.local/v1`, key `claude-api-key`                        |
-| Codex         | not proxied: `codex` uses its own ChatGPT login                               |
+| Client        | Command                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| Claude Code   | `claude-hara` (alias in `~/.zshrc`; `make alias` prints it), or `make claude`               |
+| Anything else | base URL `https://hara.local/v1`, key `claude-api-key`                                      |
+| Codex         | `make codex` or `codex --profile proxy` (WebSockets); plain `codex` keeps its ChatGPT login |
 
 Keys come from `scripts/hara-key`, which caches them in the macOS Keychain and asks 1Password at most once every 30 days.
 
@@ -23,7 +23,7 @@ Keys come from `scripts/hara-key`, which caches them in the macOS Keychain and a
 1. In the Tailscale admin console, enable **MagicDNS** and **HTTPS certificates** (DNS page).
 2. Run `make local`. It renders the config from 1Password, starts the proxy and a Tailscale container, and registers `hara.local` with [portless](https://github.com/vercel-labs/portless). Starting portless on port 443 asks for your password (sudo). The first time, it prints a Tailscale link that adds the device `cliproxy` to your tailnet; open it, then run `make local-status` for the tailnet address.
 3. Sign in each provider account, as in [Add an account](#add-an-account).
-4. Check it: `make health`, `make accounts`, `make smoke`.
+4. Check it: `make health`, `make accounts`, `make smoke`, `make ws-smoke`. For Codex, run `make codex-profile` once, then `make codex-smoke`.
 
 ## Everyday commands
 
@@ -34,6 +34,8 @@ make health        # is it up?
 make accounts      # connected provider accounts
 make quota         # usage, reset times and capacity about to expire, per account
 make smoke         # one Claude request
+make codex-smoke   # one Codex turn; fails if it fell back from WebSockets to HTTP
+make ws-smoke      # WebSockets through each address (IDLE=2m, TS_URL=https://cliproxy.<tailnet>.ts.net)
 make logs          # last server log lines (LINES=500)
 make local-logs    # follow the container logs
 make local-down    # stop (logins and Tailscale identity kept)
@@ -43,14 +45,14 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 
 ## Change things
 
-| Task                         | Do this                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------- |
-| Change proxy config          | edit `config.yaml`, then `make local`                                   |
-| Upgrade CLIProxyAPI          | bump the proxy image tag in `local/compose.yaml`, then `make local`     |
-| Rebuild the management panel | `make panel`, commit `panel/management.html`, then `make local`         |
-| Add a provider account       | see [Add an account](#add-an-account)                                   |
-| Rotate a key                 | change it in 1Password, then `make keys-refresh` and `make local`       |
-| Back up local client configs | `make codex-backup` / `make claude-backup`, then commit                 |
+| Task                         | Do this                                                             |
+| ---------------------------- | ------------------------------------------------------------------- |
+| Change proxy config          | edit `config.yaml`, then `make local`                               |
+| Upgrade CLIProxyAPI          | bump the proxy image tag in `local/compose.yaml`, then `make local` |
+| Rebuild the management panel | `make panel`, commit `panel/management.html`, then `make local`     |
+| Add a provider account       | see [Add an account](#add-an-account)                               |
+| Rotate a key                 | change it in 1Password, then `make keys-refresh` and `make local`   |
+| Back up local client configs | `make codex-backup` / `make claude-backup`, then commit             |
 
 ### Add an account
 
@@ -76,21 +78,26 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 - **Unused capacity:** whatever a weekly window has left when it resets is lost. `make quota` reads each account's live usage through the management API, with the token substituted on the server, and lists the weekly windows that reset within 24 hours with capacity left.
 - **Use-it-or-lose-it routing:** the `quota` container starts with the proxy (`make local`) and runs `quota -route` at start and then every hour. It raises the priority of each Claude or Codex account whose weekly window resets within 24 hours with capacity left, the sooner the reset the higher, and returns the others to priority 0. The proxy always serves from the highest-priority accounts that are not cooling down, so expiring capacity is used first and the other accounts take over when a boosted one hits its limit. Its decisions are in `make local-logs`.
 - **Management panel:** the proxy serves this repo's build of the Management Center, `panel/management.html`: upstream `v1.25.3` plus `panel/ledger.patch`, which adds the quota **Ledger** view (provider totals, then one row per credential; the card grid stays under **Cards**). `local/compose.yaml` mounts it read-only and `config.yaml` turns off the panel auto-update. To move to a newer upstream panel, bump `PANEL_TAG` in `scripts/build-panel.sh` and run `make panel`; if the patch no longer applies, rebase it on the new tag.
-- **Codex:** Codex uses its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
+- **WebSockets:** the proxy serves the Codex Responses socket on `/v1/responses` (and `/backend-api/codex/responses`) and the AI Studio relay on `/v1/ws`. Both require the client key and answer 401 without it; v8 enables the relay's `ws-auth` by default, so `config.yaml` does not set it. `make ws-smoke` checks the handshake, a ping/pong round trip, an optional idle hold, the closing handshake and the 401, through `localhost:8317`, `hara.local` and, with `TS_URL`, the tailnet. The proxy answers pings itself, so it needs no provider account. A `response.create` that no account can serve gets no error frame: the proxy closes the socket.
+- **Clients:** Claude Code talks to the proxy over HTTP, with SSE streaming; the Anthropic API has no WebSocket transport. Codex uses the Responses WebSocket through the `proxy` profile (`codex/proxy.config.toml`, `supports_websockets = true`, base URL `http://localhost:8317/v1`, key from `scripts/hara-key`). When the socket fails, Codex prints `Falling back from WebSockets to HTTPS transport` and continues over HTTP, so a working answer alone does not prove the transport; `make codex-smoke` fails on that warning. In `make logs`, a socket turn shows `responses websocket: client connected` and `GET /v1/responses`, an HTTP turn `POST /v1/responses`.
+- **Codex without the proxy:** plain `codex` keeps its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
 - **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
 
-| Path                 | Concern                                                                             |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| `config.yaml`        | CLIProxyAPI config template (1Password references)                                  |
-| `local/compose.yaml` | The proxy and Tailscale containers                                                  |
-| `local/serve.json`   | Tailscale HTTPS serve config                                                        |
-| `panel/`             | The management panel build and `ledger.patch`; `make panel` (`scripts/build-panel.sh`) |
-| `scripts/local.sh`   | `make local*`: render the config, start and stop, portless, print the addresses     |
-| `scripts/hara-key`   | Keychain-cached keys from 1Password                                                 |
-| `scripts/quota/`     | `make quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make quota-test` |
-| `scripts/backup-*`   | Copy the Codex and Claude Code client configs into `codex/` and `claude/`           |
-| `scripts/lib/`       | Shared shell helpers, including `render_config`                                     |
-| `web/`               | Landing page on hara.sh                                                             |
+| Path                     | Concern                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `config.yaml`            | CLIProxyAPI config template (1Password references)                                                            |
+| `local/compose.yaml`     | The proxy and Tailscale containers                                                                            |
+| `local/serve.json`       | Tailscale HTTPS serve config                                                                                  |
+| `panel/`                 | The management panel build and `ledger.patch`; `make panel` (`scripts/build-panel.sh`)                        |
+| `scripts/local.sh`       | `make local*`: render the config, start and stop, portless, print the addresses                               |
+| `scripts/hara-key`       | Keychain-cached keys from 1Password                                                                           |
+| `codex/`                 | Backups of `~/.codex` config; `proxy.config.toml` is the Codex profile for the proxy (`make codex-profile`)   |
+| `scripts/codex-smoke.sh` | `make codex-smoke`: one Codex turn, fails on the HTTP fallback                                                |
+| `scripts/wssmoke/`       | `make ws-smoke` (Go, standard library): WebSocket checks per address; `make ws-smoke-test`                    |
+| `scripts/quota/`         | `make quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make quota-test` |
+| `scripts/backup-*`       | Copy the Codex and Claude Code client configs into `codex/` and `claude/`                                     |
+| `scripts/lib/`           | Shared shell helpers, including `render_config`                                                               |
+| `web/`                   | Landing page on hara.sh                                                                                       |
 
 ## Landing page (`web/`)
 
