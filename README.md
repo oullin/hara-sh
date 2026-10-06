@@ -47,6 +47,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 | ---------------------------- | ----------------------------------------------------------------------- |
 | Change proxy config          | edit `config.yaml`, then `make local`                                   |
 | Upgrade CLIProxyAPI          | bump the proxy image tag in `local/compose.yaml`, then `make local`     |
+| Rebuild the management panel | `make panel`, commit `panel/management.html`, then `make local`         |
 | Add a provider account       | see [Add an account](#add-an-account)                                   |
 | Rotate a key                 | change it in 1Password, then `make keys-refresh` and `make local`       |
 | Back up local client configs | `make codex-backup` / `make claude-backup`, then commit                 |
@@ -71,6 +72,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 - **Limits and resets:** Claude and Codex accounts each have a 5-hour window, which starts at the first request after the previous one ends, and a weekly window. When an account is rate-limited, the proxy reads the provider's reset time (Claude response headers, Codex `usage_limit_reached` body), skips that account until then, and returns it to rotation by itself. Without a reset time it backs off from 1 second up to 30 minutes. Cooldowns are kept in memory, so after a restart the proxy relearns them from one 429 per exhausted account.
 - **Unused capacity:** whatever a weekly window has left when it resets is lost. `make quota` reads each account's live usage through the management API, with the token substituted on the server, and lists the weekly windows that reset within 24 hours with capacity left.
 - **Use-it-or-lose-it routing:** the `quota` container starts with the proxy (`make local`) and runs `quota -route` at start and then every hour. It raises the priority of each Claude or Codex account whose weekly window resets within 24 hours with capacity left, the sooner the reset the higher, and returns the others to priority 0. The proxy always serves from the highest-priority accounts that are not cooling down, so expiring capacity is used first and the other accounts take over when a boosted one hits its limit. Its decisions are in `make local-logs`.
+- **Management panel:** the proxy serves this repo's build of the Management Center, `panel/management.html`: upstream `v1.25.3` plus `panel/ledger.patch`, which adds the quota **Ledger** view (provider totals, then one row per credential; the card grid stays under **Cards**). `local/compose.yaml` mounts it read-only and `config.yaml` turns off the panel auto-update. To move to a newer upstream panel, bump `PANEL_TAG` in `scripts/build-panel.sh` and run `make panel`; if the patch no longer applies, rebase it on the new tag.
 - **Codex:** Codex uses its own ChatGPT login. `~/.codex/config.toml` keeps a provider named `hara` as an alias of that login, because threads started while Codex went through the old hosted proxy remember that name.
 - **Options:** `LOCAL_NAME=…` changes `hara.local`; `TS_HOSTNAME=…` changes the tailnet name; `TS_AUTHKEY=…` joins the tailnet without the browser link.
 
@@ -79,6 +81,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 | `config.yaml`        | CLIProxyAPI config template (1Password references)                                  |
 | `local/compose.yaml` | The proxy and Tailscale containers                                                  |
 | `local/serve.json`   | Tailscale HTTPS serve config                                                        |
+| `panel/`             | The management panel build and `ledger.patch`; `make panel` (`scripts/build-panel.sh`) |
 | `scripts/local.sh`   | `make local*`: render the config, start and stop, portless, print the addresses     |
 | `scripts/hara-key`   | Keychain-cached keys from 1Password                                                 |
 | `scripts/quota/`     | `make quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make quota-test` |
