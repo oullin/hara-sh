@@ -65,7 +65,7 @@ export const steps: Array<Step> = [
 	},
 	{
 		body: 'The proxy runs in Docker on your computer. Devices on your network use hara.local; your other devices reach it over Tailscale, wherever they are.',
-		code: `make up\n\nthis computer:  http://localhost:8317\nyour network:   ${PROXY_URL}\nyour tailnet:   https://cliproxy.[TAILNET].ts.net`,
+		code: `make up\n\n✓ this computer       http://localhost:8317\n✓ your network        ${PROXY_URL}\n✓ your tailnet        https://cliproxy.[TAILNET].ts.net`,
 		file: 'make up',
 		id: 'reach',
 		title: 'Reach it from',
