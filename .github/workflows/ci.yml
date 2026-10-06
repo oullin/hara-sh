@@ -1,0 +1,42 @@
+# Runs `make code check` (shellcheck, gofmt, Go vet and tests, web type-check and 100% coverage),
+# the same command as on your computer, and builds the quota image the local stack runs.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: scripts/ops/go.mod
+          # The modules use the standard library only, so there is no go.sum to key a cache on.
+          cache: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+        working-directory: web
+
+      - run: make code check
+
+      - name: Build the quota image
+        run: docker build -q -t cli-proxy-api-quota:ci scripts/quota
