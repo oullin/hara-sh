@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Render config.yaml from 1Password, store it in R2, and reload the running server.
 #   scripts/push-config.sh
+#   R2_BUCKET=cli-proxy-api-dev SKIP_RELOAD=1 scripts/push-config.sh   # dev bucket only
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 cd "$REPO_ROOT" || exit 1
@@ -47,4 +48,10 @@ config_file=""
 temp_file config_file
 render_config "$config_file"
 upload_to_r2 "$config_file"
-reload_live_server "$config_file"
+
+# SKIP_RELOAD=1 uploads only (used for the dev bucket, which must never reload production).
+if [[ "${SKIP_RELOAD:-0}" == 1 ]]; then
+	log "live reload skipped (SKIP_RELOAD=1)"
+else
+	reload_live_server "$config_file"
+fi

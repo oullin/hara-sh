@@ -34,8 +34,8 @@ check: types ## Type-check the Worker, tests and Node tooling config
 	npx tsc -p .
 	npx tsc -p tsconfig.node.json
 
-dev: ## Run the Worker locally with Vite + workerd (container needs secrets; not wired, see README)
-	npx cf dev
+dev: ## Run the Worker + container locally against the dev R2 bucket (secrets from 1Password)
+	./scripts/dev.sh
 
 test: ## Run the Vitest suite
 	npx vitest run
