@@ -1,5 +1,5 @@
 # The quota service in local/compose.yaml: `quota -route -every 1h` next to the proxy.
-FROM golang:1.24-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod *.go ./
 # timetzdata embeds the zone database: the final image has no /usr/share/zoneinfo for TZ.

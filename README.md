@@ -81,7 +81,7 @@ Run `make` for every target. The operations targets use `https://hara.local`; pa
 | `local/serve.json`   | Tailscale HTTPS serve config                                                        |
 | `scripts/local.sh`   | `make local*`: render the config, start and stop, portless, print the addresses     |
 | `scripts/hara-key`   | Keychain-cached keys from 1Password                                                 |
-| `scripts/quota/`     | `make quota` and the `quota` container (Go): usage, resets, use-it-or-lose-it routing |
+| `scripts/quota/`     | `make quota` and the `quota` container (Go 1.27): usage, resets, use-it-or-lose-it routing; `make quota-test` |
 | `scripts/backup-*`   | Copy the Codex and Claude Code client configs into `codex/` and `claude/`           |
 | `scripts/lib/`       | Shared shell helpers, including `render_config`                                     |
 | `web/`               | Landing page on hara.sh                                                             |
