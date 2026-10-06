@@ -84,6 +84,18 @@ make deploy-dry    # build with Vite and validate without uploading
 | `scripts/`               | deploy, config push, key cache, config backups (`lib/common.sh` shared)                   |
 | `test/`                  | Vitest suite, one file per module                                                         |
 
+## Landing page (`web/`)
+
+[www.hara.sh](https://www.hara.sh) is a separate, static Worker named `hara-web`. The apex `hara.sh` belongs to another service (the Alloy npm/Go registry), so never attach this site to it.
+
+- **Stack:**
+    - Vite, Vue 3 and TypeScript.
+    - [shadcn-vue](https://www.shadcn-vue.com) for every UI primitive: Button, Card, Badge, Separator, Tabs. They are vendored in `web/src/components/ui/` and excluded from lint and coverage.
+    - Tailwind CSS v4.
+    - Design tokens ported from the Geist design system in `web/src/styles/tokens.css`: gray, alpha-gray and purple scales, border shadows, radius and the centered 1448px page column. The primary color is purple-900.
+- **Commands:** `make web-dev`, `make web-test`, `make web-coverage` (100% enforced), and `make web-deploy` (type-check, coverage, then `cf deploy`).
+- **Content:** lives in `web/src/lib/content.ts`. The dot-matrix motion (`web/src/lib/dots.ts` and `style.css`) respects reduced-motion settings.
+
 ## How it works
 
 - **Runtime:** a Worker forwards requests to a single container running `eceasy/cli-proxy-api`. The container sleeps after 30 minutes idle, so the first request after that takes a few seconds.
