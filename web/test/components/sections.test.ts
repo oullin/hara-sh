@@ -212,6 +212,7 @@ describe('CallToAction and SiteFooter', () => {
 		expect(
 			cta.find(`a[href="${DOCS_URL}setup"]`).exists(),
 		).toBe(true);
+
 		const footer = mount(SiteFooter);
 
 		expect(

@@ -18,7 +18,7 @@ Use this key for client requests. The management password and provider tokens ar
 
 ## Claude Code
 
-With Bash and Make:
+With Make:
 
 ```bash
 make claude
@@ -29,24 +29,24 @@ Or configure the environment directly:
 
 ```bash
 export ANTHROPIC_BASE_URL='http://localhost:8317'
-export ANTHROPIC_AUTH_TOKEN="$(./scripts/hara-key claude-api-key)"
+export ANTHROPIC_AUTH_TOKEN="$(./bin/hara key claude-api-key)"
 claude
 ```
 
-On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
+`bin/hara` is the [host helper](./operations#make-and-the-host-helper); any `make` action that needs it, such as `make status`, builds it first. On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
 
 Claude Code uses HTTP with SSE streaming; the Anthropic API does not use the Responses WebSocket.
 
 ## Codex
 
-Install the private profile using the Bash helper:
+Install the private profile with Make:
 
 ```bash
 make codex profile
 make codex
 ```
 
-It writes `~/.codex/proxy.config.toml`, uses `http://localhost:8317/v1`, and reads the key through `hara-key`. Your Codex release must support profile files, command-based auth, and Responses WebSockets.
+It writes `~/.codex/proxy.config.toml` (or `$CODEX_HOME/proxy.config.toml`), uses `http://localhost:8317/v1`, and has Codex run `bin/hara key claude-api-key` by absolute path whenever it needs the key. Your Codex release must support profile files, command-based auth, and Responses WebSockets.
 
 After connecting an account, verify that Codex stays on WebSockets:
 
@@ -54,7 +54,7 @@ After connecting an account, verify that Codex stays on WebSockets:
 make codex smoke
 ```
 
-For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Reinstall the profile if you move this checkout. Without Bash, configure the URL and key directly in your client.
+For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. If you use T3 Code, run `make t3` again for the same reason. Without Make, configure the URL and key directly in your client.
 
 Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback.
 
@@ -79,7 +79,7 @@ It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), sets T3 Code's 
 |          | Shadow home path       | Empty                                 |
 |          | `CODEX_CA_CERTIFICATE` | Absolute path to `~/.portless/ca.pem` |
 
-The separate Claude config directory keeps a cached Anthropic login from replacing the client key. The empty `ANTHROPIC_API_KEY` stops Claude Code from asking for one. The Codex home reads the key through `hara-key`, so it needs no ChatGPT login and no shadow home.
+The separate Claude config directory keeps a cached Anthropic login from replacing the client key. The empty `ANTHROPIC_API_KEY` stops Claude Code from asking for one. The Codex home reads the key through `bin/hara key`, so it needs no ChatGPT login and no shadow home.
 
 Without portless, `make t3` uses `http://localhost:8317` and drops both certificate variables. `T3_URL=` picks another address. Pick models in the thread's model picker; `make ops models` lists them.
 
@@ -124,7 +124,7 @@ It returns T3 Code's environment description as JSON.
 Test a real request with curl:
 
 ```bash
-client_key="$(./scripts/hara-key claude-api-key)"
+client_key="$(./bin/hara key claude-api-key)"
 curl --fail-with-body http://localhost:8317/v1/chat/completions \
   -H "Authorization: Bearer $client_key" \
   -H 'Content-Type: application/json' \

@@ -10,9 +10,10 @@ CODEX_MODEL ?= gpt-5.5
 
 export OP_ACCOUNT OP_VAULT OP_ITEM_NAME
 
-# The helper reads private Docker state; HARA_SECRET_PROVIDER=op opts into 1Password.
-HARA_KEY = $(CURDIR)/scripts/hara-key
-API_KEY  = $$($(HARA_KEY) claude-api-key)
+# The host helper (scripts/hara, built into bin/) reads private Docker state; HARA_SECRET_PROVIDER=op opts into 1Password.
+HARA         = $(CURDIR)/bin/hara
+HARA_SOURCES = $(filter-out %_test.go,$(wildcard scripts/hara/*.go)) scripts/hara/go.mod
+API_KEY      = $$($(HARA) key claude-api-key)
 # hara.local uses the portless certificate authority; Node-based clients need it named.
 PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
 
@@ -30,8 +31,8 @@ ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
 ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), rotate local keys or import optional 1Password credentials
 web_ACTIONS    := dev install test coverage build docs deploy
 web_HELP       := The landing page and docs on hara.sh: Vite dev server, dependencies, tests, coverage (fails under 100%), type-check, test and deploy
-code_ACTIONS   := check format lint test complexity panel public
-code_HELP      := check runs what CI runs (lint, Go tests, web coverage); format and lint with fmtkit and shellcheck; Go tests; complexity limits; rebuild the panel (needs bun); public-file privacy guard
+code_ACTIONS   := check test complexity panel public
+code_HELP      := check runs what CI runs (Go tests, web build and coverage, privacy guard); Go tests; complexity limits; rebuild the panel (needs bun); public-file privacy guard
 
 # `make ops quota`, `make logs proxy`: the words after an area (or logs) name its action or service,
 # not targets, so they get an empty rule here; anything else fails with the choices.
@@ -62,7 +63,7 @@ endif
 $(foreach a,$(AREAS),$(eval $(a): $(a)/$(if $(filter $(a),$(FIRST)),$(ACTION),$(firstword $($(a)_ACTIONS)))))
 
 .DEFAULT_GOAL := help
-.PHONY: help init up portless down purge status logs $(AREAS) $(foreach a,$(AREAS),$(addprefix $(a)/,$($(a)_ACTIONS)))
+.PHONY: help init up portless down purge status logs format-all $(AREAS) $(foreach a,$(AREAS),$(addprefix $(a)/,$($(a)_ACTIONS)))
 
 space := $(subst ,, )
 help:
@@ -75,31 +76,49 @@ help:
 	  '  down      Stop the proxy (credentials, logins and Tailscale identity kept)' \
 	  '  purge     Remove containers, networks, images, build cache and the hara.local route (private state kept)' \
 	  '  status    Check containers, proxy, panel, keys and accounts; print available addresses' \
-	  '  logs      Follow the container logs: all, or one of $(SERVICES) (Ctrl-C to stop)'
+	  '  logs      Follow the container logs: all, or one of $(SERVICES) (Ctrl-C to stop)' \
+	  '' \
+	  'make format-all                                                      the only formatter and lint: fmtkit for TS/Vue and every Go module'
 	@$(foreach a,$(AREAS),printf '\n  \033[36m%-7s\033[0m %s\n          %s\n' '$(a)' '$(subst $(space), | ,$($(a)_ACTIONS))' '$($(a)_HELP)';)
+
+## --- The host helper --------------------------------------------------------------------
+
+# Built on first use and after source changes. Without host Go, Docker cross-compiles it for this computer.
+$(HARA): $(HARA_SOURCES)
+	@mkdir -p $(@D)
+	@if command -v go >/dev/null; then \
+	  cd scripts/hara && CGO_ENABLED=0 go build -trimpath -o $@ .; \
+	else \
+	  docker run --rm -u "$$(id -u):$$(id -g)" -e CGO_ENABLED=0 -e GOCACHE=/tmp/go-cache \
+	    -e GOOS="$$(uname -s | tr '[:upper:]' '[:lower:]')" -e GOARCH="$$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src golang:1.27-alpine go build -trimpath -o /out/hara .; \
+	fi
+
+init up portless down purge status logs claude/run claude/backup codex/profile codex/smoke codex/backup t3/setup t3/smoke code/panel: $(HARA)
+$(addprefix ops/,$(ops_ACTIONS)): $(HARA)
 
 ## --- The Docker Compose stack (Tailscale is optional) -----------------------------------
 
 init:
-	./scripts/local.sh init
+	$(HARA) init
 
 up:
-	./scripts/local.sh up
+	$(HARA) up
 
 portless:
-	./scripts/local.sh portless
+	$(HARA) portless
 
 down:
-	./scripts/local.sh down
+	$(HARA) down
 
 purge:
-	./scripts/local.sh purge
+	$(HARA) purge
 
 status:
-	@./scripts/local.sh status
+	@$(HARA) status
 
 logs:
-	./scripts/local.sh logs $(SERVICE)
+	$(HARA) logs $(SERVICE)
 
 ## --- claude, codex: the clients -----------------------------------------------------------
 # Claude Code speaks HTTP (with SSE streaming) to the proxy. Codex goes through it with the `proxy`
@@ -110,38 +129,38 @@ claude/run:
 
 # Client backups remain private, outside the repository.
 claude/backup:
-	./scripts/backup-claude.sh
+	$(HARA) backup claude
 
 codex/run:
 	@codex --profile proxy $(ARGS)
 
 codex/profile:
-	./scripts/install-codex-profile.sh
+	$(HARA) codex-profile
 
 codex/smoke:
-	./scripts/codex-smoke.sh
+	$(HARA) codex-smoke
 
 codex/backup:
-	./scripts/backup-codex.sh
+	$(HARA) backup codex
 
 ## --- t3: T3 Code's Claude and Codex provider instances -------------------------------------
 # T3 Code runs the same CLIs, so each instance carries the proxy URL and key; T3_URL overrides
 # the default (https://hara.local with portless, else localhost).
 
 t3/setup:
-	@./scripts/t3.sh setup
+	@$(HARA) t3 setup
 
 t3/smoke:
-	@MODEL="$(MODEL)" ./scripts/t3.sh smoke
+	@MODEL="$(MODEL)" $(HARA) t3 smoke
 
 ## --- ops: requests to the running proxy (URL) ----------------------------------------------
 
 # Go tools are built once in Docker, with no host Go installation.
-OPS = ./scripts/local.sh tools ops
+OPS = $(HARA) tools ops
 
 # % used, reset times, weekly capacity expiring unused within 24h.
 ops/quota:
-	@URL=$(URL) ./scripts/local.sh tools quota
+	@URL=$(URL) $(HARA) tools quota
 
 ops/accounts:
 	@URL=$(URL) $(OPS) accounts
@@ -159,19 +178,19 @@ ops/smoke:
 # so it needs no provider account. TS_URL adds the tailnet address (from `make status`);
 # IDLE=2m holds each socket idle, then pings again.
 ops/ws-smoke:
-	@URL=$(URL) ./scripts/local.sh ws-smoke $${IDLE:-0s} $(TS_URL)
+	@URL=$(URL) $(HARA) ws-smoke $${IDLE:-0s} $(TS_URL)
 
 # Real requests: N per API per address (about 5k prompt tokens each, mostly cached). The first of
 # each series is cold, the rest should hit the prompt cache. CODEX_MODEL= skips Codex, MODEL= Claude.
 ops/bench:
-	@URL=$(URL) ./scripts/local.sh bench $${N:-5} "$(MODEL)" "$(CODEX_MODEL)"
+	@URL=$(URL) $(HARA) bench $${N:-5} "$(MODEL)" "$(CODEX_MODEL)"
 
 # Rotation is explicit; apply it with make up and refresh running clients.
 ops/keys:
-	./scripts/local.sh rotate
+	$(HARA) rotate
 
 ops/import-op:
-	./scripts/local.sh import-op
+	$(HARA) import-op
 
 ## --- web: the landing page (web/: Vue + shadcn-vue + Tailwind CSS v4, served on hara.sh) ---
 
@@ -198,22 +217,16 @@ web/deploy:
 
 ## --- code: checks, formatting and the panel build ------------------------------------------
 
-GO_MODULES := scripts/ops scripts/quota scripts/wssmoke scripts/bench scripts/tools scripts/public
-SHELL_SCRIPTS := scripts/*.sh scripts/hara-key scripts/lib/common.sh
+GO_MODULES := scripts/hara scripts/ops scripts/quota scripts/wssmoke scripts/bench scripts/tools scripts/public
 
-# What CI runs (.github/workflows/ci.yml). Without fmtkit, lint checks the shell scripts and gofmt only.
-code/check: code/lint code/test code/public
+# What CI runs (.github/workflows/ci.yml). Formatting and lint stay in `make format-all`.
+code/check: code/test code/public
 	cd web && npm run build && npm run coverage
 
 # Go is formatted from its module directory, so fmtkit also runs go vet there.
-code/format:
+format-all:
 	fmtkit format-all --ts
 	@for m in $(GO_MODULES); do (cd $$m && fmtkit format-all --go) || exit 1; done
-
-code/lint:
-	shellcheck $(SHELL_SCRIPTS)
-	@unformatted="$$(gofmt -l $(GO_MODULES))"; [[ -z "$$unformatted" ]] || { echo "gofmt needed: $$unformatted"; exit 1; }
-	@if command -v fmtkit >/dev/null; then fmtkit lint web/src web/worker web/scripts web/docs/.vitepress web/cloudflare.config.ts; else echo "fmtkit is not installed; skipping the TS lint"; fi
 
 code/test:
 	docker build --target verify -f scripts/tools/Dockerfile .
@@ -224,11 +237,7 @@ code/complexity:
 
 # Upstream panel + panel/ledger.patch; commit it, then `make up`.
 code/panel:
-	./scripts/build-panel.sh
+	$(HARA) panel
 
 code/public:
 	cd scripts/public && go run .
-
-# Compatibility entrypoint for the full formatter.
-.PHONY: format-all
-format-all: code/format

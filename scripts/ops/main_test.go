@@ -16,6 +16,7 @@ var testKeys = keys{api: "client-key", mgmt: "mgmt-key"}
 // logs for the management password, and messages for the client key in x-api-key.
 func mockProxy(t *testing.T, accounts string) *httptest.Server {
 	t.Helper()
+
 	mux := http.NewServeMux()
 	bearer := func(r *http.Request, key string) bool { return r.Header.Get("Authorization") == "Bearer "+key }
 
@@ -97,6 +98,7 @@ var allRunning = map[string]string{
 
 func runStatus(t *testing.T, srv *httptest.Server, k keys, sh shell) (string, error) {
 	t.Helper()
+
 	var out bytes.Buffer
 	err := run("status", []string{"-local", srv.URL, "-network", srv.URL + "/", "-project", "p"}, k, srv.Client(), sh, &out)
 
@@ -213,6 +215,7 @@ func TestCommands(t *testing.T) {
 
 func TestCommandErrors(t *testing.T) {
 	srv := mockProxy(t, `{"files":[]}`)
+
 	var out bytes.Buffer
 
 	if err := run("models", []string{"-url", srv.URL}, keys{api: "wrong"}, srv.Client(), nil, &out); err == nil || !strings.Contains(err.Error(), `401 {"error":"invalid api key"}`) {

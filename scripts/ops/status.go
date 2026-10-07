@@ -13,17 +13,6 @@ import (
 // because a link it depends on is broken).
 type level int
 
-const (
-	pass level = iota
-	warn
-	fail
-	skip
-)
-
-func (l level) String() string {
-	return [...]string{"✓", "!", "✗", "-"}[l]
-}
-
 // check is one line of `make status`: what was checked, how it went, and how to fix it.
 type check struct {
 	label  string
@@ -39,6 +28,26 @@ type status struct {
 	network string
 	project string
 	sh      shell
+}
+
+// tailscaleStatus is the part of `tailscale status --json` that status reads.
+type tailscaleStatus struct {
+	BackendState string `json:"BackendState"`
+	AuthURL      string `json:"AuthURL"`
+	Self         struct {
+		DNSName string `json:"DNSName"`
+	} `json:"Self"`
+}
+
+const (
+	pass level = iota
+	warn
+	fail
+	skip
+)
+
+func (l level) String() string {
+	return [...]string{"✓", "!", "✗", "-"}[l]
 }
 
 func (s status) checks() []check {
@@ -126,18 +135,10 @@ func (s status) address(label, base, hint string) check {
 	}
 }
 
-// tailscaleStatus is the part of `tailscale status --json` that status reads.
-type tailscaleStatus struct {
-	BackendState string `json:"BackendState"`
-	AuthURL      string `json:"AuthURL"`
-	Self         struct {
-		DNSName string `json:"DNSName"`
-	} `json:"Self"`
-}
-
 func (s status) tailnet() check {
 	const label = "your tailnet"
 	out, err := s.sh("docker", "exec", s.project+"-tailscale-1", "tailscale", "status", "--json", "--peers=false")
+
 	var ts tailscaleStatus
 
 	if err != nil || json.Unmarshal(out, &ts) != nil {
@@ -215,6 +216,7 @@ func (s status) accounts() check {
 	}
 
 	counts := map[string]int{}
+
 	var order []string
 
 	for _, a := range accounts {
