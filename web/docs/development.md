@@ -43,6 +43,7 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 | --------------------------------------------------------------- | ------------------------------------------------------------- |
 | `config.yaml`, `local/`                                         | Public proxy template, Compose services and Tailscale serving |
 | `scripts/tools/`                                                | Docker tools image, credential initialisation and tests       |
+| `scripts/public/`                                               | Publication guard and the CI rule rejecting Python source     |
 | `scripts/ops/`, `quota/`, `wssmoke/`, `bench/` under `scripts/` | Status, quota routing, transport checks and benchmarks        |
 | `scripts/*.sh`, `scripts/hara-key`                              | Optional host helpers and private client backups              |
 | `codex/proxy.config.toml`                                       | Portable client profile template                              |

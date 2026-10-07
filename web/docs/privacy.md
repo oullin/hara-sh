@@ -21,12 +21,12 @@ make code public
 gitleaks dir . --redact
 ```
 
-The publication guard reports personal paths, client-state files, and recognisable credentials without printing matched values. Gitleaks adds broader secret detection. Review generated assets and examples too; neither tool detects every private fact.
+The publication guard rejects Python source and reports personal paths, client-state files, and recognisable credentials without printing matched values. Gitleaks adds broader secret detection. Review generated assets and examples too; neither tool detects every private fact.
 
 ## Check history
 
 ```bash
-python3 scripts/check-public.py --history
+(cd scripts/public && go run . --history)
 gitleaks git --log-opts='--all' --redact
 ```
 

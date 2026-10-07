@@ -12,7 +12,7 @@ Hara runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) in Docker.
 2. **[Connect providers](./providers)** — add an account in the management panel.
 3. **[Configure clients](./clients)** — point Claude Code, Codex, or another client at Hara.
 
-The server needs Docker Compose. Go, Python, and the operations tools run inside containers. 1Password and Tailscale are optional.
+The server needs Docker Compose. Go tools run inside containers. 1Password and Tailscale are optional.
 
 ## What Hara handles
 
