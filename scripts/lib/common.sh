@@ -40,3 +40,19 @@ temp_file() {
 
 # secret FIELD: read local private state or the explicitly selected 1Password provider.
 secret() { "$SCRIPTS_DIR/hara-key" "$1"; }
+
+# install_codex_config DEST [BASE_URL]: codex/proxy.config.toml with this checkout's absolute
+# key-helper path, and BASE_URL (ending in /v1) in place of the template's localhost URL.
+install_codex_config() {
+  local command_path replacement url profile=""
+  # Escape for TOML first, then for the sed replacement.
+  command_path="${SCRIPTS_DIR//\\/\\\\}"
+  command_path="${command_path//\"/\\\"}/hara-key"
+  replacement="$(printf '%s' "$command_path" | sed 's/[&|\\]/\\&/g')"
+  url="$(printf '%s' "${2:-http://localhost:8317/v1}" | sed 's/[&|\\]/\\&/g')"
+  temp_file profile
+  sed -e "s|__HARA_KEY_COMMAND__|$replacement|" -e "s|^base_url = .*|base_url = \"$url\"|" \
+    "$REPO_ROOT/codex/proxy.config.toml" >"$profile"
+  mkdir -p "$(dirname "$1")"
+  install -m 600 "$profile" "$1"
+}

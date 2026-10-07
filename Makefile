@@ -17,13 +17,15 @@ API_KEY  = $$($(HARA_KEY) claude-api-key)
 PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
 
 # Each area lists its actions, the first being the default, and one line of help.
-AREAS    := claude codex ops web code
+AREAS    := claude codex t3 ops web code
 SERVICES := proxy tailscale quota
 
 claude_ACTIONS := run backup
 claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
 codex_ACTIONS  := run profile smoke backup
 codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; smoke fails on the HTTP fallback; backup copies client settings outside the repository
+t3_ACTIONS     := setup smoke
+t3_HELP        := T3 Code through the proxy: setup writes its Codex home, moves its Tailscale HTTPS off portless port 443 and prints the provider settings; smoke sends one Claude and one Codex request with them
 ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
 ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), rotate local keys or import optional 1Password credentials
 web_ACTIONS    := dev install test coverage build docs deploy
@@ -121,6 +123,16 @@ codex/smoke:
 
 codex/backup:
 	./scripts/backup-codex.sh
+
+## --- t3: T3 Code's Claude and Codex provider instances -------------------------------------
+# T3 Code runs the same CLIs, so each instance carries the proxy URL and key; T3_URL overrides
+# the default (https://hara.local with portless, else localhost).
+
+t3/setup:
+	@./scripts/t3.sh setup
+
+t3/smoke:
+	@MODEL="$(MODEL)" ./scripts/t3.sh smoke
 
 ## --- ops: requests to the running proxy (URL) ----------------------------------------------
 

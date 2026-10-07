@@ -59,6 +59,10 @@ Authorise the device and check MagicDNS, HTTPS certificates, ACLs, and client ta
 
 Run `make portless`, then `portless doctor`. The portless proxy must run in LAN mode; after a reboot, it only returns if you installed it with `sudo portless service install --lan`. Node clients also need `NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"`.
 
+## T3 Code's Tailscale HTTPS switch turns itself off
+
+Portless in LAN mode holds port 443 on the host's tailnet address. Run `make t3`, quit T3 Code with Cmd-Q, reopen it, and switch Tailscale HTTPS on again. T3 Code then serves `https://<host>.<your-tailnet>.ts.net:8443`; `T3_TAILSCALE_PORT=` picks another free port. Check it with `tailscale serve status`.
+
 ## Codex falls back to HTTP
 
 ```bash

@@ -85,6 +85,7 @@ Bash and Make are optional. These commands run the same Docker tools:
 | Accounts / models / quota    | `make ops accounts` / `make ops models` / `make ops quota` |
 | Request / WebSocket check    | `make ops smoke` / `make ops ws-smoke IDLE=2m`             |
 | Real Codex transport check   | `make codex smoke`                                         |
+| Prepare / check T3 Code      | `make t3` / `make t3 smoke`                                |
 | Rotate / import keys         | `make ops keys` / `make ops import-op`                     |
 | Back up host client settings | `make claude backup` / `make codex backup`                 |
 
