@@ -19,6 +19,8 @@ export const PROXY_URL = 'http://localhost:8317';
 
 export const DOCS_URL = 'https://docs.hara.sh/';
 
+export const REPO_URL = 'https://github.com/oullin/hara-sh';
+
 export type Client = { command: string; id: string; label: string };
 
 // The hero's "For …" switch: the one line each client needs.
