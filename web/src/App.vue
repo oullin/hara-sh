@@ -8,7 +8,7 @@ import StepsSection from '@/components/sections/StepsSection.vue';
 </script>
 
 <template>
-	<div class="min-h-screen bg-background font-sans text-foreground antialiased">
+	<div class="site-frame min-h-screen bg-background font-sans text-foreground antialiased">
 		<SiteHeader />
 		<main id="top">
 			<HeroSection />

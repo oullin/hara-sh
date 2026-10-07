@@ -14,10 +14,10 @@ export const providers: Array<Provider> = [
 	{ glyph: '..#..|..#..|#####|..#..|..#..', name: 'Plugins', via: 'Copilot, Kiro and more' },
 ];
 
-// Served by portless on this computer and announced on the local network (mDNS).
-export const PROXY_URL = 'https://hara.local';
+// Default Docker host endpoint.
+export const PROXY_URL = 'http://localhost:8317';
 
-export const DOCS_URL = 'https://github.com/router-for-me/CLIProxyAPI';
+export const DOCS_URL = 'https://docs.hara.sh/';
 
 export type Client = { command: string; id: string; label: string };
 
@@ -25,7 +25,7 @@ export type Client = { command: string; id: string; label: string };
 export const clients: Array<Client> = [
 	{ command: `export ANTHROPIC_BASE_URL=${PROXY_URL}`, id: 'claude', label: 'For Claude Code' },
 	{ command: `base_url = "${PROXY_URL}/v1"`, id: 'codex', label: 'For Codex' },
-	{ command: `curl ${PROXY_URL}/v1/models`, id: 'openai', label: 'For any client' },
+	{ command: `curl -H "Authorization: Bearer YOUR_KEY" ${PROXY_URL}/v1/models`, id: 'openai', label: 'For any client' },
 ];
 
 export type Step = {
@@ -37,38 +37,38 @@ export type Step = {
 	token: string;
 };
 
-// "How it works": each step's code is shown in the sticky panel while the step is in view.
+// Each setup step drives the adjacent code example.
 export const steps: Array<Step> = [
 	{
-		body: 'Sign in to each subscription once, or add an API key. Tokens stay on your own computer and refresh on their own.',
-		code: 'auths/\n  claude-personal.json\n  claude-work.json\n  codex-pro.json\n  codex-team.json\n  gemini.key',
-		file: 'auths/',
+		body: 'Docker builds the tools, generates private keys, and starts the proxy. No host Go installation or 1Password account needed.',
+		code: 'docker compose -f local/compose.yaml up -d --build --force-recreate',
+		file: 'Terminal',
 		id: 'connect',
+		title: 'Start with',
+		token: 'Docker',
+	},
+	{
+		body: 'Open the management panel and connect your provider accounts. Credentials stay in your private state directory.',
+		code: 'http://localhost:8317/management.html\n\n# Get your management password.\ndocker compose -f local/compose.yaml run --rm --no-deps -T tools key management-password',
+		file: 'Management panel',
+		id: 'point',
 		title: 'Connect your',
 		token: 'accounts',
 	},
 	{
-		body: 'Point Claude Code, Codex or any OpenAI client at one base URL. Nothing else in your setup changes.',
-		code: `export ANTHROPIC_BASE_URL=${PROXY_URL}\nexport ANTHROPIC_AUTH_TOKEN=[YOUR KEY]\n\n# ~/.codex/config.toml\nmodel_provider = "hara"\nbase_url = "${PROXY_URL}/v1"`,
-		file: 'setup',
-		id: 'point',
-		title: 'Set one',
-		token: 'base_url',
-	},
-	{
-		body: 'A conversation and its subagents stay on the account that started it, so prompt caches keep working. At the limit, the next request moves on.',
-		code: 'session=7f3a…  auth=claude-personal  model=claude-opus-4-8\nsession=7f3a…  auth=claude-personal  model=claude-opus-4-8\nlimit reached  →  rebinding\nsession=7f3a…  auth=claude-work      model=claude-opus-4-8',
-		file: 'routing.log',
+		body: 'Set the URL and client key in Claude Code, Codex, or any OpenAI-compatible client. Keep your existing workflow.',
+		code: `# Claude Code\nexport ANTHROPIC_BASE_URL=${PROXY_URL}\nexport ANTHROPIC_AUTH_TOKEN="YOUR_KEY"\n\n# OpenAI-compatible clients\nbase_url = "${PROXY_URL}/v1"`,
+		file: 'Client settings',
 		id: 'route',
-		title: 'Keep the',
-		token: 'session',
+		title: 'Point your',
+		token: 'client',
 	},
 	{
-		body: 'The proxy runs in Docker on your computer. Devices on your network use hara.local; your other devices reach it over Tailscale, wherever they are.',
-		code: `make up\n\n✓ this computer       http://localhost:8317\n✓ your network        ${PROXY_URL}\n✓ your tailnet        https://cliproxy.[TAILNET].ts.net`,
-		file: 'make up',
+		body: 'Use the loopback endpoint on your computer, or enable Tailscale for private HTTPS from another device.',
+		code: 'docker compose -f local/compose.yaml --profile tailscale up -d --build --force-recreate\n\n# Host client URL\nhttp://localhost:8317\n\n# Remote client URL\nhttps://cliproxy.YOUR-TAILNET.ts.net',
+		file: 'Optional remote access',
 		id: 'reach',
-		title: 'Reach it from',
+		title: 'Use it',
 		token: 'anywhere',
 	},
 ];

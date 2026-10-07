@@ -31,7 +31,7 @@ describe('SiteHeader', () => {
 		).toBe(true);
 		expect(
 			wrapper.findAll('nav a').map((a) => a.attributes('href')),
-		).toEqual(['#meaning', '#how', '#providers']);
+		).toEqual(['#how', '#providers']);
 		expect(
 			wrapper.find(`a[href="${DOCS_URL}"]`).text(),
 		).toBe('Docs');
@@ -51,7 +51,7 @@ describe('HeroSection', () => {
 
 		expect(
 			wrapper.find('h1').text(),
-		).toBe('One center for every model');
+		).toBe('Your accounts.One endpoint.');
 		expect(
 			wrapper.find('code').text(),
 		).toBe(clients[0].command);
@@ -110,7 +110,7 @@ describe('HeroSection', () => {
 		).toContain('腹');
 		expect(
 			meaning.text(),
-		).toContain("the body's center of gravity");
+		).toContain("the body's centre of gravity");
 	});
 
 	it('falls back to the first command for an unknown selection', async () => {
@@ -208,9 +208,9 @@ describe('CallToAction and SiteFooter', () => {
 
 		expect(
 			cta.text(),
-		).toContain('Find your center');
+		).toContain('Find your centre');
 		expect(
-			cta.find(`a[href="${DOCS_URL}"]`).exists(),
+			cta.find(`a[href="${DOCS_URL}setup"]`).exists(),
 		).toBe(true);
 		expect(
 			mount(SiteFooter)

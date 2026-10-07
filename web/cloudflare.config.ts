@@ -4,9 +4,9 @@ import { bindings, defineConfig, defineWorker } from 'cf/config';
 // static assets Vite built for everything else.
 const worker = defineWorker(
 	{
-		assets: { notFoundHandling: 'none', runWorkerFirst: true },
+		assets: { htmlHandling: 'none', notFoundHandling: 'none', runWorkerFirst: true },
 		compatibilityDate: '2026-10-01',
-		domains: ['hara.sh', 'www.hara.sh'],
+		domains: ['hara.sh', 'www.hara.sh', 'docs.hara.sh'],
 		entrypoint: 'worker/index.ts',
 		env: { ASSETS: bindings.assets() },
 		name: 'hara-web',
@@ -16,7 +16,6 @@ const worker = defineWorker(
 );
 
 export default defineConfig({
-	// Personal account "Ollin".
-	accountId: 'YOUR_ACCOUNT_ID',
+	// Account selection comes from the local cf profile, outside version control.
 	worker,
 });

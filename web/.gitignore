@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 .cloudflare
 coverage
+
+# Generated docs are rebuilt before Vite copies public assets.
+public/docs/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

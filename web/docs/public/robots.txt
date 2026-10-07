@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hara.sh/sitemap.xml
 Sitemap: https://docs.hara.sh/sitemap.xml
