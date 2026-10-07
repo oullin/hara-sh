@@ -1,3 +1,3 @@
-module github.com/oullin/cli-proxy-api/scripts/bench
+module github.com/oullin/hara-sh/scripts/bench
 
 go 1.27

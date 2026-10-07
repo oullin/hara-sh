@@ -1,3 +1,3 @@
-module github.com/oullin/cli-proxy-api/scripts/wssmoke
+module github.com/oullin/hara-sh/scripts/wssmoke
 
 go 1.27
