@@ -7,7 +7,7 @@ import ProvidersSection from '@/components/sections/ProvidersSection.vue';
 import SiteFooter from '@/components/sections/SiteFooter.vue';
 import SiteHeader from '@/components/sections/SiteHeader.vue';
 import StepsSection from '@/components/sections/StepsSection.vue';
-import { clients, DOCS_URL, providers, steps } from '@/lib/content';
+import { clients, DOCS_URL, providers, REPO_URL, steps } from '@/lib/content';
 
 // A detached element carrying a step id, for driving the steps panel.
 function stepElement(id: string): HTMLElement {
@@ -212,10 +212,13 @@ describe('CallToAction and SiteFooter', () => {
 		expect(
 			cta.find(`a[href="${DOCS_URL}setup"]`).exists(),
 		).toBe(true);
+		const footer = mount(SiteFooter);
+
 		expect(
-			mount(SiteFooter)
-				.find('a[href="https://gocanto.sh"]')
-				.text(),
+			footer.find(`a[href="${REPO_URL}"]`).text(),
+		).toBe('GitHub');
+		expect(
+			footer.find('a[href="https://gocanto.sh"]').text(),
 		).toBe('gocanto.sh');
 	});
 });
