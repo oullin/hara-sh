@@ -9,9 +9,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
+
+// codexCheck is one Codex smoke run: the Codex home, its profile (empty uses config.toml), the
+// proxy to probe, the command that installs the config and extra child environment.
+type codexCheck struct {
+	home     string
+	profile  string
+	proxyURL string
+	hint     string
+	env      []string
+}
 
 const (
 	apiField        = "claude-api-key"
@@ -19,7 +30,10 @@ const (
 	toolsImage      = "hara-tools:local"
 	keyPlaceholder  = "__HARA_KEY_COMMAND__"
 	fallbackWarning = "Falling back from WebSockets"
+	defaultCodexURL = "http://localhost:8317/v1"
 )
+
+var baseURLLine = regexp.MustCompile(`(?m)^base_url = .*$`)
 
 // key prints a client credential from local Docker state; HARA_SECRET_PROVIDER=op reads 1Password instead.
 // Codex runs it as its auth command, so standard output carries the credential and nothing else.
@@ -34,16 +48,27 @@ func (h host) key(args []string) error {
 		field = args[0]
 	}
 
+	cmd, err := h.keyCommand(field)
+
+	if err != nil {
+		return err
+	}
+
+	return h.call(cmd)
+}
+
+// keyCommand returns the command that prints field on standard output, building the tools image first if needed.
+func (h host) keyCommand(field string) (*exec.Cmd, error) {
 	switch field {
 	case apiField, managementField:
 	case "--refresh", "--clear":
-		return errors.New("use make ops import-op to sync 1Password, or make ops keys to rotate local keys")
+		return nil, errors.New("use make ops import-op to sync 1Password, or make ops keys to rotate local keys")
 	default:
-		return errors.New("unknown credential field")
+		return nil, errors.New("unknown credential field")
 	}
 
 	if h.getenv("HARA_SECRET_PROVIDER") == "op" {
-		return h.call(h.opRead(field))
+		return h.opRead(field), nil
 	}
 
 	// The tools image is never published, and an implicit build inside `run` fails while stdout is captured.
@@ -52,11 +77,24 @@ func (h host) key(args []string) error {
 		build.Stdout = h.stderr
 
 		if err := h.call(build); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return h.call(h.compose("run", "--rm", "--no-deps", "-T", "tools", "key", field))
+	return h.compose("run", "--rm", "--no-deps", "-T", "tools", "key", field), nil
+}
+
+// secret returns a client credential for a child process's environment.
+func (h host) secret(field string) (string, error) {
+	cmd, err := h.keyCommand(field)
+
+	if err != nil {
+		return "", err
+	}
+
+	value, err := h.output(cmd)
+
+	return strings.TrimRight(value, "\n"), err
 }
 
 func (h host) opRead(field string) *exec.Cmd {
@@ -122,12 +160,30 @@ func copyPrivate(source, dest string) error {
 	return os.Chmod(dest, 0o600)
 }
 
-// codexProfile installs the public profile template with this checkout's absolute helper path.
+// codexProfile installs the public profile template as the `proxy` profile of the usual Codex home.
 func (h host) codexProfile() error {
+	dest := filepath.Join(h.codexHome(), "proxy.config.toml")
+
+	if err := h.installCodexConfig(dest, defaultCodexURL); err != nil {
+		return err
+	}
+
+	h.log("installed the proxy profile; run: codex --profile proxy")
+
+	return nil
+}
+
+func (h host) codexHome() string {
+	return cmp.Or(h.getenv("CODEX_HOME"), filepath.Join(h.home, ".codex"))
+}
+
+// installCodexConfig writes codex/proxy.config.toml to dest with this checkout's absolute helper
+// path, and baseURL (ending in /v1) in place of the template's base_url.
+func (h host) installCodexConfig(dest, baseURL string) error {
 	command := filepath.Join(h.root, "bin", "hara")
 
 	if info, err := os.Stat(command); err != nil || !info.Mode().IsRegular() {
-		return errors.New("bin/hara is missing; run: make codex profile")
+		return errors.New("bin/hara is missing; build it with any make action, such as make codex profile")
 	}
 
 	template, err := os.ReadFile(filepath.Join(h.root, "codex", "proxy.config.toml"))
@@ -140,21 +196,18 @@ func (h host) codexProfile() error {
 		return errors.New("codex/proxy.config.toml has no " + keyPlaceholder + " placeholder")
 	}
 
-	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(command)
-	profile := bytes.ReplaceAll(template, []byte(keyPlaceholder), []byte(escaped))
-	dir := cmp.Or(h.getenv("CODEX_HOME"), filepath.Join(h.home, ".codex"))
+	profile := strings.ReplaceAll(string(template), keyPlaceholder, tomlEscape(command))
+	profile = baseURLLine.ReplaceAllLiteralString(profile, `base_url = "`+tomlEscape(baseURL)+`"`)
 
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 		return err
 	}
 
-	if err := writePrivate(filepath.Join(dir, "proxy.config.toml"), profile); err != nil {
-		return err
-	}
+	return writePrivate(dest, []byte(profile))
+}
 
-	h.log("installed the proxy profile; run: codex --profile proxy")
-
-	return nil
+func tomlEscape(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value)
 }
 
 // writePrivate replaces path atomically with an owner-only file.
@@ -184,27 +237,45 @@ func writePrivate(path string, content []byte) error {
 	return os.Rename(temporary.Name(), path)
 }
 
-// codexSmoke runs one Codex turn through the proxy and fails unless it completed over the WebSocket.
-// Codex falls back to HTTP by itself when the socket fails, so a turn that answers is not enough:
-// the fallback warning in its output is what tells the two transports apart.
+// codexSmoke checks the proxy profile of the usual Codex home.
 // Env: CODEX_PROFILE (default proxy), PROXY_URL (default http://localhost:8317).
 func (h host) codexSmoke() error {
-	profile := cmp.Or(h.getenv("CODEX_PROFILE"), "proxy")
-	proxyURL := cmp.Or(h.getenv("PROXY_URL"), "http://localhost:8317")
-	file := filepath.Join(cmp.Or(h.getenv("CODEX_HOME"), filepath.Join(h.home, ".codex")), profile+".config.toml")
+	return h.checkCodex(codexCheck{
+		home:     h.codexHome(),
+		profile:  cmp.Or(h.getenv("CODEX_PROFILE"), "proxy"),
+		proxyURL: cmp.Or(h.getenv("PROXY_URL"), "http://localhost:8317"),
+		hint:     "make codex profile",
+	})
+}
 
-	if info, err := os.Stat(file); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("no Codex profile '%s'; run: make codex profile", profile)
+// checkCodex runs one Codex turn through the proxy and fails unless it completed over the WebSocket.
+// Codex falls back to HTTP by itself when the socket fails, so a turn that answers is not enough:
+// the fallback warning in its output is what tells the two transports apart.
+func (h host) checkCodex(check codexCheck) error {
+	config := filepath.Join(check.home, "config.toml")
+	args := []string{"exec", "--skip-git-repo-check"}
+
+	if check.profile != "" {
+		config = filepath.Join(check.home, check.profile+".config.toml")
+		args = append(args, "--profile", check.profile)
 	}
 
-	if !h.healthy(proxyURL) {
-		return fmt.Errorf("the proxy does not answer on %s; run: make up", proxyURL)
+	if info, err := os.Stat(config); err != nil || !info.Mode().IsRegular() {
+		return fmt.Errorf("no Codex config at %s; run: %s", config, check.hint)
+	}
+
+	if !h.healthy(check.proxyURL) {
+		return fmt.Errorf("the proxy does not answer on %s; run: make up", check.proxyURL)
 	}
 
 	var out bytes.Buffer
 
-	cmd := h.command("codex", "exec", "--profile", profile, "--skip-git-repo-check", "Reply with exactly: pong")
+	cmd := h.command("codex", append(args, "Reply with exactly: pong")...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, &out, &out
+
+	if len(check.env) != 0 {
+		cmd.Env = append(os.Environ(), check.env...)
+	}
 
 	if err := h.call(cmd); err != nil {
 		h.stderr.Write(out.Bytes())
@@ -234,7 +305,7 @@ func (h host) codexSmoke() error {
 		return errors.New("Codex did not answer pong")
 	}
 
-	h.log("ok: Codex answered pong over the WebSocket (profile %s, %s)", profile, proxyURL)
+	h.log("ok: Codex answered pong over the WebSocket (%s, %s)", config, check.proxyURL)
 
 	return nil
 }

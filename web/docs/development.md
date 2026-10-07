@@ -52,12 +52,13 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 
 ## Host helper
 
-`scripts/hara` is the Go program behind the Make targets. It uses only the standard library and runs `docker`, `git`, `bun`, `op`, `portless` and `codex` as child processes:
+`scripts/hara` is the Go program behind the Make targets. It uses only the standard library and runs `docker`, `git`, `bun`, `op`, `portless`, `claude` and `codex` as child processes:
 
 | File          | Commands                                                           |
 | ------------- | ------------------------------------------------------------------ |
 | `stack.go`    | Compose stack, containerised tools, Tailscale wait, portless       |
 | `clients.go`  | `key`, client backups, Codex profile and WebSocket smoke           |
+| `t3.go`       | T3 Code setup and smoke                                            |
 | `panel.go`    | Management panel build                                             |
 | `settings.go` | Checkout discovery, `credentials.env` parsing, private directories |
 

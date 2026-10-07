@@ -87,6 +87,7 @@ These commands run the same Docker tools as above:
 | Accounts / models / quota    | `make ops accounts` / `make ops models` / `make ops quota` |
 | Request / WebSocket check    | `make ops smoke` / `make ops ws-smoke IDLE=2m`             |
 | Real Codex transport check   | `make codex smoke`                                         |
+| Prepare / check T3 Code      | `make t3` / `make t3 smoke`                                |
 | Rotate / import keys         | `make ops keys` / `make ops import-op`                     |
 | Back up host client settings | `make claude backup` / `make codex backup`                 |
 
@@ -105,11 +106,12 @@ You can also run the helper directly from any directory; it finds the checkout f
 
 Besides the [stack settings](./configuration#settings) such as `LOCAL_DIR` and `HARA_PORT`, and its [optional settings file](./configuration#host-helper-settings), the helper reads:
 
-| Variable                     | Effect                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------- |
-| `URL`                        | Target for `tools`, `ws-smoke` and `bench`; host loopback maps to `http://proxy:8317` |
-| `HARA_SECRET_PROVIDER=op`    | `key` reads 1Password through `OP_ACCOUNT`, `OP_VAULT` and `OP_ITEM_NAME`             |
-| `BACKUP_DIR`                 | Client backup destination (default `$LOCAL_DIR/backups`)                              |
-| `CODEX_HOME`                 | Codex settings directory for `codex-profile` and `codex-smoke`                        |
-| `CODEX_PROFILE`, `PROXY_URL` | Profile and proxy address checked by `make codex smoke`                               |
-| `PANEL_TAG`, `PANEL_REPO`    | Upstream panel release and repository for `make code panel`                           |
+| Variable                                                                    | Effect                                                                                |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `URL`                                                                       | Target for `tools`, `ws-smoke` and `bench`; host loopback maps to `http://proxy:8317` |
+| `HARA_SECRET_PROVIDER=op`                                                   | `key` reads 1Password through `OP_ACCOUNT`, `OP_VAULT` and `OP_ITEM_NAME`             |
+| `BACKUP_DIR`                                                                | Client backup destination (default `$LOCAL_DIR/backups`)                              |
+| `CODEX_HOME`                                                                | Codex settings directory for `codex-profile` and `codex-smoke`                        |
+| `CODEX_PROFILE`, `PROXY_URL`                                                | Profile and proxy address checked by `make codex smoke`                               |
+| `T3_URL`, `T3_CODEX_HOME`, `T3_CLAUDE_HOME`, `T3_HOME`, `T3_TAILSCALE_PORT` | Address, Codex and Claude homes, T3 Code settings and Tailscale port for `make t3`    |
+| `PANEL_TAG`, `PANEL_REPO`                                                   | Upstream panel release and repository for `make code panel`                           |

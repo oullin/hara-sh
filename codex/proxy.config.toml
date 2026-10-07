@@ -1,7 +1,9 @@
 # Codex profile: route Codex through the local CLIProxyAPI (`make up`) over WebSockets.
 # Select with: codex --profile proxy (or make codex). Install with: make codex profile
+# `make t3` installs it as the config.toml of a Codex home of its own for T3 Code.
 # Plain HTTP on localhost: the proxy runs on this computer, and hara.local would need the portless
 # certificate (CODEX_CA_CERTIFICATE), which the Codex app does not get when started from the Dock.
+# T3 Code sets it per provider instance, so `make t3` uses https://hara.local when portless is installed.
 model_provider = "hara-proxy"
 
 [model_providers.hara-proxy]

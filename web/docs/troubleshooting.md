@@ -59,6 +59,17 @@ Authorise the device and check MagicDNS, HTTPS certificates, ACLs, and client ta
 
 Run `make portless`, then `portless doctor`. The portless proxy must run in LAN mode; after a reboot, it only returns if you installed it with `sudo portless service install --lan`. Node clients also need `NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"`.
 
+## T3 Code's Tailscale HTTPS switch turns itself off
+
+Portless in LAN mode holds port 443 on the host's tailnet address. Run `make t3`, quit T3 Code with Cmd-Q, reopen it, and switch Tailscale HTTPS on again. T3 Code then serves `https://<host>.<your-tailnet>.ts.net:8443`; `T3_TAILSCALE_PORT=` picks another free port. Check it with `tailscale serve status`.
+
+## T3 Code cannot pair a device
+
+- **`/.well-known/t3/environment` returned undeclared status 404**: the host is not T3 Code. `https://hara.local` is Hara. Use the Tailscale HTTPS address from `tailscale serve status`, such as `https://<host>.<your-tailnet>.ts.net:8443`.
+- **The environment credential is invalid**: the host is right, but the code is not. Codes come from **Create pairing code** in T3 Code's settings, work once and expire after five minutes. Create a new one and paste the full pairing URL.
+
+See [Pair a phone](./clients#pair-a-phone).
+
 ## Codex falls back to HTTP
 
 ```bash

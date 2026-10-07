@@ -496,7 +496,7 @@ func TestBackupCopiesPrivateSettings(t *testing.T) {
 func TestCodexProfileInstallsTheHelperPath(t *testing.T) {
 	codexHome := filepath.Join(t.TempDir(), "codex")
 	h := newTestHost(t, map[string]string{"CODEX_HOME": codexHome})
-	template := "auth.command = \"" + keyPlaceholder + "\"\n"
+	template := "base_url = \"http://localhost:8317/v1\"\nauth.command = \"" + keyPlaceholder + "\"\n"
 
 	if err := os.WriteFile(filepath.Join(h.root, "codex", "proxy.config.toml"), []byte(template), 0o644); err != nil {
 		t.Fatal(err)
@@ -528,7 +528,7 @@ func TestCodexProfileInstallsTheHelperPath(t *testing.T) {
 	content, _ := os.ReadFile(profile)
 	escaped := strings.ReplaceAll(strings.ReplaceAll(filepath.Join(h.root, "bin", "hara"), `\`, `\\`), `"`, `\"`)
 
-	if string(content) != "auth.command = \""+escaped+"\"\n" {
+	if string(content) != "base_url = \""+defaultCodexURL+"\"\nauth.command = \""+escaped+"\"\n" {
 		t.Errorf("profile = %s", content)
 	}
 
@@ -548,7 +548,7 @@ func TestCodexSmoke(t *testing.T) {
 	codexHome := t.TempDir()
 	env := map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": healthy.URL}
 
-	if err := newTestHost(t, env).dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "no Codex profile 'proxy'") {
+	if err := newTestHost(t, env).dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "no Codex config at "+filepath.Join(codexHome, "proxy.config.toml")+"; run: make codex profile") {
 		t.Fatalf("err = %v", err)
 	}
 

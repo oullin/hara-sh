@@ -40,7 +40,9 @@ portless alias hara 8317 --force
 
 Starting the proxy on port 443 may ask for sudo. Run `sudo portless service install --lan` once to start it at boot instead. LAN mode exposes every app served by that instance. Client devices need mDNS and trust in its public CA; never transfer the private CA key.
 
-Host Node clients can set `NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"`. Container tools do not inherit that CA or `.local` discovery; use the Docker service or Tailscale address.
+Host Node clients can set `NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"`. Codex reads `CODEX_CA_CERTIFICATE` instead. Neither uses the copy in the macOS keychain. Container tools do not inherit that CA or `.local` discovery; use the Docker service or Tailscale address.
+
+LAN mode listens on port 443 on every interface, including the host's own Tailscale address. Tailscale Serve on that host must therefore use another port, such as 8443. Otherwise portless answers the tailnet URL with its own certificate and a 404. `make t3` sets T3 Code's Tailscale HTTPS to 8443 for this reason. The Hara Tailscale container is a separate tailnet device, so it is unaffected.
 
 ## Availability
 

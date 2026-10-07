@@ -7,7 +7,7 @@ A self-hosted [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) stack 
 The server needs Docker with Compose v2. Go tools run inside containers; Make, Go, 1Password, Tailscale and portless are optional. With Make, `make up` builds the `bin/hara` host helper and starts the stack.
 
 - [Connect providers](https://docs.hara.sh/providers)
-- [Configure Claude Code, Codex and other clients](https://docs.hara.sh/clients)
+- [Configure Claude Code, Codex, T3 Code and other clients](https://docs.hara.sh/clients)
 - [Operate the proxy](https://docs.hara.sh/operations)
 - [Fix a problem](https://docs.hara.sh/troubleshooting)
 
