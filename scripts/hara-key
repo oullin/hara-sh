@@ -17,5 +17,10 @@ if [[ "${HARA_SECRET_PROVIDER:-file}" == op ]]; then
 fi
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-LOCAL_DIR="${LOCAL_DIR:-$HOME/.hara-sh}" \
-  exec docker compose -f "$repo/local/compose.yaml" run --rm --no-deps -T tools key "$field"
+export LOCAL_DIR="${LOCAL_DIR:-$HOME/.hara-sh}"
+compose=(docker compose -f "$repo/local/compose.yaml")
+# The tools image is never published, and an implicit build inside `run` fails while stdout is captured.
+if ! docker image inspect hara-tools:local >/dev/null 2>&1; then
+  "${compose[@]}" build tools >&2
+fi
+exec "${compose[@]}" run --rm --no-deps -T tools key "$field"
