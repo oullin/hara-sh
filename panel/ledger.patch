@@ -97,10 +97,10 @@ index 1bd1570..b74715c 100644
              {pageItems.map((entry, index) => (
 diff --git a/src/features/quota/components/QuotaLedger.module.scss b/src/features/quota/components/QuotaLedger.module.scss
 new file mode 100644
-index 0000000..05276b1
+index 0000000..1aa196f
 --- /dev/null
 +++ b/src/features/quota/components/QuotaLedger.module.scss
-@@ -0,0 +1,486 @@
+@@ -0,0 +1,490 @@
 +@use '../../../styles/mixins' as *;
 +
 +/* ============================================================
@@ -587,12 +587,16 @@ index 0000000..05276b1
 +    animation: none;
 +  }
 +}
++
++.exhausted {
++  color: var(--viz-failure);
++}
 diff --git a/src/features/quota/components/QuotaLedger.tsx b/src/features/quota/components/QuotaLedger.tsx
 new file mode 100644
-index 0000000..62b6c92
+index 0000000..b43886d
 --- /dev/null
 +++ b/src/features/quota/components/QuotaLedger.tsx
-@@ -0,0 +1,412 @@
+@@ -0,0 +1,424 @@
 +/**
 + * Ledger view: provider totals on top, one row per credential below.
 + *
@@ -620,6 +624,8 @@ index 0000000..62b6c92
 +import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
 +import {
 +  buildLedgerWindows,
++  formatRemaining,
++  isLimitReached,
 +  ledgerPlanLabel,
 +  orderRowWindows,
 +  summarizeProvider,
@@ -756,7 +762,11 @@ index 0000000..62b6c92
 +          {shown.map((window) => (
 +            <div key={window.key} className={styles.summaryMoreRow}>
 +              <span className={styles.summaryMoreLabel}>{window.label}</span>
-+              <span className={styles.summaryMoreValue}>{formatPercent(window.total)}</span>
++              <span
++                className={`${styles.summaryMoreValue} ${isLimitReached(window.total) ? styles.exhausted : ''}`}
++              >
++                {formatRemaining(window.total, t)}
++              </span>
 +            </div>
 +          ))}
 +          {hidden > 0 && (
@@ -808,13 +818,18 @@ index 0000000..62b6c92
 +  locale?: string;
 +  t: TFunction;
 +}) {
++  const remaining = formatRemaining(window.remaining, t);
 +  return (
 +    <div className={styles.cell}>
 +      <div className={styles.cellHead}>
 +        <span className={styles.cellLabel} title={window.label}>
 +          {window.label}
 +        </span>
-+        <span className={styles.cellPercent}>{formatPercent(window.remaining)}</span>
++        <span
++          className={`${styles.cellPercent} ${isLimitReached(window.remaining) ? styles.exhausted : ''}`}
++        >
++          {remaining}
++        </span>
 +      </div>
 +      <div
 +        className={styles.meter}
@@ -823,6 +838,7 @@ index 0000000..62b6c92
 +        aria-valuemin={window.remaining === null ? undefined : 0}
 +        aria-valuemax={window.remaining === null ? undefined : 100}
 +        aria-valuenow={window.remaining ?? undefined}
++        aria-valuetext={window.remaining === null ? undefined : remaining}
 +      >
 +        <span
 +          className={`${styles.meterFill} ${toneClass(window.remaining)}`}
@@ -1022,10 +1038,10 @@ index b5252af..97dad29 100644
  export const CARD_ENTRANCE_BUDGET_MS = 360;
 diff --git a/src/features/quota/ledgerModel.ts b/src/features/quota/ledgerModel.ts
 new file mode 100644
-index 0000000..d2bee2b
+index 0000000..4d9a60a
 --- /dev/null
 +++ b/src/features/quota/ledgerModel.ts
-@@ -0,0 +1,314 @@
+@@ -0,0 +1,328 @@
 +/**
 + * Ledger view model: every provider's quota flattened to comparable windows.
 + *
@@ -1076,6 +1092,20 @@ index 0000000..d2bee2b
 +
 +const remainingFromUsed = (used: unknown): number | null =>
 +  typeof used === 'number' && Number.isFinite(used) ? clampPercent(100 - used) : null;
++
++/** True when a remaining percent rounds to nothing: the window is used up. */
++export const isLimitReached = (remaining: number | null): boolean =>
++  remaining !== null && Math.round(remaining) === 0;
++
++/**
++ * A remaining percent as text: "17% left", "Limit reached" when used up, "--"
++ * when not reported. Always says "left": a bare percentage reads as used.
++ */
++export function formatRemaining(remaining: number | null, t: TFunction): string {
++  if (remaining === null) return '--';
++  if (isLimitReached(remaining)) return String(t('quota_ledger.limit_reached'));
++  return String(t('quota_ledger.percent_left', { percent: Math.round(remaining) }));
++}
 +
 +const finiteMs = (value: unknown): number | null =>
 +  typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -1388,10 +1418,10 @@ index aba0a0e..acfd983 100644
    } catch {
      return null;
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
-index 820a069..7c14dab 100644
+index 820a069..542e69b 100644
 --- a/src/i18n/locales/en.json
 +++ b/src/i18n/locales/en.json
-@@ -1538,6 +1538,21 @@
+@@ -1538,6 +1538,23 @@
        }
      }
    },
@@ -1402,7 +1432,9 @@ index 820a069..7c14dab 100644
 +    "summary_label": "Totals by provider",
 +    "credentials_one": "{{count}} credential",
 +    "credentials_other": "{{count}} credentials",
-+    "of_capacity": "of {{capacity}}%",
++    "of_capacity": "left of {{capacity}}%",
++    "percent_left": "{{percent}}% left",
++    "limit_reached": "Limit reached",
 +    "not_loaded": "Not loaded yet",
 +    "no_reset": "No reset pending",
 +    "no_windows": "No quota windows reported",
@@ -1414,10 +1446,10 @@ index 820a069..7c14dab 100644
      "search_label": "Search accounts",
      "search_placeholder": "Search by filename or email",
 diff --git a/src/i18n/locales/ru.json b/src/i18n/locales/ru.json
-index e0b6d8b..845385a 100644
+index e0b6d8b..1d11d58 100644
 --- a/src/i18n/locales/ru.json
 +++ b/src/i18n/locales/ru.json
-@@ -1541,6 +1541,23 @@
+@@ -1541,6 +1541,25 @@
        }
      }
    },
@@ -1430,7 +1462,9 @@ index e0b6d8b..845385a 100644
 +    "credentials_few": "{{count}} учётные записи",
 +    "credentials_many": "{{count}} учётных записей",
 +    "credentials_other": "{{count}} учётной записи",
-+    "of_capacity": "из {{capacity}}%",
++    "of_capacity": "осталось из {{capacity}}%",
++    "percent_left": "осталось {{percent}}%",
++    "limit_reached": "Лимит исчерпан",
 +    "not_loaded": "Ещё не загружено",
 +    "no_reset": "Сброс не ожидается",
 +    "no_windows": "Окна квот не получены",
@@ -1442,10 +1476,10 @@ index e0b6d8b..845385a 100644
      "search_label": "Поиск аккаунтов",
      "search_placeholder": "Поиск по имени файла или электронной почте",
 diff --git a/src/i18n/locales/zh-CN.json b/src/i18n/locales/zh-CN.json
-index d7029c6..927c268 100644
+index d7029c6..38eafbc 100644
 --- a/src/i18n/locales/zh-CN.json
 +++ b/src/i18n/locales/zh-CN.json
-@@ -1536,6 +1536,21 @@
+@@ -1536,6 +1536,23 @@
        }
      }
    },
@@ -1456,7 +1490,9 @@ index d7029c6..927c268 100644
 +    "summary_label": "按提供商汇总",
 +    "credentials_one": "{{count}} 个凭证",
 +    "credentials_other": "{{count}} 个凭证",
-+    "of_capacity": "/ {{capacity}}%",
++    "of_capacity": "剩余 / {{capacity}}%",
++    "percent_left": "剩余 {{percent}}%",
++    "limit_reached": "已达上限",
 +    "not_loaded": "尚未加载",
 +    "no_reset": "暂无待重置",
 +    "no_windows": "未返回额度窗口",
@@ -1468,10 +1504,10 @@ index d7029c6..927c268 100644
      "search_label": "搜索账号",
      "search_placeholder": "按文件名或邮箱搜索",
 diff --git a/src/i18n/locales/zh-TW.json b/src/i18n/locales/zh-TW.json
-index ee4918d..1fc160d 100644
+index ee4918d..dd3c6e7 100644
 --- a/src/i18n/locales/zh-TW.json
 +++ b/src/i18n/locales/zh-TW.json
-@@ -1562,6 +1562,21 @@
+@@ -1562,6 +1562,23 @@
        }
      }
    },
@@ -1482,7 +1518,9 @@ index ee4918d..1fc160d 100644
 +    "summary_label": "按提供商彙總",
 +    "credentials_one": "{{count}} 個憑證",
 +    "credentials_other": "{{count}} 個憑證",
-+    "of_capacity": "/ {{capacity}}%",
++    "of_capacity": "剩餘 / {{capacity}}%",
++    "percent_left": "剩餘 {{percent}}%",
++    "limit_reached": "已達上限",
 +    "not_loaded": "尚未載入",
 +    "no_reset": "暫無待重置",
 +    "no_windows": "未回傳額度視窗",
@@ -1495,14 +1533,16 @@ index ee4918d..1fc160d 100644
      "search_placeholder": "依檔案名稱或電子郵件搜尋",
 diff --git a/tests/quotaLedgerModel.test.ts b/tests/quotaLedgerModel.test.ts
 new file mode 100644
-index 0000000..ec2c005
+index 0000000..be5c31c
 --- /dev/null
 +++ b/tests/quotaLedgerModel.test.ts
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,249 @@
 +import { describe, expect, test } from 'bun:test';
 +import type { TFunction } from 'i18next';
 +import {
 +  buildLedgerWindows,
++  formatRemaining,
++  isLimitReached,
 +  ledgerPlanLabel,
 +  orderRowWindows,
 +  summarizeProvider,
@@ -1710,6 +1750,23 @@ index 0000000..ec2c005
 +      'b',
 +      'c',
 +    ]);
++  });
++});
++
++describe('formatRemaining', () => {
++  const tWithParams = ((key: string, params?: Record<string, unknown>) =>
++    params ? `${key}:${JSON.stringify(params)}` : key) as unknown as TFunction;
++
++  test('labels the percent as left, and a used-up window as reached', () => {
++    expect(formatRemaining(17, tWithParams)).toBe('quota_ledger.percent_left:{"percent":17}');
++    expect(formatRemaining(99.6, tWithParams)).toBe('quota_ledger.percent_left:{"percent":100}');
++    expect(formatRemaining(0, tWithParams)).toBe('quota_ledger.limit_reached');
++    expect(formatRemaining(0.4, tWithParams)).toBe('quota_ledger.limit_reached');
++    expect(formatRemaining(null, tWithParams)).toBe('--');
++  });
++
++  test('a limit is reached only when the remainder rounds to zero', () => {
++    expect([0, 0.4, 0.5, 1, null].map(isLimitReached)).toEqual([true, true, false, false, false]);
 +  });
 +});
 +
