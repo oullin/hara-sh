@@ -11,8 +11,8 @@ Already running Hara with 1Password? [Import your existing keys](./configuration
 ## 1. Get the project
 
 ```bash
-git clone https://github.com/oullin/cli-proxy-api.git
-cd cli-proxy-api
+git clone https://github.com/oullin/hara-sh.git
+cd hara-sh
 ```
 
 Or download the repository as a ZIP and open a terminal in the extracted directory.
