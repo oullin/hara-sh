@@ -76,6 +76,6 @@ Run deployment from `web/` when invoking `cf` directly. Only the static site and
 
 ## Rebuild the management panel
 
-Install Bun and run `make code panel`. It applies `panel/ledger.patch` to the tagged upstream panel and updates `panel/management.html`. Review the result and recreate the proxy. A newer upstream tag may require rebasing the patch.
+Install Bun and run `make code panel`. It applies `panel/ledger.patch` to the tagged upstream panel and updates `panel/management.html`. Review the result and reload the panel; the proxy serves the new file without a restart. A newer upstream tag may require rebasing the patch.
 
 Set `PANEL_TAG` to test a newer upstream release. The panel is mounted read-only, and automatic upstream panel updates are disabled so that the Ledger patch remains in use.

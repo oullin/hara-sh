@@ -28,7 +28,9 @@ services:
       TZ: ${TZ:-UTC}
     volumes:
       - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/proxy:/data
-      - ../panel/management.html:/panel/management.html:ro
+      # The directory, not the file: a file mount keeps the old inode after git or an editor
+      # replaces panel/management.html, and the panel 404s until the proxy is recreated.
+      - ../panel:/panel:ro
     healthcheck:
       test:
         - CMD
