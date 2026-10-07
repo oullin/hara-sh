@@ -30,8 +30,20 @@ status() {
   log "Host endpoint: http://localhost:${HARA_PORT:-8317}"
   # Tailscale is optional; show its login/address only when enabled and running.
   if [[ -n "$(compose --profile tailscale ps -q --status running tailscale)" ]]; then
+    wait_tailscale
     compose exec -T tailscale tailscale status --peers=false || log "! Tailscale needs attention; authorize its device before using the tailnet URL"
   fi
+}
+
+# A just-started node reports NoState, then offline, for a few seconds; a node that needs login settles at once.
+wait_tailscale() {
+  local attempt state starting='NoState|Starting|offline|failed to connect'
+  for attempt in {1..15}; do
+    state="$(compose exec -T tailscale tailscale status --peers=false 2>&1 || true)"
+    [[ -n "$state" && ! "$state" =~ $starting ]] && return 0
+    (( attempt == 1 )) && log "Waiting for Tailscale to connect..."
+    sleep 1
+  done
 }
 
 # Optional https://hara.local through portless in LAN mode; skipped when portless is not installed.
