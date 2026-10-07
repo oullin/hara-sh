@@ -1,37 +1,35 @@
 # cli-proxy-api — make up | down | status | logs [service], or make <area> [action]. Run `make` for the list.
-# Secrets are read from 1Password at run time and never echoed.
+# Private credentials are read through Docker; 1Password is optional.
 
 SHELL      := /bin/bash
-# portless serves the local proxy here (scripts/local.sh); URL=http://localhost:8317 skips it.
-URL        ?= https://hara.local
-OP_ACCOUNT ?= my.1password.com
+# Host clients use loopback; containerized tools map it to the proxy service.
+URL        ?= http://localhost:$(or $(HARA_PORT),8317)
 MODEL      ?= claude-haiku-4-5-20251001
 # Codex model for `make ops bench`.
 CODEX_MODEL ?= gpt-5.5
 
-export OP_ACCOUNT
+export OP_ACCOUNT OP_VAULT OP_ITEM_NAME
 
-# Cached in the macOS Keychain for 30 days (scripts/hara-key); 1Password is asked once a month.
+# The helper reads private Docker state; HARA_SECRET_PROVIDER=op opts into 1Password.
 HARA_KEY = $(CURDIR)/scripts/hara-key
 API_KEY  = $$($(HARA_KEY) claude-api-key)
-MGMT_KEY = $$($(HARA_KEY) management-password)
 # hara.local uses the portless certificate authority; Node-based clients need it named.
-PORTLESS_CA = $(HOME)/.portless/ca.pem
+PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
 
 # Each area lists its actions, the first being the default, and one line of help.
 AREAS    := claude codex ops web code
 SERVICES := proxy tailscale quota
 
 claude_ACTIONS := run alias backup
-claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); alias prints claude-hara for ~/.zshrc; backup copies ~/.claude into claude/
+claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); alias prints claude-hara for ~/.zshrc; backup copies client settings outside the repository
 codex_ACTIONS  := run profile smoke backup
-codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; smoke fails on the HTTP fallback; backup copies ~/.codex into codex/
-ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys
-ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), re-fetch the cached keys
-web_ACTIONS    := dev install test coverage deploy
-web_HELP       := The landing page on hara.sh: Vite dev server, dependencies, tests, coverage (fails under 100%), type-check, test and deploy
-code_ACTIONS   := check format lint test complexity panel
-code_HELP      := check runs what CI runs (lint, Go tests, web coverage); format and lint with fmtkit and shellcheck; Go tests; complexity limits; rebuild the panel (needs bun)
+codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; smoke fails on the HTTP fallback; backup copies client settings outside the repository
+ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
+ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), rotate local keys or import optional 1Password credentials
+web_ACTIONS    := dev install test coverage build docs deploy
+web_HELP       := The landing page and docs on hara.sh: Vite dev server, dependencies, tests, coverage (fails under 100%), type-check, test and deploy
+code_ACTIONS   := check format lint test complexity panel public
+code_HELP      := check runs what CI runs (lint, Go tests, web coverage); format and lint with fmtkit and shellcheck; Go tests; complexity limits; rebuild the panel (needs bun); public-file privacy guard
 
 # `make ops quota`, `make logs proxy`: the words after an area (or logs) name its action or service,
 # not targets, so they get an empty rule here; anything else fails with the choices.
@@ -62,23 +60,24 @@ endif
 $(foreach a,$(AREAS),$(eval $(a): $(a)/$(if $(filter $(a),$(FIRST)),$(ACTION),$(firstword $($(a)_ACTIONS)))))
 
 .DEFAULT_GOAL := help
-.PHONY: help up down status logs $(AREAS) $(foreach a,$(AREAS),$(addprefix $(a)/,$($(a)_ACTIONS)))
+.PHONY: help init up down status logs $(AREAS) $(foreach a,$(AREAS),$(addprefix $(a)/,$($(a)_ACTIONS)))
 
 space := $(subst ,, )
 help:
 	@printf '%s\n' \
-	  'make up | down | status | logs [service]   the proxy on this computer' \
+	  'make init | up | down | status | logs [service]   the proxy on this computer' \
 	  'make <area> [action]                       the first action is the default' \
 	  '' \
-	  '  up      Start the proxy, or apply config.yaml changes (config from 1Password), then run status' \
-	  '  down    Stop the proxy and remove hara.local (logins and Tailscale identity kept)' \
-	  '  status  Check every link, from the containers to the accounts, and print the addresses' \
+	  '  up      Start Docker services, initialize private keys, apply config.yaml, then run status' \
+	  '  down    Stop the proxy (credentials, logins and Tailscale identity kept)' \
+	  '  status  Check containers, proxy, panel, keys and accounts; print available addresses' \
 	  '  logs    Follow the container logs: all, or one of $(SERVICES) (Ctrl-C to stop)'
 	@$(foreach a,$(AREAS),printf '\n  \033[36m%-7s\033[0m %s\n          %s\n' '$(a)' '$(subst $(space), | ,$($(a)_ACTIONS))' '$($(a)_HELP)';)
 
-## --- The proxy on this computer (Docker + Tailscale + portless) ------------------------------
-# https://hara.local on your network (portless in LAN mode) and https://cliproxy.<tailnet>.ts.net
-# on your tailnet (local/compose.yaml).
+## --- The Docker Compose stack (Tailscale is optional) -----------------------------------
+
+init:
+	./scripts/local.sh init
 
 up:
 	./scripts/local.sh up
@@ -102,7 +101,7 @@ claude/run:
 claude/alias:
 	@echo "alias claude-hara='NODE_EXTRA_CA_CERTS=\$$HOME/.portless/ca.pem ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
 
-# settings.json is copied with its Omniyat auto-mode section redacted.
+# Client backups remain private, outside the repository.
 claude/backup:
 	./scripts/backup-claude.sh
 
@@ -110,7 +109,7 @@ codex/run:
 	@codex --profile proxy $(ARGS)
 
 codex/profile:
-	install -m 644 codex/proxy.config.toml $(HOME)/.codex/proxy.config.toml
+	./scripts/install-codex-profile.sh
 
 codex/smoke:
 	./scripts/codex-smoke.sh
@@ -120,40 +119,42 @@ codex/backup:
 
 ## --- ops: requests to the running proxy (URL) ----------------------------------------------
 
-# Built rather than `go run`, which adds its own "exit status 1" to every failure.
-OPS_BIN := $(or $(LOCAL_DIR),$(HOME)/.cli-proxy-api)/bin/ops
-OPS = (cd scripts/ops && go build -o $(OPS_BIN) .) && API_KEY="$(API_KEY)" MGMT_KEY="$(MGMT_KEY)" $(OPS_BIN)
+# Go tools are built once in Docker, with no host Go installation.
+OPS = ./scripts/local.sh tools ops
 
 # % used, reset times, weekly capacity expiring unused within 24h.
 ops/quota:
-	@cd scripts/quota && MGMT_KEY="$(MGMT_KEY)" URL=$(URL) go run .
+	@URL=$(URL) ./scripts/local.sh tools quota
 
 ops/accounts:
-	@$(OPS) accounts -url $(URL)
+	@URL=$(URL) $(OPS) accounts
 
 ops/models:
-	@$(OPS) models -url $(URL)
+	@URL=$(URL) $(OPS) models
 
 ops/logs:
-	@$(OPS) logs -url $(URL) -n $${LINES:-200}
+	@URL=$(URL) $(OPS) logs -n $${LINES:-200}
 
 ops/smoke:
-	@$(OPS) smoke -url $(URL) -model "$(MODEL)"
+	@URL=$(URL) $(OPS) smoke -model "$(MODEL)"
 
 # Handshake, ping/pong, close and 401 without a key, per address. The proxy answers pings itself,
 # so it needs no provider account. TS_URL adds the tailnet address (from `make status`);
 # IDLE=2m holds each socket idle, then pings again.
 ops/ws-smoke:
-	@cd scripts/wssmoke && API_KEY="$(API_KEY)" go run . -idle $${IDLE:-0s} http://localhost:8317 $(URL) $(TS_URL)
+	@URL=$(URL) ./scripts/local.sh ws-smoke $${IDLE:-0s} $(TS_URL)
 
 # Real requests: N per API per address (about 5k prompt tokens each, mostly cached). The first of
 # each series is cold, the rest should hit the prompt cache. CODEX_MODEL= skips Codex, MODEL= Claude.
 ops/bench:
-	@cd scripts/bench && API_KEY="$(API_KEY)" go run . -n $${N:-5} -claude-model "$(MODEL)" -codex-model "$(CODEX_MODEL)" http://localhost:8317 $(URL)
+	@URL=$(URL) ./scripts/local.sh bench $${N:-5} "$(MODEL)" "$(CODEX_MODEL)"
 
-# After rotating a key in 1Password; `make up` then applies it to the proxy.
+# Rotation is explicit; apply it with make up and refresh running clients.
 ops/keys:
-	@for f in claude-api-key management-password; do $(HARA_KEY) --refresh $$f >/dev/null; done && echo "keys refreshed"
+	./scripts/local.sh rotate
+
+ops/import-op:
+	./scripts/local.sh import-op
 
 ## --- web: the landing page (web/: Vue + shadcn-vue + Tailwind CSS v4, served on hara.sh) ---
 
@@ -169,6 +170,12 @@ web/test:
 web/coverage:
 	cd web && npm run coverage
 
+web/build:
+	cd web && npm run build
+
+web/docs:
+	cd web && npm run docs:dev
+
 web/deploy:
 	cd web && npm run deploy
 
@@ -178,8 +185,8 @@ GO_MODULES := scripts/ops scripts/quota scripts/wssmoke scripts/bench
 SHELL_SCRIPTS := scripts/*.sh scripts/hara-key scripts/lib/common.sh
 
 # What CI runs (.github/workflows/ci.yml). Without fmtkit, lint checks the shell scripts and gofmt only.
-code/check: code/lint code/test
-	cd web && npx vue-tsc -b && npm run coverage
+code/check: code/lint code/test code/public
+	cd web && npm run build && npm run coverage
 
 # Go is formatted from its module directory, so fmtkit also runs go vet there.
 code/format:
@@ -189,10 +196,12 @@ code/format:
 code/lint:
 	shellcheck $(SHELL_SCRIPTS)
 	@unformatted="$$(gofmt -l $(GO_MODULES))"; [[ -z "$$unformatted" ]] || { echo "gofmt needed: $$unformatted"; exit 1; }
-	@if command -v fmtkit >/dev/null; then fmtkit lint web/src web/worker web/cloudflare.config.ts; else echo "fmtkit is not installed; skipping the TS lint"; fi
+	@if command -v fmtkit >/dev/null; then fmtkit lint web/src web/worker web/docs/.vitepress web/cloudflare.config.ts; else echo "fmtkit is not installed; skipping the TS lint"; fi
 
 code/test:
-	@for m in $(GO_MODULES); do echo "$$m"; (cd $$m && go vet ./... && go test ./...) || exit 1; done
+	docker compose -f local/compose.yaml build tests
+	docker compose -f local/compose.yaml run --rm --no-deps -T tests
+	docker build --target verify -f scripts/tools/Dockerfile .
 
 code/complexity:
 	fmtkit complexity --ts web/src web/worker
@@ -201,3 +210,10 @@ code/complexity:
 # Upstream panel + panel/ledger.patch; commit it, then `make up`.
 code/panel:
 	./scripts/build-panel.sh
+
+code/public:
+	python3 scripts/check-public.py
+
+# Compatibility entrypoint for the full formatter.
+.PHONY: format-all
+format-all: code/format

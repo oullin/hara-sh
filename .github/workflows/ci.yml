@@ -1,5 +1,5 @@
 # Runs `make code check` (shellcheck, gofmt, Go vet and tests, web type-check and 100% coverage),
-# the same command as on your computer, and builds the quota image the local stack runs.
+# the same command as on your computer; runtime/tool tests use Docker.
 name: CI
 
 on:
@@ -38,5 +38,5 @@ jobs:
 
       - run: make code check
 
-      - name: Build the quota image
-        run: docker build -q -t cli-proxy-api-quota:ci scripts/quota
+      - name: Build the runtime tools image
+        run: docker compose -f local/compose.yaml build init

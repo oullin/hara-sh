@@ -1,0 +1,18 @@
+# The tools build only receives public tool sources.
+**
+!scripts/
+!scripts/ops/
+!scripts/ops/*.go
+!scripts/ops/go.mod
+!scripts/quota/
+!scripts/quota/*.go
+!scripts/quota/go.mod
+!scripts/wssmoke/
+!scripts/wssmoke/*.go
+!scripts/wssmoke/go.mod
+!scripts/bench/
+!scripts/bench/*.go
+!scripts/bench/go.mod
+!scripts/tools/
+!scripts/tools/Dockerfile
+!scripts/tools/*.py

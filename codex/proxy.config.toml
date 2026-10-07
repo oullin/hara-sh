@@ -11,8 +11,8 @@ wire_api = "responses"
 # Open the Responses WebSocket (GET /v1/responses). When it fails, Codex prints
 # "Falling back from WebSockets to HTTPS transport" and continues over HTTP; `make codex smoke` fails on that.
 supports_websockets = true
-# The proxy's client key, from the Keychain cache (1Password at most every 30 days).
-auth.command = "/path/to/Sites/CLIProxyAPI/scripts/hara-key"
+# The proxy's client key, from private Docker state (1Password is optional).
+auth.command = "__HARA_KEY_COMMAND__"
 auth.args = ["claude-api-key"]
 auth.timeout_ms = 60000
 auth.refresh_interval_ms = 86400000

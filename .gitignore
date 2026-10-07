@@ -4,3 +4,14 @@ node_modules/
 .cloudflare/
 worker-configuration.d.ts
 coverage/
+
+# Personal client state and local credentials are never public examples.
+claude/
+.claude/
+codex/*.toml
+!codex/proxy.config.toml
+.env.*
+!.env.example
+.dev.vars*
+*.pem
+*.key

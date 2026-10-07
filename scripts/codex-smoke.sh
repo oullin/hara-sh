@@ -13,6 +13,7 @@ PROXY_URL="${PROXY_URL:-http://localhost:8317}"
 [[ -f "${CODEX_HOME:-$HOME/.codex}/$PROFILE.config.toml" ]] || die "no Codex profile '$PROFILE'; run: make codex profile"
 curl -fsS --max-time 5 "$PROXY_URL/healthz" >/dev/null 2>&1 || die "the proxy does not answer on $PROXY_URL; run: make up"
 
+out=""
 temp_file out
 codex exec --profile "$PROFILE" --skip-git-repo-check "Reply with exactly: pong" </dev/null >"$out" 2>&1 || {
   cat "$out" >&2
