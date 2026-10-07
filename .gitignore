@@ -4,6 +4,8 @@ node_modules/
 .cloudflare/
 worker-configuration.d.ts
 coverage/
+# The host helper, built by make from scripts/hara.
+/bin/
 
 # Personal client state and local credentials are never public examples.
 claude/

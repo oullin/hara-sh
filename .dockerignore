@@ -13,6 +13,9 @@
 !scripts/bench/
 !scripts/bench/*.go
 !scripts/bench/go.mod
+!scripts/hara/
+!scripts/hara/*.go
+!scripts/hara/go.mod
 !scripts/tools/
 !scripts/tools/Dockerfile
 !scripts/tools/*.py

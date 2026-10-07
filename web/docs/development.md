@@ -31,7 +31,7 @@ make format-all
 make code check
 ```
 
-Checks cover shell lint, containerised Go tests and credential tests, the web build, and 100% application coverage. Development checks need Docker, shellcheck, Go for gofmt, Node.js, and installed web dependencies. Server users need only Docker.
+`make format-all` is the only formatter and lint: it runs fmtkit over the TS/Vue sources and every Go module (with go vet). `make code check` covers containerised Go tests and credential tests, the web build, 100% application coverage and the publication guard. Development checks need Docker, fmtkit, Go, Node.js, and installed web dependencies. Server users need only Docker: without host Go, `make` builds the `bin/hara` host helper in a container.
 
 Keep browser artefacts outside the checkout. Test desktop/mobile navigation, search, direct links, and missing routes before publishing.
 
@@ -45,7 +45,7 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 | `scripts/tools/`                                                | Docker tools image, credential initialisation and tests       |
 | `scripts/public/`                                               | Publication guard and CI source-language checks               |
 | `scripts/ops/`, `quota/`, `wssmoke/`, `bench/` under `scripts/` | Status, quota routing, transport checks and benchmarks        |
-| `scripts/*.sh`, `scripts/hara-key`                              | Optional host helpers and private client backups              |
+| `scripts/hara/`                                                 | Host helper behind `make`, built into `bin/hara`              |
 | `codex/proxy.config.toml`                                       | Portable client profile template                              |
 | `panel/`                                                        | Management panel build and Ledger patch                       |
 | `web/`, `.github/workflows/`                                    | Public website, documentation and CI checks                   |

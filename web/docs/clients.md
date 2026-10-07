@@ -29,24 +29,24 @@ Or configure the environment directly:
 
 ```bash
 export ANTHROPIC_BASE_URL='http://localhost:8317'
-export ANTHROPIC_AUTH_TOKEN="$(./scripts/hara-key claude-api-key)"
+export ANTHROPIC_AUTH_TOKEN="$(./bin/hara key claude-api-key)"
 claude
 ```
 
-On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
+`bin/hara` is the host helper; any `make` action that needs it, such as `make status`, builds it first. On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
 
 Claude Code uses HTTP with SSE streaming; the Anthropic API does not use the Responses WebSocket.
 
 ## Codex
 
-Install the private profile using the Bash helper:
+Install the private profile using the host helper:
 
 ```bash
 make codex profile
 make codex
 ```
 
-It writes `~/.codex/proxy.config.toml`, uses `http://localhost:8317/v1`, and reads the key through `hara-key`. Your Codex release must support profile files, command-based auth, and Responses WebSockets.
+It writes `~/.codex/proxy.config.toml`, uses `http://localhost:8317/v1`, and reads the key through `bin/hara key`. Your Codex release must support profile files, command-based auth, and Responses WebSockets.
 
 After connecting an account, verify that Codex stays on WebSockets:
 
@@ -54,7 +54,7 @@ After connecting an account, verify that Codex stays on WebSockets:
 make codex smoke
 ```
 
-For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Reinstall the profile if you move this checkout. Without Bash, configure the URL and key directly in your client.
+For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Reinstall the profile if you move this checkout. Without `make`, configure the URL and key directly in your client.
 
 Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback.
 
@@ -69,7 +69,7 @@ Plain `codex` continues to use your usual login. Select the `proxy` profile only
 Test a real request with curl:
 
 ```bash
-client_key="$(./scripts/hara-key claude-api-key)"
+client_key="$(./bin/hara key claude-api-key)"
 curl --fail-with-body http://localhost:8317/v1/chat/completions \
   -H "Authorization: Bearer $client_key" \
   -H 'Content-Type: application/json' \

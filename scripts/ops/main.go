@@ -26,6 +26,15 @@ import (
 	"time"
 )
 
+// keys holds the client key and the management password.
+type keys struct {
+	api  string
+	mgmt string
+}
+
+// shell runs a command and returns its standard output; tests replace it.
+type shell func(name string, args ...string) ([]byte, error)
+
 const usage = "usage: ops status|models|accounts|smoke|logs [flags] (run it through make)"
 
 func main() {
@@ -46,12 +55,6 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-}
-
-// keys holds the client key and the management password.
-type keys struct {
-	api  string
-	mgmt string
 }
 
 // errFailed reports that status found a broken link; the checks already say which.
@@ -133,9 +136,6 @@ func newClient() *http.Client {
 
 	return client
 }
-
-// shell runs a command and returns its standard output; tests replace it.
-type shell func(name string, args ...string) ([]byte, error)
 
 func docker(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).Output()

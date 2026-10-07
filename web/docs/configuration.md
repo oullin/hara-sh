@@ -16,7 +16,7 @@ The initialiser renders `$LOCAL_DIR/proxy/config.yaml`, replacing `__API_KEY__` 
 
 | Variable               | Default                  | Use                                      |
 | ---------------------- | ------------------------ | ---------------------------------------- |
-| `LOCAL_DIR`            | `$HOME/.hara-sh`   | Private state; set explicitly on Windows |
+| `LOCAL_DIR`            | `$HOME/.hara-sh`         | Private state; set explicitly on Windows |
 | `HARA_PORT`            | `8317`                   | Published host port                      |
 | `HARA_CONFIG_TEMPLATE` | Repository `config.yaml` | Absolute path to a private template      |
 | `TZ`                   | `UTC`                    | Container timezone                       |
@@ -42,11 +42,11 @@ Keep the existing state directory. Import the original keys before starting the 
 export OP_ACCOUNT='my.1password.com'
 export OP_VAULT='Private'
 export OP_ITEM_NAME='cli-proxy-api'
-./scripts/local.sh import-op
+make ops import-op
 make up
 ```
 
-Use your own account, vault, and item. The item needs `claude-api-key` and `management-password` fields. The helper requires Bash and a signed-in `op` CLI, reads without printing, and imports into private files. Subsequent startup needs no `op`.
+Use your own account, vault, and item. The item needs `claude-api-key` and `management-password` fields. The helper requires a signed-in `op` CLI, reads without printing, and imports into private files. Subsequent startup needs no `op`.
 
 For another secret manager, export exactly two lines—client key first, management password second—to a private file:
 
@@ -57,7 +57,7 @@ docker compose -f local/compose.yaml run --rm --no-deps -T init import < /path/t
 
 Each value must be 20–72 UTF-8 bytes without embedded line breaks. Import replaces both credentials. Remove the export afterwards and recreate services. Initialisation refuses to replace keys from an older installation automatically.
 
-To read directly from 1Password in a host client, set `HARA_SECRET_PROVIDER=op` with the same `OP_*` settings. Sync changes before restarting the server. Optional Bash settings live in `$LOCAL_DIR/credentials.env`; Compose does not source that file.
+To read directly from 1Password in a host client, set `HARA_SECRET_PROVIDER=op` with the same `OP_*` settings. Sync changes before restarting the server. Optional host helper settings live in `$LOCAL_DIR/credentials.env` as `NAME=value` lines (values are not expanded); Compose does not read that file.
 
 ## Routing defaults
 
@@ -79,7 +79,7 @@ An existing session's affinity takes precedence over quota priority. Priority ch
 | `secrets/`                  | Client key and management password; tools mount them read-only           |
 | `proxy/`                    | Rendered config, provider logins, persistent cooldowns and rotating logs |
 | `tailscale/`                | Optional device identity                                                 |
-| `backups/`                  | Host client settings saved by the optional Bash helpers                  |
+| `backups/`                  | Host client settings saved by the optional host helper                   |
 
 Logs rotate in 10 MB files with a 512 MB total cap. Protect the whole state directory and include your outside-Git provider template in private backups.
 

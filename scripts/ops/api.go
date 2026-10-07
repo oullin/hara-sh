@@ -51,6 +51,7 @@ func (p proxy) do(method, path string, header http.Header, body []byte) ([]byte,
 	}
 
 	defer res.Body.Close()
+
 	data, err := io.ReadAll(res.Body)
 
 	return data, res.StatusCode, err

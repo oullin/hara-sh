@@ -7,6 +7,7 @@ COPY scripts/wssmoke /src/wssmoke
 COPY scripts/bench /src/bench
 COPY scripts/tools /src/tools
 COPY scripts/public /src/public
+COPY scripts/hara /src/hara
 RUN mkdir /bin-tools && for tool in ops quota wssmoke bench; do \
     cd /src/$tool && CGO_ENABLED=0 go build -trimpath -tags timetzdata -o /bin-tools/$tool . || exit 1; \
     done
@@ -15,7 +16,7 @@ RUN cd /src/tools && CGO_ENABLED=0 go build -trimpath -tags timetzdata -o /bin-t
 # Development verification also runs with the image's Go toolchain.
 FROM build AS verify
 RUN apk add --no-cache git
-RUN for tool in ops quota wssmoke bench tools public; do \
+RUN for tool in ops quota wssmoke bench tools public hara; do \
     cd /src/$tool && go vet ./... && go test ./... || exit 1; \
     done
 

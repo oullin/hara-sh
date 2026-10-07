@@ -1,4 +1,4 @@
-# Runs `make code check` (shellcheck, gofmt, Go vet and tests, web type-check and 100% coverage),
+# Runs `make code check` (Go vet and tests, web type-check and 100% coverage),
 # the same command as on your computer; runtime/tool tests use Docker.
 name: CI
 
