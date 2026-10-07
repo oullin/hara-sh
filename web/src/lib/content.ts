@@ -64,8 +64,8 @@ export const steps: Array<Step> = [
 		token: 'client',
 	},
 	{
-		body: 'Use the loopback endpoint on your computer, or enable Tailscale for private HTTPS from another device.',
-		code: 'docker compose -f local/compose.yaml --profile tailscale up -d --build --force-recreate\n\n# Host client URL\nhttp://localhost:8317\n\n# Remote client URL\nhttps://cliproxy.YOUR-TAILNET.ts.net',
+		body: 'Use the loopback endpoint on your computer, a stable local domain through portless, or Tailscale for private HTTPS from another device.',
+		code: 'docker compose -f local/compose.yaml --profile tailscale up -d --build --force-recreate\n\n# Host client URL\nhttp://localhost:8317\n\n# Local domain (portless)\nhttps://hara.local\n\n# Remote client URL\nhttps://cliproxy.YOUR-TAILNET.ts.net',
 		file: 'Optional remote access',
 		id: 'reach',
 		title: 'Use it',

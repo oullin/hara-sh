@@ -3,7 +3,7 @@
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-DEST="${BACKUP_DIR:-${LOCAL_DIR:-$HOME/.cli-proxy-api}/backups}/codex"
+DEST="${BACKUP_DIR:-${LOCAL_DIR:-$HOME/.hara-sh}/backups}/codex"
 umask 077
 private_backup_dir "$DEST"
 for file in config.toml openai.config.toml proxy.config.toml; do

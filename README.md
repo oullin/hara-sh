@@ -4,7 +4,7 @@ A self-hosted [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) stack 
 
 **[Get started →](https://docs.hara.sh/setup)** · [Documentation](https://docs.hara.sh/) · [Website](https://hara.sh/)
 
-The server needs Docker with Compose v2. Go tools run inside containers; 1Password, Tailscale, Bash and Make are optional.
+The server needs Docker with Compose v2. Go tools run inside containers; 1Password, Tailscale, portless, Bash and Make are optional.
 
 - [Connect providers](https://docs.hara.sh/providers)
 - [Configure Claude Code, Codex and other clients](https://docs.hara.sh/clients)

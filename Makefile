@@ -1,4 +1,4 @@
-# hara-sh — make up | down | status | logs [service], or make <area> [action]. Run `make` for the list.
+# hara-sh — make up | portless | down | purge | status | logs [service], or make <area> [action]. Run `make` for the list.
 # Private credentials are read through Docker; 1Password is optional.
 
 SHELL      := /bin/bash
@@ -20,8 +20,8 @@ PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
 AREAS    := claude codex ops web code
 SERVICES := proxy tailscale quota
 
-claude_ACTIONS := run alias backup
-claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); alias prints claude-hara for ~/.zshrc; backup copies client settings outside the repository
+claude_ACTIONS := run backup
+claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
 codex_ACTIONS  := run profile smoke backup
 codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; smoke fails on the HTTP fallback; backup copies client settings outside the repository
 ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
@@ -60,18 +60,20 @@ endif
 $(foreach a,$(AREAS),$(eval $(a): $(a)/$(if $(filter $(a),$(FIRST)),$(ACTION),$(firstword $($(a)_ACTIONS)))))
 
 .DEFAULT_GOAL := help
-.PHONY: help init up down status logs $(AREAS) $(foreach a,$(AREAS),$(addprefix $(a)/,$($(a)_ACTIONS)))
+.PHONY: help init up portless down purge status logs $(AREAS) $(foreach a,$(AREAS),$(addprefix $(a)/,$($(a)_ACTIONS)))
 
 space := $(subst ,, )
 help:
 	@printf '%s\n' \
-	  'make init | up | down | status | logs [service]   the proxy on this computer' \
-	  'make <area> [action]                       the first action is the default' \
+	  'make init | up | portless | down | purge | status | logs [service]   the proxy on this computer' \
+	  'make <area> [action]                                                 the first action is the default' \
 	  '' \
-	  '  up      Start Docker services, initialize private keys, apply config.yaml, then run status' \
-	  '  down    Stop the proxy (credentials, logins and Tailscale identity kept)' \
-	  '  status  Check containers, proxy, panel, keys and accounts; print available addresses' \
-	  '  logs    Follow the container logs: all, or one of $(SERVICES) (Ctrl-C to stop)'
+	  '  up        Start Docker services, initialize private keys, apply config.yaml, run portless, then status' \
+	  '  portless  Serve the proxy at https://hara.local through portless in LAN mode (skipped if not installed)' \
+	  '  down      Stop the proxy (credentials, logins and Tailscale identity kept)' \
+	  '  purge     Remove containers, networks, images, build cache and the hara.local route (private state kept)' \
+	  '  status    Check containers, proxy, panel, keys and accounts; print available addresses' \
+	  '  logs      Follow the container logs: all, or one of $(SERVICES) (Ctrl-C to stop)'
 	@$(foreach a,$(AREAS),printf '\n  \033[36m%-7s\033[0m %s\n          %s\n' '$(a)' '$(subst $(space), | ,$($(a)_ACTIONS))' '$($(a)_HELP)';)
 
 ## --- The Docker Compose stack (Tailscale is optional) -----------------------------------
@@ -82,8 +84,14 @@ init:
 up:
 	./scripts/local.sh up
 
+portless:
+	./scripts/local.sh portless
+
 down:
 	./scripts/local.sh down
+
+purge:
+	./scripts/local.sh purge
 
 status:
 	@./scripts/local.sh status
@@ -97,9 +105,6 @@ logs:
 
 claude/run:
 	@NODE_EXTRA_CA_CERTS=$(PORTLESS_CA) ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
-
-claude/alias:
-	@echo "alias claude-hara='NODE_EXTRA_CA_CERTS=\$$HOME/.portless/ca.pem ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN=\"\$$($(HARA_KEY))\" claude'"
 
 # Client backups remain private, outside the repository.
 claude/backup:

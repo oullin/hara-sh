@@ -35,7 +35,7 @@ claude
 
 On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
 
-`make claude alias` prints the optional `claude-hara` shell alias. Claude Code uses HTTP with SSE streaming; the Anthropic API does not use the Responses WebSocket.
+Claude Code uses HTTP with SSE streaming; the Anthropic API does not use the Responses WebSocket.
 
 ## Codex
 

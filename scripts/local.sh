@@ -4,7 +4,7 @@
 source "$(dirname "$0")/lib/common.sh"
 cd "$REPO_ROOT" || exit 1
 
-LOCAL_DIR="${LOCAL_DIR:-$HOME/.cli-proxy-api}"
+LOCAL_DIR="${LOCAL_DIR:-$HOME/.hara-sh}"
 export LOCAL_DIR
 
 # Prevent writing credentials into the source checkout, even through a symlink.
@@ -34,12 +34,29 @@ status() {
   fi
 }
 
+# Optional https://hara.local through portless in LAN mode; skipped when portless is not installed.
+# Starting the proxy on port 443 may ask for sudo unless `portless service install --lan` was run.
+portless_route() {
+  command -v portless >/dev/null || { log "portless not installed; skipping https://hara.local"; return 0; }
+  portless proxy start --lan || { log "! portless proxy did not start; https://hara.local is unavailable"; return 0; }
+  portless alias hara "${HARA_PORT:-8317}" --force
+}
+
 up() {
   docker info >/dev/null 2>&1 || die "Docker is not running"
   # Initialization never regenerates existing keys. Restart readers after rendering.
   compose up -d --build --force-recreate
   tools health
+  portless_route
   status
+}
+
+# Docker rebuilds or pulls everything on the next `up`; private state in LOCAL_DIR is kept.
+purge() {
+  compose --profile tailscale --profile tools down --rmi all --volumes --remove-orphans
+  docker builder prune -f
+  if command -v portless >/dev/null; then portless alias --remove hara || true; fi
+  log "Private state kept in $LOCAL_DIR; delete it yourself to remove keys and provider logins."
 }
 
 import_op() {
@@ -53,6 +70,7 @@ import_op() {
 
 case "${1:-up}" in
   up) up ;;
+  portless) portless_route ;;
   init) compose build init && compose run --rm --no-deps -T init init ;;
   import-op) import_op ;;
   rotate) compose run --rm --no-deps -T init rotate ;;
@@ -62,5 +80,6 @@ case "${1:-up}" in
   bench) tools benchmark "${@:2}" ;;
   logs) compose logs -f --tail=100 "${@:2}" ;;
   down) compose --profile tailscale down ;;
-  *) die "usage: scripts/local.sh up|init|import-op|rotate|status|tools COMMAND|logs [service]|down" ;;
+  purge) purge ;;
+  *) die "usage: scripts/local.sh up|portless|init|import-op|rotate|status|tools COMMAND|logs [service]|down|purge" ;;
 esac

@@ -80,6 +80,8 @@ Bash and Make are optional. These commands run the same Docker tools:
 | Task                         | Command                                                    |
 | ---------------------------- | ---------------------------------------------------------- |
 | Start / stop / status        | `make up` / `make down` / `make status`                    |
+| Serve `https://hara.local`   | `make portless` (also run by `make up`)                    |
+| Remove containers and images | `make purge` (private state kept)                          |
 | Accounts / models / quota    | `make ops accounts` / `make ops models` / `make ops quota` |
 | Request / WebSocket check    | `make ops smoke` / `make ops ws-smoke IDLE=2m`             |
 | Real Codex transport check   | `make codex smoke`                                         |
