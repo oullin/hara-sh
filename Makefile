@@ -1,4 +1,4 @@
-# cli-proxy-api — make up | down | status | logs [service], or make <area> [action]. Run `make` for the list.
+# hara-sh — make up | down | status | logs [service], or make <area> [action]. Run `make` for the list.
 # Private credentials are read through Docker; 1Password is optional.
 
 SHELL      := /bin/bash

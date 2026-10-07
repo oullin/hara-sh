@@ -1,3 +1,3 @@
-module github.com/oullin/cli-proxy-api/scripts/public
+module github.com/oullin/hara-sh/scripts/public
 
 go 1.27
