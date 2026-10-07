@@ -2,7 +2,7 @@
 <rect width="1200" height="630" fill="#000000"/>
 <rect x="0.5" y="0.5" width="1199" height="629" fill="none" stroke="#ffffff24"/>
 <text x="80" y="140" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#ededed">hara <tspan fill="#b07cf0">腹</tspan></text>
-<text x="80" y="300" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="-2" fill="#ededed">One center</text>
+<text x="80" y="300" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="-2" fill="#ededed">One centre</text>
 <text x="80" y="390" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="-2" fill="#ededed">for every model.</text>
 <text x="80" y="470" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="28" fill="#a1a1a1">Pool your AI subscriptions behind one endpoint.</text>
 <text x="80" y="550" font-family="Menlo, monospace" font-size="24" fill="#b07cf0">hara.sh</text>

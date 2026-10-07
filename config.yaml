@@ -1,6 +1,6 @@
 # CLIProxyAPI config template (v8 layout).
 #
-# Contains 1Password references only. `make up` renders it into
+# Contains public placeholders only. The Docker initializer renders it into
 # ~/.cli-proxy-api/proxy/config.yaml, which the local server reads.
 # Full option reference: upstream config.example.yaml.
 config-version: 8
@@ -11,7 +11,7 @@ server:
 
 management:
   allow-remote: true
-  # Replaced with a bcrypt hash of the 1Password value by render_config (scripts/lib/common.sh).
+  # Replaced with a bcrypt hash by the Docker initializer.
   secret-key: "__MANAGEMENT_PASSWORD_BCRYPT__"
   disable-control-panel: false
   # The panel is this repo's build (panel/management.html, mounted by local/compose.yaml);
@@ -20,8 +20,8 @@ management:
 
 access:
   api-keys:
-    # The only client key (Claude Code, scripts, ...). Codex uses its own ChatGPT login.
-    - "{{ op://YOUR_VAULT/YOUR_ITEM/claude-api-key }}"
+    # The only client key (Claude Code, scripts, ...). The proxy profile uses the same key.
+    - "__API_KEY__"
 
 # Credential pool: the provider accounts signed in through the management panel.
 routing:
