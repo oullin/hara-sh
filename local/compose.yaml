@@ -89,8 +89,3 @@ services:
       - ${LOCAL_DIR:-${HOME:?}/.cli-proxy-api}/secrets:/state/secrets:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-  tests:
-    <<: *tools
-    profiles: ["tools"]
-    command: ["python-tests"]

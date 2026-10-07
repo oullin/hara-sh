@@ -181,7 +181,7 @@ web/deploy:
 
 ## --- code: checks, formatting and the panel build ------------------------------------------
 
-GO_MODULES := scripts/ops scripts/quota scripts/wssmoke scripts/bench
+GO_MODULES := scripts/ops scripts/quota scripts/wssmoke scripts/bench scripts/tools scripts/public
 SHELL_SCRIPTS := scripts/*.sh scripts/hara-key scripts/lib/common.sh
 
 # What CI runs (.github/workflows/ci.yml). Without fmtkit, lint checks the shell scripts and gofmt only.
@@ -199,8 +199,6 @@ code/lint:
 	@if command -v fmtkit >/dev/null; then fmtkit lint web/src web/worker web/docs/.vitepress web/cloudflare.config.ts; else echo "fmtkit is not installed; skipping the TS lint"; fi
 
 code/test:
-	docker compose -f local/compose.yaml build tests
-	docker compose -f local/compose.yaml run --rm --no-deps -T tests
 	docker build --target verify -f scripts/tools/Dockerfile .
 
 code/complexity:
@@ -212,7 +210,7 @@ code/panel:
 	./scripts/build-panel.sh
 
 code/public:
-	python3 scripts/check-public.py
+	cd scripts/public && go run .
 
 # Compatibility entrypoint for the full formatter.
 .PHONY: format-all

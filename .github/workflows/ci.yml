@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: scripts/ops/go.mod
-          # The modules use the standard library only, so there is no go.sum to key a cache on.
+          # Docker caches its own tool builds; host Go runs the publication guard.
           cache: false
 
       - uses: actions/setup-node@v5
