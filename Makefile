@@ -196,7 +196,7 @@ code/format:
 code/lint:
 	shellcheck $(SHELL_SCRIPTS)
 	@unformatted="$$(gofmt -l $(GO_MODULES))"; [[ -z "$$unformatted" ]] || { echo "gofmt needed: $$unformatted"; exit 1; }
-	@if command -v fmtkit >/dev/null; then fmtkit lint web/src web/worker web/docs/.vitepress web/cloudflare.config.ts; else echo "fmtkit is not installed; skipping the TS lint"; fi
+	@if command -v fmtkit >/dev/null; then fmtkit lint web/src web/worker web/scripts web/docs/.vitepress web/cloudflare.config.ts; else echo "fmtkit is not installed; skipping the TS lint"; fi
 
 code/test:
 	docker build --target verify -f scripts/tools/Dockerfile .

@@ -152,8 +152,11 @@ func (check checker) currentFiles() (bool, error) {
 		reviewed++
 		issues := findings(path, content)
 
-		if strings.HasSuffix(path, ".py") {
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".py":
 			issues = append(issues, "Python source is not permitted; use Go")
+		case ".js", ".mjs", ".cjs", ".jsx", ".es", ".es6", ".mts", ".cts":
+			issues = append(issues, "JavaScript and alternate script extensions are not permitted; use .ts")
 		}
 
 		for _, issue := range issues {

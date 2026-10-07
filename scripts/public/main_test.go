@@ -61,10 +61,12 @@ func gitForTest(t *testing.T, root string, args ...string) {
 	}
 }
 
-func TestCurrentFilesRejectPythonAndIgnoreDeletedCandidates(t *testing.T) {
+func TestCurrentFilesRejectUnsupportedSourceAndIgnoreDeletedCandidates(t *testing.T) {
 	root := newRepository(t)
 
-	for _, path := range []string{"README.md", "helper.py"} {
+	paths := []string{"README.md", "helper.ts", "helper.py", "helper.js", "helper.mjs", "helper.cjs", "helper.jsx", "helper.es", "helper.es6", "helper.mts", "helper.cts", "uppercase.JS"}
+
+	for _, path := range paths {
 		if err := os.WriteFile(filepath.Join(root, path), []byte("public fixture"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -76,19 +78,25 @@ func TestCurrentFilesRejectPythonAndIgnoreDeletedCandidates(t *testing.T) {
 	check := checker{root: root, output: &output}
 	failed, err := check.currentFiles()
 
-	if err != nil || !failed || !strings.Contains(output.String(), "Python source is not permitted") || !strings.Contains(output.String(), "Reviewed 2") {
-		t.Fatal("publication check allowed Python or failed to deduplicate tracked files")
+	if err != nil || !failed || !strings.Contains(output.String(), "Python source is not permitted") || !strings.Contains(output.String(), "Reviewed 12") {
+		t.Fatal("publication check allowed unsupported source or failed to deduplicate tracked files")
 	}
 
-	if err := os.Remove(filepath.Join(root, "helper.py")); err != nil {
-		t.Fatal(err)
+	for _, path := range paths[2:] {
+		if !strings.Contains(output.String(), path+": ") {
+			t.Errorf("unsupported extension was accepted: %s", path)
+		}
+
+		if err := os.Remove(filepath.Join(root, path)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	output.Reset()
 	failed, err = check.currentFiles()
 
-	if err != nil || failed || !strings.Contains(output.String(), "Reviewed 1") {
-		t.Fatal("deleted candidate blocked publication")
+	if err != nil || failed || !strings.Contains(output.String(), "Reviewed 2") {
+		t.Fatal("deleted candidate or TypeScript source blocked publication")
 	}
 }
 
