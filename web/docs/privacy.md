@@ -21,7 +21,7 @@ make code public
 gitleaks dir . --redact
 ```
 
-The publication guard rejects Python source and reports personal paths, client-state files, and recognisable credentials without printing matched values. Gitleaks adds broader secret detection. Review generated assets and examples too; neither tool detects every private fact.
+The publication guard rejects Python and JavaScript source and reports personal paths, client-state files, and recognisable credentials without printing matched values. Write server tools in Go and web scripts in TypeScript. Gitleaks adds broader secret detection. Review generated assets and examples too; neither tool detects every private fact.
 
 ## Check history
 

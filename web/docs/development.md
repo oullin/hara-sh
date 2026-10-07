@@ -8,7 +8,7 @@ The Vue landing page and VitePress docs are static assets served by one Cloudfla
 
 ## Develop
 
-Use Node.js 22.12+ and npm:
+Use Node.js 22.18+ or 24+ and npm:
 
 ```bash
 make web install
@@ -43,7 +43,7 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 | --------------------------------------------------------------- | ------------------------------------------------------------- |
 | `config.yaml`, `local/`                                         | Public proxy template, Compose services and Tailscale serving |
 | `scripts/tools/`                                                | Docker tools image, credential initialisation and tests       |
-| `scripts/public/`                                               | Publication guard and the CI rule rejecting Python source     |
+| `scripts/public/`                                               | Publication guard and CI source-language checks               |
 | `scripts/ops/`, `quota/`, `wssmoke/`, `bench/` under `scripts/` | Status, quota routing, transport checks and benchmarks        |
 | `scripts/*.sh`, `scripts/hara-key`                              | Optional host helpers and private client backups              |
 | `codex/proxy.config.toml`                                       | Portable client profile template                              |

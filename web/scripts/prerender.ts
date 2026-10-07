@@ -3,7 +3,7 @@ import process from 'node:process';
 import { fileURLToPath, URL } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import { createServer } from 'vite';
-import { createSSRApp } from 'vue';
+import { createSSRApp, type Component } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 
 // Render the same components at build time so crawlers and visitors without
@@ -22,7 +22,7 @@ const server = await createServer(
 );
 
 try {
-	const { default: App } = await server.ssrLoadModule('/src/App.vue');
+	const { default: App } = (await server.ssrLoadModule('/src/App.vue')) as { default: Component };
 
 	const content = await renderToString(
 		createSSRApp(App),

@@ -3,9 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "^22.18.0 || >=24.0.0"
+  },
   "scripts": {
     "dev": "npm run docs:build && vite",
-    "build": "vue-tsc -b && npm run docs:build && vite build && node scripts/prerender.mjs && node scripts/check-seo.mjs",
+    "build": "vue-tsc -b && npm run docs:build && vite build && node scripts/prerender.ts && node scripts/check-seo.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
@@ -26,6 +29,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^2.0.0-beta.sha-52b0dc0e9",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/coverage-v8": "^5.0.3",
