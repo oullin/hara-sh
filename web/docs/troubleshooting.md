@@ -55,6 +55,10 @@ docker compose -f local/compose.yaml exec tailscale tailscale status --peers=fal
 
 Authorise the device and check MagicDNS, HTTPS certificates, ACLs, and client tailnet membership. See [Network and TLS](./networking).
 
+## hara.local does not respond
+
+Run `make portless`, then `portless doctor`. The portless proxy must run in LAN mode; after a reboot, it only returns if you installed it with `sudo portless service install --lan`. Node clients also need `NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"`.
+
 ## Codex falls back to HTTP
 
 ```bash

@@ -13,7 +13,7 @@ services:
     <<: *tools
     command: ["init"]
     volumes:
-      - ${LOCAL_DIR:-${HOME:?}/.cli-proxy-api}:/state
+      - ${LOCAL_DIR:-${HOME:?}/.hara-sh}:/state
       - ${HARA_CONFIG_TEMPLATE:-../config.yaml}:/template.yaml:ro
     restart: "no"
 
@@ -27,7 +27,7 @@ services:
       MANAGEMENT_STATIC_PATH: /panel/management.html
       TZ: ${TZ:-UTC}
     volumes:
-      - ${LOCAL_DIR:-${HOME:?}/.cli-proxy-api}/proxy:/data
+      - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/proxy:/data
       - ../panel/management.html:/panel/management.html:ro
     healthcheck:
       test:
@@ -51,7 +51,7 @@ services:
       URL: http://proxy:8317
       TZ: ${TZ:-UTC}
     volumes:
-      - ${LOCAL_DIR:-${HOME:?}/.cli-proxy-api}/secrets:/state/secrets:ro
+      - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/secrets:/state/secrets:ro
     depends_on:
       proxy:
         condition: service_healthy
@@ -70,7 +70,7 @@ services:
       TS_USERSPACE: "true"
       TS_BOOT_TIMEOUT: 8760h
     volumes:
-      - ${LOCAL_DIR:-${HOME:?}/.cli-proxy-api}/tailscale:/var/lib/tailscale
+      - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/tailscale:/var/lib/tailscale
       - ./serve.json:/config/serve.json:ro
     depends_on:
       proxy:
@@ -86,6 +86,6 @@ services:
       URL: ${TOOLS_URL:-http://proxy:8317}
       TZ: ${TZ:-UTC}
     volumes:
-      - ${LOCAL_DIR:-${HOME:?}/.cli-proxy-api}/secrets:/state/secrets:ro
+      - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/secrets:/state/secrets:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

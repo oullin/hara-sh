@@ -31,14 +31,14 @@ Use tailnet ACLs to restrict access. Management is available at the same address
 
 ## Optional LAN access
 
-If you already use portless, register Hara manually:
+If portless is installed, `make up` serves Hara at `https://hara.local`; `make portless` repeats that step on its own. Without Make, run:
 
 ```bash
 portless proxy start --lan
 portless alias hara 8317 --force
 ```
 
-Startup does not manage portless. LAN mode exposes every app served by that instance. Client devices need mDNS and trust in its public CA; never transfer the private CA key.
+Starting the proxy on port 443 may ask for sudo. Run `sudo portless service install --lan` once to start it at boot instead. LAN mode exposes every app served by that instance. Client devices need mDNS and trust in its public CA; never transfer the private CA key.
 
 Host Node clients can set `NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"`. Container tools do not inherit that CA or `.local` discovery; use the Docker service or Tailscale address.
 

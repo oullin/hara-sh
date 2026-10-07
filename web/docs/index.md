@@ -12,7 +12,7 @@ Hara runs [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) in Docker.
 2. **[Connect providers](./providers)** — add an account in the management panel.
 3. **[Configure clients](./clients)** — point Claude Code, Codex, or another client at Hara.
 
-The server needs Docker Compose. Go tools run inside containers. 1Password and Tailscale are optional.
+The server needs Docker Compose. Go tools run inside containers. 1Password, Tailscale and portless are optional.
 
 ## What Hara handles
 
@@ -24,7 +24,7 @@ The server needs Docker Compose. Go tools run inside containers. 1Password and T
 | Quota routing    | Prefer weekly capacity that would otherwise expire unused     |
 | Private state    | Keep keys, provider logins, and logs outside Git              |
 
-The default URL is `http://localhost:8317`. [Tailscale](./networking#tailscale) adds private HTTPS access from other devices.
+The default URL is `http://localhost:8317`. [Tailscale](./networking#tailscale) adds private HTTPS access from other devices, and [portless](./networking#optional-lan-access) adds `https://hara.local` on your network.
 
 ## Common tasks
 

@@ -17,5 +17,5 @@ if [[ "${HARA_SECRET_PROVIDER:-file}" == op ]]; then
 fi
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-LOCAL_DIR="${LOCAL_DIR:-$HOME/.cli-proxy-api}" \
+LOCAL_DIR="${LOCAL_DIR:-$HOME/.hara-sh}" \
   exec docker compose -f "$repo/local/compose.yaml" run --rm --no-deps -T tools key "$field"

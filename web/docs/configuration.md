@@ -16,7 +16,7 @@ The initialiser renders `$LOCAL_DIR/proxy/config.yaml`, replacing `__API_KEY__` 
 
 | Variable               | Default                  | Use                                      |
 | ---------------------- | ------------------------ | ---------------------------------------- |
-| `LOCAL_DIR`            | `$HOME/.cli-proxy-api`   | Private state; set explicitly on Windows |
+| `LOCAL_DIR`            | `$HOME/.hara-sh`   | Private state; set explicitly on Windows |
 | `HARA_PORT`            | `8317`                   | Published host port                      |
 | `HARA_CONFIG_TEMPLATE` | Repository `config.yaml` | Absolute path to a private template      |
 | `TZ`                   | `UTC`                    | Container timezone                       |
@@ -86,3 +86,10 @@ Logs rotate in 10 MB files with a 512 MB total cap. Protect the whole state dire
 ## Upgrade
 
 Back up private state, update the proxy image tag in `local/compose.yaml`, and recreate services. Run [status and smoke checks](./operations#check-a-request) afterwards.
+
+The default state directory was previously `~/.cli-proxy-api`. Stop the services and move it before starting this version, or set `LOCAL_DIR` to the old path:
+
+```bash
+docker compose -f local/compose.yaml --profile tailscale down
+mv "$HOME/.cli-proxy-api" "$HOME/.hara-sh"
+```

@@ -22,12 +22,12 @@ Or download the repository as a ZIP and open a terminal in the extracted directo
 ::: code-group
 
 ```bash [macOS / Linux]
-mkdir -p "$HOME/.cli-proxy-api"
-chmod 700 "$HOME/.cli-proxy-api"
+mkdir -p "$HOME/.hara-sh"
+chmod 700 "$HOME/.hara-sh"
 ```
 
 ```powershell [Windows]
-$env:LOCAL_DIR = Join-Path $env:USERPROFILE '.cli-proxy-api'
+$env:LOCAL_DIR = Join-Path $env:USERPROFILE '.hara-sh'
 New-Item -ItemType Directory -Force $env:LOCAL_DIR | Out-Null
 ```
 
@@ -90,4 +90,4 @@ docker compose -f local/compose.yaml up -d --build --force-recreate
 docker compose -f local/compose.yaml logs --tail=100 init proxy quota
 ```
 
-Using Bash and Make? `make up`, `make status`, and `make down` are shortcuts. See [Operations](./operations) for rotation and request checks, or [Troubleshooting](./troubleshooting) if a check fails.
+Using Bash and Make? `make up`, `make status`, and `make down` are shortcuts. With [portless](./networking#optional-lan-access) installed, `make up` also serves Hara at `https://hara.local`. See [Operations](./operations) for rotation and request checks, or [Troubleshooting](./troubleshooting) if a check fails.
