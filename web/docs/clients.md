@@ -1,5 +1,5 @@
 ---
-description: Connect Claude Code, Codex and OpenAI-compatible clients to Hara. Configure your base URL, client key and WebSocket transport.
+description: Connect Claude Code, Codex, T3 Code and OpenAI-compatible clients to Hara. Configure your base URL, client key and WebSocket transport.
 ---
 
 # Configure clients
@@ -57,6 +57,39 @@ make codex smoke
 For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Reinstall the profile if you move this checkout. Without Bash, configure the URL and key directly in your client.
 
 Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback.
+
+## T3 Code
+
+[T3 Code](https://t3.codes) runs Claude Code and Codex for you, so each of its provider instances needs the same URL and key as those clients. Prepare it on the Docker host:
+
+```bash
+make t3
+```
+
+It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), sets T3 Code's Tailscale HTTPS port to 8443, and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
+
+| Instance | Field                  | Value                                 |
+| -------- | ---------------------- | ------------------------------------- |
+| Claude   | CLAUDE_CONFIG_DIR path | `~/.claude-hara`                      |
+|          | `ANTHROPIC_BASE_URL`   | `https://hara.local`, with no `/v1`   |
+|          | `ANTHROPIC_AUTH_TOKEN` | Your client key, marked **Sensitive** |
+|          | `ANTHROPIC_API_KEY`    | Empty value                           |
+|          | `NODE_EXTRA_CA_CERTS`  | Absolute path to `~/.portless/ca.pem` |
+| Codex    | CODEX_HOME path        | `~/.codex-t3-hara`                    |
+|          | Shadow home path       | Empty                                 |
+|          | `CODEX_CA_CERTIFICATE` | Absolute path to `~/.portless/ca.pem` |
+
+The separate Claude config directory keeps a cached Anthropic login from replacing the client key. The empty `ANTHROPIC_API_KEY` stops Claude Code from asking for one. The Codex home reads the key through `hara-key`, so it needs no ChatGPT login and no shadow home.
+
+Without portless, `make t3` uses `http://localhost:8317` and drops both certificate variables. `T3_URL=` picks another address. Pick models in the thread's model picker; `make ops models` lists them.
+
+Check both instances with real requests:
+
+```bash
+make t3 smoke
+```
+
+This consumes provider usage. T3 Code's Tailscale HTTPS uses port 8443 because portless in LAN mode holds port 443; see [Network and TLS](./networking#optional-lan-access).
 
 ## OpenAI-compatible clients
 
