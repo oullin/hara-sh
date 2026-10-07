@@ -18,7 +18,7 @@ Use this key for client requests. The management password and provider tokens ar
 
 ## Claude Code
 
-With Bash and Make:
+With Make:
 
 ```bash
 make claude
@@ -33,20 +33,20 @@ export ANTHROPIC_AUTH_TOKEN="$(./bin/hara key claude-api-key)"
 claude
 ```
 
-`bin/hara` is the host helper; any `make` action that needs it, such as `make status`, builds it first. On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
+`bin/hara` is the [host helper](./operations#make-and-the-host-helper); any `make` action that needs it, such as `make status`, builds it first. On Windows, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in your shell or client settings. Use a normal terminal; a nested desktop session may use its own authentication.
 
 Claude Code uses HTTP with SSE streaming; the Anthropic API does not use the Responses WebSocket.
 
 ## Codex
 
-Install the private profile using the host helper:
+Install the private profile with Make:
 
 ```bash
 make codex profile
 make codex
 ```
 
-It writes `~/.codex/proxy.config.toml`, uses `http://localhost:8317/v1`, and reads the key through `bin/hara key`. Your Codex release must support profile files, command-based auth, and Responses WebSockets.
+It writes `~/.codex/proxy.config.toml` (or `$CODEX_HOME/proxy.config.toml`), uses `http://localhost:8317/v1`, and has Codex run `bin/hara key claude-api-key` by absolute path whenever it needs the key. Your Codex release must support profile files, command-based auth, and Responses WebSockets.
 
 After connecting an account, verify that Codex stays on WebSockets:
 
@@ -54,7 +54,7 @@ After connecting an account, verify that Codex stays on WebSockets:
 make codex smoke
 ```
 
-For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Reinstall the profile if you move this checkout. Without `make`, configure the URL and key directly in your client.
+For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. Without Make, configure the URL and key directly in your client.
 
 Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback.
 

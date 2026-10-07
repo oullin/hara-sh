@@ -73,9 +73,11 @@ This replaces both client and management keys, retaining provider logins. Update
 
 Stop the stack and copy `$LOCAL_DIR` into encrypted private storage. It contains keys, rendered config, provider logins, logs, and Tailscale identity. Restore the same state path before starting again.
 
-## Make shortcuts
+## Make and the host helper
 
-Bash and Make are optional. These commands run the same Docker tools:
+Make is optional. Its targets call `bin/hara`, a small Go program built from `scripts/hara` on first use and rebuilt when that source changes. Without Go on the host, Make builds it in a `golang` container for your system. `bin/hara` is ignored by Git; delete it to force a rebuild.
+
+These commands run the same Docker tools as above:
 
 | Task                         | Command                                                    |
 | ---------------------------- | ---------------------------------------------------------- |
@@ -90,4 +92,24 @@ Bash and Make are optional. These commands run the same Docker tools:
 
 Client backups are separate from server backups and remain outside Git. `URL` selects a Make target; `TS_URL` adds a tailnet URL to WebSocket smoke.
 
-Use `make ops bench N=5 CODEX_MODEL=MODEL` for the benchmark and `make ops logs LINES=500` for recent server logs. `MODEL` selects the Claude smoke/benchmark model. `BACKUP_DIR` changes the private client backup destination. Run `make` to list every action and its options.
+Use `make ops bench N=5 CODEX_MODEL=MODEL` for the benchmark and `make ops logs LINES=500` for recent server logs. `MODEL` selects the Claude smoke/benchmark model. Run `make` to list every action and its options.
+
+You can also run the helper directly from any directory; it finds the checkout from its own location. Run `./bin/hara` without arguments to list its commands:
+
+```bash
+./bin/hara status
+./bin/hara logs proxy
+./bin/hara key claude-api-key   # Prints a secret.
+./bin/hara tools ops accounts
+```
+
+Besides the [stack settings](./configuration#settings) such as `LOCAL_DIR` and `HARA_PORT`, and its [optional settings file](./configuration#host-helper-settings), the helper reads:
+
+| Variable                     | Effect                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| `URL`                        | Target for `tools`, `ws-smoke` and `bench`; host loopback maps to `http://proxy:8317` |
+| `HARA_SECRET_PROVIDER=op`    | `key` reads 1Password through `OP_ACCOUNT`, `OP_VAULT` and `OP_ITEM_NAME`             |
+| `BACKUP_DIR`                 | Client backup destination (default `$LOCAL_DIR/backups`)                              |
+| `CODEX_HOME`                 | Codex settings directory for `codex-profile` and `codex-smoke`                        |
+| `CODEX_PROFILE`, `PROXY_URL` | Profile and proxy address checked by `make codex smoke`                               |
+| `PANEL_TAG`, `PANEL_REPO`    | Upstream panel release and repository for `make code panel`                           |

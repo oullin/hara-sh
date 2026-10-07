@@ -50,6 +50,19 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 | `panel/`                                                        | Management panel build and Ledger patch                       |
 | `web/`, `.github/workflows/`                                    | Public website, documentation and CI checks                   |
 
+## Host helper
+
+`scripts/hara` is the Go program behind the Make targets. It uses only the standard library and runs `docker`, `git`, `bun`, `op`, `portless` and `codex` as child processes:
+
+| File          | Commands                                                           |
+| ------------- | ------------------------------------------------------------------ |
+| `stack.go`    | Compose stack, containerised tools, Tailscale wait, portless       |
+| `clients.go`  | `key`, client backups, Codex profile and WebSocket smoke           |
+| `panel.go`    | Management panel build                                             |
+| `settings.go` | Checkout discovery, `credentials.env` parsing, private directories |
+
+Tests replace the child processes with a recorder, so they need no Docker or network. Run them with `cd scripts/hara && go test ./...`; `make code check` also runs them in the tools image.
+
 ## Deploy your fork
 
 Set up your own Cloudflare profile with the `cf` CLI. Replace the domains and origins in `web/cloudflare.config.ts`, `web/worker/host.ts`, the HTML metadata, VitePress config, robots files, and sitemaps.

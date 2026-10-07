@@ -67,6 +67,15 @@ docker compose -f local/compose.yaml run --rm --no-deps -T tools wssmoke http://
 
 Then run `make codex smoke`. Reinstall the profile if the checkout moved. Server logs show `GET /v1/responses` for WebSockets and `POST /v1/responses` for HTTP. Check provider availability if the socket opens but cannot serve a turn.
 
+## Host helper errors
+
+- **`expected NAME=value` with a line number**: fix that line in `credentials.env`. See the supported [setting forms](./configuration#host-helper-settings).
+- **`private state moved to ~/.hara-sh`**: move the old directory as shown, or set `LOCAL_DIR` to it.
+- **`must be outside the repository`**: point `LOCAL_DIR` or `BACKUP_DIR` at a directory outside the checkout, including through symlinks.
+- **`run hara from the hara-sh checkout`**: run Make from the repository root, or rebuild `bin/hara` with any Make action.
+- **Codex cannot fetch its key after an update**: run `make codex profile` again so the profile calls `bin/hara`.
+- **The helper seems out of date**: delete `bin/hara`; the next Make action rebuilds it.
+
 ## Panel settings disappear
 
 Startup renders the template again. Keep public settings in `config.yaml` and private provider settings in an [outside-Git template](./configuration#private-provider-settings). Quota priorities may change hourly.

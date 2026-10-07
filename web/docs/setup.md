@@ -90,4 +90,4 @@ docker compose -f local/compose.yaml up -d --build --force-recreate
 docker compose -f local/compose.yaml logs --tail=100 init proxy quota
 ```
 
-Using Bash and Make? `make up`, `make status`, and `make down` are shortcuts. With [portless](./networking#optional-lan-access) installed, `make up` also serves Hara at `https://hara.local`. See [Operations](./operations) for rotation and request checks, or [Troubleshooting](./troubleshooting) if a check fails.
+Using Make? `make up`, `make status`, and `make down` are shortcuts that run these commands through the [host helper](./operations#make-and-the-host-helper). With [portless](./networking#optional-lan-access) installed, `make up` also serves Hara at `https://hara.local`. See [Operations](./operations) for rotation and request checks, or [Troubleshooting](./troubleshooting) if a check fails.
