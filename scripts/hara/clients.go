@@ -33,7 +33,10 @@ const (
 	defaultCodexURL = "http://localhost:8317/v1"
 )
 
-var baseURLLine = regexp.MustCompile(`(?m)^base_url = .*$`)
+var (
+	baseURLLine     = regexp.MustCompile(`(?m)^base_url = .*$`)
+	authCommandLine = regexp.MustCompile(`^\s*auth\.command\s*=\s*"((?:[^"\\]|\\.)*)"`)
+)
 
 // key prints a client credential from local Docker state; HARA_SECRET_PROVIDER=op reads 1Password instead.
 // Codex runs it as its auth command, so standard output carries the credential and nothing else.
@@ -169,8 +172,37 @@ func (h host) codexProfile() error {
 	}
 
 	h.log("installed the proxy profile; run: codex --profile proxy")
+	h.warnMissingAuthCommands(h.codexHome())
 
 	return nil
+}
+
+// warnMissingAuthCommands names each Codex config in home whose auth command no longer exists. An
+// install rewrites only its own file, so a provider added to config.toml by hand keeps calling a removed
+// helper, such as the scripts/hara-key that bin/hara replaced, and Codex then sends no key.
+func (h host) warnMissingAuthCommands(home string) {
+	paths, _ := filepath.Glob(filepath.Join(home, "*.toml"))
+
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+
+		if err != nil {
+			continue
+		}
+
+		for number, line := range strings.Split(string(content), "\n") {
+			match := authCommandLine.FindStringSubmatch(line)
+
+			if match == nil {
+				continue
+			}
+
+			if command := tomlUnescape(match[1]); filepath.IsAbs(command) && !exists(command) {
+				h.log(`! %s:%d runs %s, which no longer exists; set auth.command = "%s" and auth.args = ["key", "%s"], then restart Codex`,
+					path, number+1, command, tomlEscape(filepath.Join(h.root, "bin", "hara")), apiField)
+			}
+		}
+	}
 }
 
 func (h host) codexHome() string {
@@ -208,6 +240,10 @@ func (h host) installCodexConfig(dest, baseURL string) error {
 
 func tomlEscape(value string) string {
 	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value)
+}
+
+func tomlUnescape(value string) string {
+	return strings.NewReplacer(`\\`, `\`, `\"`, `"`).Replace(value)
 }
 
 // writePrivate replaces path atomically with an owner-only file.

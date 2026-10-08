@@ -166,6 +166,13 @@ func (h host) t3TailscalePort(settings t3Settings) error {
 		return fmt.Errorf("%s is not a JSON object", settings.desktop)
 	}
 
+	// A running T3 Code writes this file from memory, so leave it alone when nothing changes.
+	if string(desktop["tailscaleServePort"]) == strconv.Itoa(settings.port) {
+		h.log("- T3 Code already serves Tailscale HTTPS on port %d (%s)", settings.port, settings.desktop)
+
+		return nil
+	}
+
 	desktop["tailscaleServePort"] = json.RawMessage(strconv.Itoa(settings.port))
 	updated, err := json.Marshal(desktop)
 

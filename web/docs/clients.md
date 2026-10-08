@@ -54,7 +54,7 @@ After connecting an account, verify that Codex stays on WebSockets:
 make codex smoke
 ```
 
-For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. If you use T3 Code, run `make t3` again for the same reason. Without Make, configure the URL and key directly in your client.
+For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. It rewrites only `proxy.config.toml`: if you copied the provider into `config.toml`, it prints the file and line of each `auth.command` that no longer exists, and you edit those yourself. If you use T3 Code, run `make t3` again for the same reason. Codex reads the command when it starts, so restart Codex, or T3 Code, afterwards. Without Make, configure the URL and key directly in your client.
 
 Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback.
 
@@ -66,7 +66,7 @@ Plain `codex` continues to use your usual login. Select the `proxy` profile only
 make t3
 ```
 
-It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), sets T3 Code's Tailscale HTTPS port to 8443, and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
+It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), sets T3 Code's Tailscale HTTPS port to 8443 (leaving its settings file untouched when the port is already 8443), and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
 
 | Instance | Field                  | Value                                 |
 | -------- | ---------------------- | ------------------------------------- |
