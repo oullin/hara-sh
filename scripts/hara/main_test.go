@@ -535,6 +535,42 @@ func TestCodexProfileInstallsTheHelperPath(t *testing.T) {
 	if info, _ := os.Stat(profile); info.Mode().Perm() != 0o600 {
 		t.Errorf("profile mode = %v", info.Mode().Perm())
 	}
+
+	if strings.Contains(h.out.String(), "no longer exists") {
+		t.Errorf("warned about the profile it just installed:\n%s", h.out)
+	}
+}
+
+func TestCodexProfileWarnsAboutMissingAuthCommands(t *testing.T) {
+	codexHome := t.TempDir()
+	h := newT3Host(t, map[string]string{"CODEX_HOME": codexHome})
+	removed := filepath.Join(h.root, "scripts", "hara-key")
+	config := strings.Join([]string{
+		`model_provider = "hara-proxy"`,
+		`[mcp_servers.playwright]`,
+		`command = "/nowhere/npx"`,
+		`[model_providers.hara-proxy]`,
+		`auth.command = "` + removed + `"`,
+		`[model_providers.relative]`,
+		`auth.command = "hara-key"`,
+		`[model_providers.present]`,
+		`auth.command = "` + filepath.Join(h.root, "bin", "hara") + `"`,
+	}, "\n")
+
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"codex-profile"}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := `! ` + filepath.Join(codexHome, "config.toml") + `:5 runs ` + removed + `, which no longer exists; set auth.command = "` +
+		filepath.Join(h.root, "bin", "hara") + `" and auth.args = ["key", "claude-api-key"], then restart Codex`
+
+	if lines := strings.Count(h.out.String(), "no longer exists"); lines != 1 || !strings.Contains(h.out.String(), want) {
+		t.Errorf("output:\n%s\nwant one warning:\n%s", h.out, want)
+	}
 }
 
 func TestCodexSmoke(t *testing.T) {

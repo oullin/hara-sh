@@ -84,7 +84,7 @@ Then run `make codex smoke`. Reinstall the profile if the checkout moved. Server
 - **`private state moved to ~/.hara-sh`**: move the old directory as shown, or set `LOCAL_DIR` to it.
 - **`must be outside the repository`**: point `LOCAL_DIR` or `BACKUP_DIR` at a directory outside the checkout, including through symlinks.
 - **`run hara from the hara-sh checkout`**: run Make from the repository root, or rebuild `bin/hara` with any Make action.
-- **Codex cannot fetch its key after an update**: run `make codex profile` again so the profile calls `bin/hara`.
+- **Codex cannot fetch its key after an update**: Codex logs `provider auth command .../scripts/hara-key failed to start` and the proxy answers `401` with `Missing API key`. Run `make codex profile`, and `make t3` if you use T3 Code, so the profiles call `bin/hara`. Fix any `config.toml` line that `make codex profile` names, then restart Codex or T3 Code; a running session keeps the old command.
 - **The helper seems out of date**: delete `bin/hara`; the next Make action rebuilds it.
 
 ## Panel settings disappear

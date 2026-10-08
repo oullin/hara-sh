@@ -121,6 +121,22 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 		}
 	}
 
+	current := `{ "tailscaleServePort": 8443, "theme": "dark" }`
+
+	if err := os.WriteFile(desktop, []byte(current), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	h.out.Reset()
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if content, _ := os.ReadFile(desktop); string(content) != current || !strings.Contains(h.out.String(), "already serves Tailscale HTTPS on port 8443") {
+		t.Errorf("rewrote desktop settings that already had the port: %s\n%s", content, h.out)
+	}
+
 	if err := os.WriteFile(desktop, []byte(`[]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
