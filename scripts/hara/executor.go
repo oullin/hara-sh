@@ -7,9 +7,13 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"maps"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +21,11 @@ import (
 )
 
 const executorBridgeVersion = "0.14.3"
+
+var (
+	executorNamePattern       = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	executorHeaderNamePattern = regexp.MustCompile("^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+$")
+)
 
 // t3Executor configures tools independently of the Hara inference endpoint. Credentials come
 // from a private header file, never command arguments or repository templates.
@@ -27,51 +36,36 @@ func (h host) t3Executor(settings t3Settings) error {
 		return err
 	}
 
+	name := cmp.Or(h.getenv("EXECUTOR_NAME"), "executor")
+
+	if !executorNamePattern.MatchString(name) {
+		return errors.New("EXECUTOR_NAME must contain only letters, digits, underscores and hyphens")
+	}
+
 	headers, err := executorHeaders(h.getenv("EXECUTOR_HEADERS_FILE"))
 
 	if err != nil {
 		return err
 	}
 
-	profile, err := h.executorAntigravityHome()
-
-	if err != nil {
-		return err
-	}
-
-	node, err := h.executorNode()
-
-	if err != nil {
-		return err
-	}
-
 	state := cmp.Or(h.getenv("T3_EXECUTOR_DIR"), filepath.Join(h.home, ".codex", "tools", "t3-executor"))
-	bridge := filepath.Join(state, "remote-bridge")
-	headerPath := filepath.Join(state, "executor.headers")
-	proxyPath := filepath.Join(bridge, "node_modules", "mcp-remote", "dist", "proxy.js")
+	headerPath := filepath.Join(state, name+".headers")
 	claudePath := filepath.Join(settings.claudeHome, ".claude.json")
 	cursorPath := filepath.Join(cmp.Or(h.getenv("T3_CURSOR_HOME"), filepath.Join(h.home, ".cursor")), "mcp.json")
-	agyPath := filepath.Join(profile, "config", "mcp_config.json")
 	codexPath := filepath.Join(settings.codexHome, "config.toml")
 
 	// Prepare and validate every config before installing packages or replacing any client file.
 	direct := map[string]any{"url": endpoint, "headers": headers}
-	stdio := map[string]any{
-		"command": node,
-		"args":    []string{proxyPath, endpoint, "--transport", "http-only", "--header-file", headerPath},
-		"env":     map[string]string{"MCP_REMOTE_CONFIG_DIR": filepath.Join(state, "auth")},
-	}
 	configs := map[string][]byte{}
 
 	for _, client := range []struct {
-		path, name string
-		server     map[string]any
+		path   string
+		server map[string]any
 	}{
-		{claudePath, "collections_executor", map[string]any{"type": "http", "url": endpoint, "headers": headers}},
-		{cursorPath, "executor", direct},
-		{agyPath, "executor", stdio},
+		{claudePath, map[string]any{"type": "http", "url": endpoint, "headers": headers}},
+		{cursorPath, direct},
 	} {
-		content, err := executorJSON(client.path, client.name, client.server)
+		content, err := executorJSON(client.path, name, client.server)
 
 		if err != nil {
 			return err
@@ -80,29 +74,27 @@ func (h host) t3Executor(settings t3Settings) error {
 		configs[client.path] = content
 	}
 
-	configs[codexPath], err = executorTOML(codexPath, endpoint, headers)
+	configs[codexPath], err = executorTOML(codexPath, name, endpoint, headers)
 
 	if err != nil {
 		return err
 	}
 
-	for _, dir := range []string{state, filepath.Join(state, "backups"), filepath.Join(state, "npm-cache"), filepath.Join(state, "auth"), filepath.Dir(claudePath), filepath.Dir(cursorPath), filepath.Dir(agyPath), filepath.Dir(codexPath)} {
+	for _, dir := range []string{state, filepath.Join(state, "backups"), filepath.Dir(claudePath), filepath.Dir(cursorPath), filepath.Dir(codexPath)} {
 		if err := privateDir(dir, h.root); err != nil {
 			return err
 		}
 	}
 
-	if err := h.executorInstall(state, bridge, proxyPath); err != nil {
-		return err
+	providers := "Claude, Codex and Cursor"
+
+	if path, content, err := h.executorAntigravityConfig(state, name, endpoint, headerPath); err != nil {
+		h.log("! Skipping Antigravity: %v", err)
+	} else {
+		configs[path] = content
+		configs[headerPath] = executorHeaderText(headers)
+		providers += ", plus Antigravity"
 	}
-
-	var privateHeaders strings.Builder
-
-	for _, name := range []string{"CF-Access-Client-Id", "CF-Access-Client-Secret"} {
-		fmt.Fprintf(&privateHeaders, "%s: %s\n", name, headers[name])
-	}
-
-	configs[headerPath] = []byte(privateHeaders.String())
 
 	for path, content := range configs {
 		if err := executorWrite(path, content, filepath.Join(state, "backups")); err != nil {
@@ -110,10 +102,62 @@ func (h host) t3Executor(settings t3Settings) error {
 		}
 	}
 
-	h.log("Installed Executor MCP access for T3 Claude, Codex, Cursor and Antigravity. Private backups: %s", filepath.Join(state, "backups"))
-	h.log("Start fresh T3 chats. Wait for Claude MCP startup; approve executor in Cursor if prompted. Verify skills and execute in each provider; use Grok in Cursor when other models have exhausted their quota.")
+	h.log("Installed %s MCP access for T3 %s. Private backups: %s", name, providers, filepath.Join(state, "backups"))
+	h.log("Start fresh T3 chats. Wait for Claude MCP startup; approve %s in Cursor if prompted. Verify skills and execute in each provider; use Grok in Cursor when other models have exhausted their quota.", name)
 
 	return nil
+}
+
+func executorHeaderText(headers map[string]string) []byte {
+	var content strings.Builder
+
+	for _, name := range slices.Sorted(maps.Keys(headers)) {
+		fmt.Fprintf(&content, "%s: %s\n", name, headers[name])
+	}
+
+	return []byte(content.String())
+}
+
+// Antigravity is optional: profile, runtime or bridge failures are reported by the caller while
+// the direct HTTP providers continue. Each named connection has its own credential file.
+func (h host) executorAntigravityConfig(state, name, endpoint, headerPath string) (string, []byte, error) {
+	profile, err := h.executorAntigravityHome()
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	node, err := h.executorNode()
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	bridge := filepath.Join(state, "remote-bridge")
+	proxyPath := filepath.Join(bridge, "node_modules", "mcp-remote", "dist", "proxy.js")
+	path := filepath.Join(profile, "config", "mcp_config.json")
+	stdio := map[string]any{
+		"command": node,
+		"args":    []string{proxyPath, endpoint, "--transport", "http-only", "--header-file", headerPath},
+		"env":     map[string]string{"MCP_REMOTE_CONFIG_DIR": filepath.Join(state, "auth")},
+	}
+	content, err := executorJSON(path, name, stdio)
+
+	if err != nil {
+		return "", nil, err
+	}
+
+	for _, dir := range []string{filepath.Join(state, "npm-cache"), filepath.Join(state, "auth"), filepath.Dir(path)} {
+		if err := privateDir(dir, h.root); err != nil {
+			return "", nil, err
+		}
+	}
+
+	if err := h.executorInstall(state, bridge, proxyPath); err != nil {
+		return "", nil, err
+	}
+
+	return path, content, nil
 }
 
 func validateExecutorURL(endpoint string) error {
@@ -163,7 +207,7 @@ func (h host) executorInstall(state, bridge, proxyPath string) error {
 
 func executorHeaders(path string) (map[string]string, error) {
 	if path == "" {
-		return nil, errors.New("EXECUTOR_HEADERS_FILE must name a private Cloudflare Access header file")
+		return nil, errors.New("EXECUTOR_HEADERS_FILE must name a private HTTP header file")
 	}
 
 	content, err := os.ReadFile(path)
@@ -184,27 +228,38 @@ func executorHeaders(path string) (map[string]string, error) {
 		name, value, ok := strings.Cut(line, ":")
 		name, value = strings.TrimSpace(name), strings.TrimSpace(value)
 
-		switch {
-		case strings.EqualFold(name, "CF-Access-Client-Id"):
-			name = "CF-Access-Client-Id"
-		case strings.EqualFold(name, "CF-Access-Client-Secret"):
-			name = "CF-Access-Client-Secret"
-		default:
-			return nil, errors.New("Executor header file contains an unsupported header")
+		if !ok || !executorHeaderNamePattern.MatchString(name) || !validExecutorHeaderValue(value) {
+			return nil, errors.New("Executor header file contains an invalid HTTP header")
 		}
 
-		if !ok || value == "" || headers[name] != "" || strings.ContainsAny(value, "\r\x00") {
-			return nil, errors.New("Executor header file must contain one client ID and one client secret, with no other headers")
+		name = http.CanonicalHeaderKey(name)
+
+		if _, present := headers[name]; present {
+			return nil, errors.New("Executor header file contains a duplicate HTTP header")
 		}
 
 		headers[name] = value
 	}
 
-	if len(headers) != 2 {
-		return nil, errors.New("Executor header file is missing a Cloudflare Access header")
+	if len(headers) == 0 {
+		return nil, errors.New("Executor header file must contain at least one HTTP header")
 	}
 
 	return headers, nil
+}
+
+func validExecutorHeaderValue(value string) bool {
+	if value == "" {
+		return false
+	}
+
+	for _, char := range value {
+		if char == 127 || (char < 32 && char != '\t') {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (h host) executorAntigravityHome() (string, error) {
@@ -274,7 +329,7 @@ func executorJSON(path, name string, server map[string]any) ([]byte, error) {
 	return json.Marshal(config, jsontext.WithIndent("  "))
 }
 
-func executorTOML(path, endpoint string, headers map[string]string) ([]byte, error) {
+func executorTOML(path, name, endpoint string, headers map[string]string) ([]byte, error) {
 	content, err := os.ReadFile(path)
 
 	if err != nil {
@@ -297,7 +352,7 @@ func executorTOML(path, endpoint string, headers map[string]string) ([]byte, err
 		servers = map[string]any{}
 	}
 
-	servers["collections_executor"] = map[string]any{"url": endpoint, "http_headers": headers}
+	servers[name] = map[string]any{"url": endpoint, "http_headers": headers}
 	config["mcp_servers"] = servers
 
 	return toml.Marshal(config)

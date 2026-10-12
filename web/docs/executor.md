@@ -8,44 +8,51 @@ Executor supplies MCP tools independently of Hara's model API. A working inferen
 
 ## Prepare T3 Code
 
-Set up the Hara providers with [make t3](./clients#t3-code), and install and sign in to Cursor and Antigravity through T3's provider settings. Executor must already be deployed with a Cloudflare Access service token authorized for its MCP endpoint.
+Set up the Hara providers with [make t3](./clients#t3-code), and install and sign in to Cursor through T3's provider settings. Set up Antigravity too when you want that provider connected. Executor must already be deployed, with credentials that its MCP endpoint accepts.
 
-Create a private header file outside the checkout, with these two lines filled from your secret manager:
+Create a private header file outside the checkout, with one `Name: value` line per HTTP header from your secret manager. Header names are configurable; for example, a bearer-authenticated endpoint uses:
 
 ```text
-CF-Access-Client-Id: YOUR_CLIENT_ID
-CF-Access-Client-Secret: YOUR_CLIENT_SECRET
+Authorization: Bearer YOUR_TOKEN
 ```
 
 Restrict that file to its owner (`chmod 600`). Keep shell tracing off. Pass only its path and the HTTPS MCP endpoint to the helper:
 
 ```bash
 EXECUTOR_URL='https://executor.example.com/mcp' \
+EXECUTOR_NAME='executor' \
 EXECUTOR_HEADERS_FILE="$HOME/.private/executor.headers" \
 make t3 executor
 ```
 
-Replace the example endpoint with your Executor URL, including `/mcp`. This command needs Node.js and npm and installs the pinned `mcp-remote@0.14.3` bridge. It validates all client files first, backs up previous bytes outside Git, and writes owner-only configuration files. Unrelated JSON values, MCP servers and Codex inference settings are preserved. Codex TOML is reserialized, so comments and formatting are retained in the backup rather than the updated file.
+Replace the example endpoint with your Executor URL, including `/mcp`. `EXECUTOR_NAME` selects the same MCP entry name across providers and defaults to `executor`; names may contain letters, digits, underscores and hyphens. Set it to an existing entry's name when updating that connection. Different names keep separate credential files and preserve other connections.
 
-| Provider    | Configuration                                                       | Connection                                       |
-| ----------- | ------------------------------------------------------------------- | ------------------------------------------------ |
-| Claude      | `~/.claude-hara/.claude.json`                                       | `collections_executor`, HTTP with Access headers |
-| Codex       | `~/.codex-t3-hara/config.toml`                                      | `collections_executor`, HTTP with Access headers |
-| Cursor      | `~/.cursor/mcp.json`                                                | `executor`, HTTP with Access headers             |
-| Antigravity | T3's selected profile under `~/.t3/userdata/providers/antigravity/` | `executor`, local stdio bridge to HTTP           |
+Any valid HTTP header name is accepted, including `Authorization`, `X-Api-Key`, and Cloudflare Access headers. The file must contain at least one non-empty header; comments and blank lines are allowed. Duplicate names are rejected case-insensitively, along with invalid names and control characters in values. For a Cloudflare-protected deployment, supply its `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers in this file.
 
-Cursor's `executor` entry replaces a stale localhost proxy if one exists. Antigravity's direct remote configuration did not expose the tools in the tested T3 runtime; the stdio bridge did. The bridge reads credentials from a private header file, keeping them out of process arguments.
+The command validates the direct provider configurations, backs up previous bytes outside Git, and writes owner-only configuration files. Unrelated JSON values, MCP servers and Codex inference settings are preserved. Codex TOML is reserialized, so comments and formatting are retained in the backup rather than the updated file.
+
+| Provider    | Configuration                                                       | Connection                                  |
+| ----------- | ------------------------------------------------------------------- | ------------------------------------------- |
+| Claude      | `~/.claude-hara/.claude.json`                                       | Named HTTP connection with supplied headers |
+| Codex       | `~/.codex-t3-hara/config.toml`                                      | Named HTTP connection with supplied headers |
+| Cursor      | `~/.cursor/mcp.json`                                                | Named HTTP connection with supplied headers |
+| Antigravity | T3's selected profile under `~/.t3/userdata/providers/antigravity/` | Named local stdio bridge to HTTP            |
+
+Cursor's selected entry replaces a stale localhost proxy if one exists. Antigravity's direct remote configuration did not expose the tools in the tested T3 runtime; the stdio bridge did. The bridge reads credentials from a private header file, keeping them out of process arguments.
+
+Antigravity setup is optional. Missing or ambiguous profiles, unavailable Node.js/npm, invalid Antigravity configuration, and bridge installation failures produce a `Skipping Antigravity` report while the direct providers continue. Node.js/npm and the pinned `mcp-remote@0.14.3` installation are needed only for Antigravity.
 
 Overrides for another installation:
 
-| Variable              | Default or purpose                                                                |
-| --------------------- | --------------------------------------------------------------------------------- |
-| `T3_CODEX_HOME`       | `~/.codex-t3-hara`                                                                |
-| `T3_CLAUDE_HOME`      | `~/.claude-hara`                                                                  |
-| `T3_CURSOR_HOME`      | `~/.cursor`                                                                       |
-| `T3_HOME`             | `~/.t3`                                                                           |
-| `T3_ANTIGRAVITY_HOME` | Exact existing T3 profile; otherwise discover the only initialized profile        |
-| `T3_EXECUTOR_DIR`     | `~/.codex/tools/t3-executor`, holding the bridge, header file, caches and backups |
+| Variable              | Default or purpose                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| `EXECUTOR_NAME`       | `executor`; selects the MCP entry name for every provider                                    |
+| `T3_CODEX_HOME`       | `~/.codex-t3-hara`                                                                           |
+| `T3_CLAUDE_HOME`      | `~/.claude-hara`                                                                             |
+| `T3_CURSOR_HOME`      | `~/.cursor`                                                                                  |
+| `T3_HOME`             | `~/.t3`                                                                                      |
+| `T3_ANTIGRAVITY_HOME` | Exact existing T3 profile; otherwise discover the only initialized profile                   |
+| `T3_EXECUTOR_DIR`     | `~/.codex/tools/t3-executor`, holding the bridge, `<name>.headers` files, caches and backups |
 
 Use absolute paths for overrides. When multiple Antigravity profiles exist, choose one explicitly. Start fresh T3 chats after setup so each provider loads its configuration. Leave T3's live settings and account tokens unchanged.
 
@@ -61,7 +68,7 @@ cursor-agent mcp list
 cursor-agent mcp list-tools executor
 ```
 
-If Cursor requests approval, enable the server with `cursor-agent mcp enable executor`. Choose **Grok** in T3's **Cursor** provider for the E2E test. Cursor's Opus and Gemini usage limits can stop a turn before any tool call; that is a model quota failure even when the connector reports ready. Do not raise spending limits to run this check.
+If Cursor requests approval, enable the server with `cursor-agent mcp enable executor`. Substitute your chosen name in these commands when `EXECUTOR_NAME` differs from the default. Choose **Grok** in T3's **Cursor** provider for the E2E test. Cursor's Opus and Gemini usage limits can stop a turn before any tool call; that is a model quota failure even when the connector reports ready. Do not raise spending limits to run this check.
 
 In a new T3 chat, select each provider and send:
 
@@ -84,7 +91,7 @@ The live setup was verified on T3 Code nightly `0.0.46-nightly.20261011.2994` wi
 
 ## Connect Linear Agent
 
-In Linear's **Settings → Agent personalization → MCP connectors**, choose **Custom URL**, enter your Executor HTTPS endpoint ending in `/mcp`, and open **Advanced**. Add the `CF-Access-Client-Id` and `CF-Access-Client-Secret` authentication headers from your secret manager, then add the connector.
+In Linear's **Settings → Agent personalization → MCP connectors**, choose **Custom URL**, enter your Executor HTTPS endpoint ending in `/mcp`, and open **Advanced**. Add the authentication header names and values required by your endpoint, then add the connector. For Cloudflare Access, use `CF-Access-Client-Id` and `CF-Access-Client-Secret` from your secret manager.
 
 Linear stores the credentials and can use Executor's tools, so authorise that access explicitly. Successful discovery lists seven tools: `execute`, `skills`, `resume`, `create-artifact`, `edit-artifact`, `list-artifacts`, and `show-artifact`. Run the same read-only test in Linear Agent and inspect its activity trace. The tested Linear setup completed both calls successfully.
 
