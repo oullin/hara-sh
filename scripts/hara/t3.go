@@ -31,7 +31,7 @@ type t3Settings struct {
 // T3_HOME (default ~/.t3), T3_TAILSCALE_PORT (default 8443), MODEL (Claude model for smoke).
 func (h host) t3(args []string) error {
 	if len(args) > 1 {
-		return errors.New("usage: hara t3 setup|smoke")
+		return errors.New("usage: hara t3 setup|smoke|executor")
 	}
 
 	settings, err := h.t3Settings()
@@ -51,8 +51,10 @@ func (h host) t3(args []string) error {
 		return h.t3Setup(settings)
 	case "smoke":
 		return h.t3Smoke(settings)
+	case "executor":
+		return h.t3Executor(settings)
 	default:
-		return errors.New("usage: hara t3 setup|smoke")
+		return errors.New("usage: hara t3 setup|smoke|executor")
 	}
 }
 

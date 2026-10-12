@@ -49,6 +49,7 @@ export default defineConfig({
 					{ link: '/setup', text: 'Set up the project' },
 					{ link: '/providers', text: 'Connect providers' },
 					{ link: '/clients', text: 'Configure clients' },
+					{ link: '/executor', text: 'Connect Executor' },
 				],
 				text: 'Get started',
 			},

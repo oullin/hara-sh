@@ -91,6 +91,8 @@ make t3 smoke
 
 This consumes provider usage. T3 Code's Tailscale HTTPS uses port 8443 because portless in LAN mode holds port 443; see [Network and TLS](./networking#optional-lan-access).
 
+To add tools independently of model inference, see [Connect Executor](./executor). `make t3 executor` configures authenticated MCP access for Claude, Codex, Cursor and Antigravity without changing their model endpoint.
+
 ### Pair a phone
 
 A phone or second computer connects to T3 Code's own server, not to Hara. That server listens on port 3773, and Tailscale HTTPS publishes it on port 8443:
