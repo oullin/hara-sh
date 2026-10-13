@@ -70,6 +70,12 @@ Portless in LAN mode holds port 443 on the host's tailnet address. Run `make t3`
 
 See [Pair a phone](./clients#pair-a-phone).
 
+## Codex or T3 Code reports `unsupported websocket request type: response.interrupt`
+
+Codex's instant interruption sends `response.interrupt` when new input arrives during a response. CLIProxyAPI v8.0.15 rejects that event. Hara's Codex profile disables `features.instant_interrupt`, so steering input waits for the current response to finish and WebSockets remain enabled.
+
+Run `make codex profile` for the proxy profile and `make t3` for T3 Code's Codex home, then restart the affected app. If your Codex app uses a Hara provider defined directly in `~/.codex/config.toml`, add `instant_interrupt = false` to its existing `[features]` table as well. Stopping a turn still works; only instant steering is disabled.
+
 ## Codex falls back to HTTP
 
 ```bash

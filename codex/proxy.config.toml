@@ -6,6 +6,11 @@
 # T3 Code sets it per provider instance, so `make t3` uses https://hara.local when portless is installed.
 model_provider = "hara-proxy"
 
+[features]
+# CLIProxyAPI v8.0.15 rejects response.interrupt. Queue steering input until the
+# current response finishes, while keeping Responses WebSockets enabled.
+instant_interrupt = false
+
 [model_providers.hara-proxy]
 name = "hara local proxy"
 base_url = "http://localhost:8317/v1"
