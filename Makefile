@@ -12,7 +12,7 @@ export OP_ACCOUNT OP_VAULT OP_ITEM_NAME
 
 # The host helper (scripts/hara, built into bin/) reads private Docker state; HARA_SECRET_PROVIDER=op opts into 1Password.
 HARA         = $(CURDIR)/bin/hara
-HARA_SOURCES = $(filter-out %_test.go,$(wildcard scripts/hara/*.go)) scripts/hara/go.mod
+HARA_SOURCES = $(filter-out %_test.go,$(wildcard scripts/hara/*.go)) scripts/hara/go.mod scripts/hara/go.sum
 API_KEY      = $$($(HARA) key claude-api-key)
 # hara.local uses the portless certificate authority; Node-based clients need it named.
 PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
@@ -25,8 +25,8 @@ claude_ACTIONS := run backup
 claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
 codex_ACTIONS  := run profile smoke backup
 codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; smoke fails on the HTTP fallback; backup copies client settings outside the repository
-t3_ACTIONS     := setup smoke
-t3_HELP        := T3 Code through the proxy: setup writes its Codex home, moves its Tailscale HTTPS off portless port 443 and prints the provider settings; smoke sends one Claude and one Codex request with them
+t3_ACTIONS     := setup smoke executor
+t3_HELP        := T3 Code: setup prepares Hara providers; smoke checks inference; executor installs authenticated MCP access for Claude, Codex, Cursor and Antigravity
 ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
 ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), rotate local keys or import optional 1Password credentials
 web_ACTIONS    := dev install test coverage build docs deploy
@@ -94,7 +94,7 @@ $(HARA): $(HARA_SOURCES)
 	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src golang:1.27-alpine go build -trimpath -o /out/hara .; \
 	fi
 
-init up portless down purge status logs claude/run claude/backup codex/profile codex/smoke codex/backup t3/setup t3/smoke code/panel: $(HARA)
+init up portless down purge status logs claude/run claude/backup codex/profile codex/smoke codex/backup t3/setup t3/smoke t3/executor code/panel: $(HARA)
 $(addprefix ops/,$(ops_ACTIONS)): $(HARA)
 
 ## --- The Docker Compose stack (Tailscale is optional) -----------------------------------
@@ -152,6 +152,9 @@ t3/setup:
 
 t3/smoke:
 	@MODEL="$(MODEL)" $(HARA) t3 smoke
+
+t3/executor:
+	@$(HARA) t3 executor
 
 ## --- ops: requests to the running proxy (URL) ----------------------------------------------
 

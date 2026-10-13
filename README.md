@@ -8,6 +8,7 @@ The server needs Docker with Compose v2. Go tools run inside containers; Make, G
 
 - [Connect providers](https://docs.hara.sh/providers)
 - [Configure Claude Code, Codex, T3 Code and other clients](https://docs.hara.sh/clients)
+- [Connect Executor to T3 providers and Linear Agent](https://docs.hara.sh/executor)
 - [Operate the proxy](https://docs.hara.sh/operations)
 - [Fix a problem](https://docs.hara.sh/troubleshooting)
 
