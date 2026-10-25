@@ -146,6 +146,109 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 	}
 }
 
+func TestT3SetupHidesCursorAttribution(t *testing.T) {
+	h := newT3Host(t, nil)
+	path := filepath.Join(h.home, ".cursor", "cli-config.json")
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if exists(path) || !strings.Contains(h.out.String(), "Cursor config not found") {
+		t.Fatalf("created a Cursor config the CLI had not written:\n%s", h.out)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(path, []byte(`{"version":1,"maxMode":false,"limit":9007199254740993}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	content, _ := os.ReadFile(path)
+
+	var cursor map[string]any
+
+	if err := json.Unmarshal(content, &cursor); err != nil || fmt.Sprint(cursor["attribution"]) != fmt.Sprint(map[string]any{"attributeCommitsToAgent": false, "attributePRsToAgent": false}) ||
+		cursor["version"] != float64(1) || !strings.Contains(string(content), "9007199254740993") {
+		t.Errorf("Cursor config: %s", content)
+	}
+
+	if !strings.Contains(h.out.String(), "Cursor commits and pull requests carry no attribution") {
+		t.Errorf("output: %s", h.out)
+	}
+}
+
+func TestT3SetupHidesClaudeAttribution(t *testing.T) {
+	h := newT3Host(t, nil)
+	path := filepath.Join(h.home, ".claude-hara", "settings.json")
+	hidden := map[string]any{"commit": "", "pr": "", "sessionUrl": false}
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var claude map[string]any
+
+	content, _ := os.ReadFile(path)
+
+	if err := json.Unmarshal(content, &claude); err != nil || fmt.Sprint(claude["attribution"]) != fmt.Sprint(hidden) {
+		t.Errorf("new Claude settings: %s", content)
+	}
+
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Errorf("Claude settings mode = %v", info.Mode().Perm())
+	}
+
+	if !strings.Contains(h.out.String(), "carry no attribution") {
+		t.Errorf("output: %s", h.out)
+	}
+
+	if err := os.WriteFile(path, []byte(`{"model":"opus","disabledMcpjsonServers":["executor"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	claude = nil
+	content, _ = os.ReadFile(path)
+
+	if err := json.Unmarshal(content, &claude); err != nil || fmt.Sprint(claude["attribution"]) != fmt.Sprint(hidden) || claude["model"] != "opus" || claude["disabledMcpjsonServers"] == nil {
+		t.Errorf("existing Claude settings: %s", content)
+	}
+
+	custom := `{ "attribution": { "pr": "Made by me" } }`
+
+	if err := os.WriteFile(path, []byte(custom), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	h.out.Reset()
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if content, _ := os.ReadFile(path); string(content) != custom || !strings.Contains(h.out.String(), "already configured") {
+		t.Errorf("replaced an existing attribution: %s\n%s", content, h.out)
+	}
+
+	if err := os.WriteFile(path, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"t3"}); err == nil {
+		t.Error("rewrote Claude settings that are not a JSON object")
+	}
+}
+
 func TestT3Smoke(t *testing.T) {
 	healthy := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(healthy.Close)

@@ -21,13 +21,23 @@ type t3Settings struct {
 	ca         string
 	codexHome  string
 	claudeHome string
+	cursorHome string
 	desktop    string
 	port       int
 }
 
+// agentAttribution is one provider's switch for the credit lines it adds to commits and pull requests.
+type agentAttribution struct {
+	name   string
+	home   string
+	file   string
+	hidden string
+	create bool
+}
+
 // t3 prepares (setup) or checks (smoke) T3 Code's provider instances.
 // Env: T3_URL (default https://hara.local when portless is installed, else http://localhost:8317),
-// T3_CODEX_HOME (default ~/.codex-t3-hara), T3_CLAUDE_HOME (default ~/.claude-hara),
+// T3_CODEX_HOME (default ~/.codex-t3-hara), T3_CLAUDE_HOME (default ~/.claude-hara), T3_CURSOR_HOME (default ~/.cursor),
 // T3_HOME (default ~/.t3), T3_TAILSCALE_PORT (default 8443), MODEL (Claude model for smoke).
 func (h host) t3(args []string) error {
 	if len(args) > 1 {
@@ -64,6 +74,7 @@ func (h host) t3Settings() (t3Settings, error) {
 		local:      "http://localhost:" + h.port(),
 		codexHome:  cmp.Or(h.getenv("T3_CODEX_HOME"), filepath.Join(h.home, ".codex-t3-hara")),
 		claudeHome: cmp.Or(h.getenv("T3_CLAUDE_HOME"), filepath.Join(h.home, ".claude-hara")),
+		cursorHome: cmp.Or(h.getenv("T3_CURSOR_HOME"), filepath.Join(h.home, ".cursor")),
 		desktop:    filepath.Join(cmp.Or(h.getenv("T3_HOME"), filepath.Join(h.home, ".t3")), "userdata", "desktop-settings.json"),
 	}
 
@@ -109,6 +120,10 @@ func (h host) t3Setup(settings t3Settings) error {
 
 	h.log("- Codex home for T3 Code: %s (%s/v1)", filepath.Join(settings.codexHome, "config.toml"), settings.url)
 
+	if err := h.t3Attribution(settings); err != nil {
+		return err
+	}
+
 	if err := h.t3TailscalePort(settings); err != nil {
 		return err
 	}
@@ -142,6 +157,70 @@ func (h host) t3Setup(settings t3Settings) error {
 
 	lines = append(lines, "", "Tailscale HTTPS can now be switched on in T3 Code. Check both instances with: make t3 smoke")
 	h.log("%s", strings.Join(lines, "\n"))
+
+	return nil
+}
+
+// t3Attribution keeps T3 Code's providers from signing the commits and pull requests they create.
+// Claude Code takes the object form, because older releases reject `"attribution": false` and then
+// skip the whole settings file. The Cursor CLI writes its own config, so a missing one is left for
+// it to create. Codex has no such setting: it credits itself only for a ChatGPT login, and the
+// Codex home here signs in with the Hara key. An attribution that is already set is kept.
+func (h host) t3Attribution(settings t3Settings) error {
+	for _, agent := range []agentAttribution{
+		{"Claude", settings.claudeHome, "settings.json", `{"commit":"","pr":"","sessionUrl":false}`, true},
+		{"Cursor", settings.cursorHome, "cli-config.json", `{"attributeCommitsToAgent":false,"attributePRsToAgent":false}`, false},
+	} {
+		if err := h.hideAttribution(agent); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (h host) hideAttribution(agent agentAttribution) error {
+	path := filepath.Join(agent.home, agent.file)
+	content, err := os.ReadFile(path)
+
+	if errors.Is(err, os.ErrNotExist) && !agent.create {
+		h.log("- %s config not found at %s; run %s once and rerun", agent.name, path, agent.name)
+
+		return nil
+	}
+
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	config := map[string]json.RawMessage{}
+
+	if err == nil && (json.Unmarshal(content, &config) != nil || config == nil) {
+		return fmt.Errorf("%s is not a JSON object", path)
+	}
+
+	if _, ok := config["attribution"]; ok {
+		h.log("- %s attribution is already configured (%s)", agent.name, path)
+
+		return nil
+	}
+
+	config["attribution"] = json.RawMessage(agent.hidden)
+	updated, err := json.MarshalIndent(config, "", "  ")
+
+	if err != nil {
+		return err
+	}
+
+	if err := privateDir(agent.home, h.root); err != nil {
+		return err
+	}
+
+	if err := writePrivate(path, append(updated, '\n')); err != nil {
+		return err
+	}
+
+	h.log("- %s commits and pull requests carry no attribution (%s)", agent.name, path)
 
 	return nil
 }
