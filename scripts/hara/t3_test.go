@@ -146,6 +146,71 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 	}
 }
 
+func TestT3SetupHidesClaudeAttribution(t *testing.T) {
+	h := newT3Host(t, nil)
+	path := filepath.Join(h.home, ".claude-hara", "settings.json")
+	hidden := map[string]any{"commit": "", "pr": "", "sessionUrl": false}
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var claude map[string]any
+
+	content, _ := os.ReadFile(path)
+
+	if err := json.Unmarshal(content, &claude); err != nil || fmt.Sprint(claude["attribution"]) != fmt.Sprint(hidden) {
+		t.Errorf("new Claude settings: %s", content)
+	}
+
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Errorf("Claude settings mode = %v", info.Mode().Perm())
+	}
+
+	if !strings.Contains(h.out.String(), "carry no attribution") {
+		t.Errorf("output: %s", h.out)
+	}
+
+	if err := os.WriteFile(path, []byte(`{"model":"opus","disabledMcpjsonServers":["executor"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	claude = nil
+	content, _ = os.ReadFile(path)
+
+	if err := json.Unmarshal(content, &claude); err != nil || fmt.Sprint(claude["attribution"]) != fmt.Sprint(hidden) || claude["model"] != "opus" || claude["disabledMcpjsonServers"] == nil {
+		t.Errorf("existing Claude settings: %s", content)
+	}
+
+	custom := `{ "attribution": { "pr": "Made by me" } }`
+
+	if err := os.WriteFile(path, []byte(custom), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	h.out.Reset()
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if content, _ := os.ReadFile(path); string(content) != custom || !strings.Contains(h.out.String(), "already configured") {
+		t.Errorf("replaced an existing attribution: %s\n%s", content, h.out)
+	}
+
+	if err := os.WriteFile(path, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"t3"}); err == nil {
+		t.Error("rewrote Claude settings that are not a JSON object")
+	}
+}
+
 func TestT3Smoke(t *testing.T) {
 	healthy := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(healthy.Close)

@@ -109,6 +109,10 @@ func (h host) t3Setup(settings t3Settings) error {
 
 	h.log("- Codex home for T3 Code: %s (%s/v1)", filepath.Join(settings.codexHome, "config.toml"), settings.url)
 
+	if err := h.t3ClaudeAttribution(settings); err != nil {
+		return err
+	}
+
 	if err := h.t3TailscalePort(settings); err != nil {
 		return err
 	}
@@ -142,6 +146,49 @@ func (h host) t3Setup(settings t3Settings) error {
 
 	lines = append(lines, "", "Tailscale HTTPS can now be switched on in T3 Code. Check both instances with: make t3 smoke")
 	h.log("%s", strings.Join(lines, "\n"))
+
+	return nil
+}
+
+// t3ClaudeAttribution keeps Claude Code from signing the commits and pull requests that T3 Code's
+// Claude instance creates. The object form is used because older Claude Code releases reject
+// `"attribution": false` and then skip the whole settings file. An existing attribution is kept.
+func (h host) t3ClaudeAttribution(settings t3Settings) error {
+	path := filepath.Join(settings.claudeHome, "settings.json")
+	content, err := os.ReadFile(path)
+
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	claude := map[string]json.RawMessage{}
+
+	if err == nil && (json.Unmarshal(content, &claude) != nil || claude == nil) {
+		return fmt.Errorf("%s is not a JSON object", path)
+	}
+
+	if _, ok := claude["attribution"]; ok {
+		h.log("- Claude attribution is already configured (%s)", path)
+
+		return nil
+	}
+
+	claude["attribution"] = json.RawMessage(`{"commit":"","pr":"","sessionUrl":false}`)
+	updated, err := json.MarshalIndent(claude, "", "  ")
+
+	if err != nil {
+		return err
+	}
+
+	if err := privateDir(settings.claudeHome, h.root); err != nil {
+		return err
+	}
+
+	if err := writePrivate(path, append(updated, '\n')); err != nil {
+		return err
+	}
+
+	h.log("- Claude commits and pull requests carry no attribution (%s)", path)
 
 	return nil
 }

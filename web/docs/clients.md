@@ -66,7 +66,7 @@ Plain `codex` continues to use your usual login. Select the `proxy` profile only
 make t3
 ```
 
-It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), sets T3 Code's Tailscale HTTPS port to 8443 (leaving its settings file untouched when the port is already 8443), and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
+It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), turns off Claude Code's commit and pull request attribution in `~/.claude-hara/settings.json` (unless that file already sets `attribution`), sets T3 Code's Tailscale HTTPS port to 8443 (leaving its settings file untouched when the port is already 8443), and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
 
 | Instance | Field                  | Value                                 |
 | -------- | ---------------------- | ------------------------------------- |
