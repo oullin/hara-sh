@@ -146,6 +146,44 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 	}
 }
 
+func TestT3SetupHidesCursorAttribution(t *testing.T) {
+	h := newT3Host(t, nil)
+	path := filepath.Join(h.home, ".cursor", "cli-config.json")
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if exists(path) || !strings.Contains(h.out.String(), "Cursor config not found") {
+		t.Fatalf("created a Cursor config the CLI had not written:\n%s", h.out)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(path, []byte(`{"version":1,"maxMode":false,"limit":9007199254740993}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"t3"}); err != nil {
+		t.Fatal(err)
+	}
+
+	content, _ := os.ReadFile(path)
+
+	var cursor map[string]any
+
+	if err := json.Unmarshal(content, &cursor); err != nil || fmt.Sprint(cursor["attribution"]) != fmt.Sprint(map[string]any{"attributeCommitsToAgent": false, "attributePRsToAgent": false}) ||
+		cursor["version"] != float64(1) || !strings.Contains(string(content), "9007199254740993") {
+		t.Errorf("Cursor config: %s", content)
+	}
+
+	if !strings.Contains(h.out.String(), "Cursor commits and pull requests carry no attribution") {
+		t.Errorf("output: %s", h.out)
+	}
+}
+
 func TestT3SetupHidesClaudeAttribution(t *testing.T) {
 	h := newT3Host(t, nil)
 	path := filepath.Join(h.home, ".claude-hara", "settings.json")

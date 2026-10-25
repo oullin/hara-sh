@@ -51,7 +51,7 @@ func (h host) t3Executor(settings t3Settings) error {
 	state := cmp.Or(h.getenv("T3_EXECUTOR_DIR"), filepath.Join(h.home, ".codex", "tools", "t3-executor"))
 	headerPath := filepath.Join(state, name+".headers")
 	claudePath := filepath.Join(settings.claudeHome, ".claude.json")
-	cursorPath := filepath.Join(cmp.Or(h.getenv("T3_CURSOR_HOME"), filepath.Join(h.home, ".cursor")), "mcp.json")
+	cursorPath := filepath.Join(settings.cursorHome, "mcp.json")
 	codexPath := filepath.Join(settings.codexHome, "config.toml")
 
 	// Prepare and validate every config before installing packages or replacing any client file.

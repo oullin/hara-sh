@@ -66,7 +66,7 @@ Plain `codex` continues to use your usual login. Select the `proxy` profile only
 make t3
 ```
 
-It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), turns off Claude Code's commit and pull request attribution in `~/.claude-hara/settings.json` (unless that file already sets `attribution`), sets T3 Code's Tailscale HTTPS port to 8443 (leaving its settings file untouched when the port is already 8443), and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
+It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), turns off the commit and pull request attribution of Claude Code (`~/.claude-hara/settings.json`) and the Cursor CLI (`~/.cursor/cli-config.json`, once Cursor has created it) unless the file already sets `attribution`, sets T3 Code's Tailscale HTTPS port to 8443 (leaving its settings file untouched when the port is already 8443), and prints the values for this computer. Quit T3 Code with Cmd-Q and reopen it before changing any setting, then add two instances under **Settings → Providers**:
 
 | Instance | Field                  | Value                                 |
 | -------- | ---------------------- | ------------------------------------- |
@@ -79,7 +79,7 @@ It writes a Codex home that only uses Hara (`~/.codex-t3-hara`), turns off Claud
 |          | Shadow home path       | Empty                                 |
 |          | `CODEX_CA_CERTIFICATE` | Absolute path to `~/.portless/ca.pem` |
 
-The separate Claude config directory keeps a cached Anthropic login from replacing the client key. The empty `ANTHROPIC_API_KEY` stops Claude Code from asking for one. The Codex home reads the key through `bin/hara key`, so it needs no ChatGPT login and no shadow home.
+The separate Claude config directory keeps a cached Anthropic login from replacing the client key. The empty `ANTHROPIC_API_KEY` stops Claude Code from asking for one. The Codex home reads the key through `bin/hara key`, so it needs no ChatGPT login and no shadow home. Without a ChatGPT login, Codex adds no `Co-authored-by` trailer or "Generated with Codex" line either; with one, only the account's own setting turns them off, because Codex reads no configuration key for it.
 
 Without portless, `make t3` uses `http://localhost:8317` and drops both certificate variables. `T3_URL=` picks another address. Pick models in the thread's model picker; `make ops models` lists them.
 
