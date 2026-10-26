@@ -55,6 +55,9 @@ routing:
     save-cooldown-status: true
 
 requests:
+  # Bound silent upstream TLS handshakes so retry/failover can proceed. This does
+  # not limit inference or the duration of an established stream (requires v8.0.29+).
+  tls-handshake-timeout-seconds: 15
   payload:
     # Fast mode for every Codex request ("2x speed, increased usage"). The Codex app sends no
     # service_tier to a custom provider. The proxy drops any client tier other than "priority"

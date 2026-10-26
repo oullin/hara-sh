@@ -41,6 +41,35 @@ Run `tools ops accounts`, `tools ops models`, and `tools quota` with the Compose
 
 Provider cooldowns survive restarts. Use an eligible account/model or wait for the reset; restarting does not restore capacity.
 
+## Claude repeatedly returns 429
+
+Read the upstream error in **Logs → Error Request Logs**. `Usage credits are required for fast mode.` means the request selected paid fast mode, even if the subscription still has ordinary quota. Hara preserves the client's speed selection; the proxy cannot supply missing usage credits.
+
+To use fast mode, enable and fund **Usage credits** in Claude's **Settings → Usage**, and check the spending limit. Work accounts may need a billing administrator to replenish credits or an organization Owner to enable fast mode. Every account receiving fast requests needs the required credits and access; an account without them can still serve standard requests. See [Anthropic's fast-mode requirements](https://code.claude.com/docs/en/fast-mode#requirements).
+
+If you need service while credits are unavailable, turn off `/fast` in the client. To enforce standard speed across clients temporarily, add this under the existing `requests.payload` section of your configuration template, then apply it with `make up`:
+
+```yaml
+override:
+  - models:
+      - name: "claude-*"
+        protocol: "claude"
+    params:
+      speed: "standard"
+```
+
+Remove this override once the accounts have fast-mode credits; leaving it in place forces standard speed even when the client requests fast mode.
+
+Other 429 responses can indicate genuine rate or usage limits. Respect their retry/reset times; changing speed does not restore exhausted quota. The pinned proxy includes fixes that preserve cooldowns during concurrent requests and credential-file updates, and distinguish short per-minute limits from billing resets.
+
+## Connection failures and cancellation logs
+
+`EOF` or `connect: connection refused` from Anthropic indicates an upstream connection failed. Hara bounds the upstream TLS handshake to 15 seconds so a silent handshake can reach the proxy's retry/failover handling. This timeout does not limit generation or established streams, and cannot prevent a remote outage.
+
+`499` and `response body close error: context canceled` commonly follow a client stopping a request. Check whether a turn actually failed before treating these as provider faults. A model-catalog refresh warning says the last valid catalog was retained; investigate network access if refreshes continue failing or models are missing.
+
+Claude Code sends `HEAD /api/hello` to its configured Anthropic base URL to warm up the connection. Hara does not expose that route, so it returns a harmless 404; Claude Code ignores the result. Use `/healthz` for your own health checks. This is separate from inference failures.
+
 ## Container cannot reach localhost
 
 Use `http://proxy:8317` inside tools containers. Host clients use `http://localhost:8317`. Use `host.docker.internal` for other host-local services.
