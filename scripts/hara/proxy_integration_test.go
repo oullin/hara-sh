@@ -329,7 +329,10 @@ func startProxyLab(t *testing.T) *proxyLab {
 			t.Errorf("remove test proxy: %v: %s", err, out)
 		}
 	})
-	labDocker(t, "run", "-d", "--name", name, "--add-host", "host.docker.internal:host-gateway", "-p", "127.0.0.1::8317", "-e", "WRITABLE_PATH=/test", "-v", dir+":/test", image, "./CLIProxyAPI", "-config", "/test/config.yaml", "--local-model")
+	// On Linux a root container would leave owner-only auth/log directories that
+	// the host's TempDir cleanup cannot remove. Docker Desktop masks that mismatch.
+	owner := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
+	labDocker(t, "run", "-d", "--name", name, "--user", owner, "--add-host", "host.docker.internal:host-gateway", "-p", "127.0.0.1::8317", "-e", "WRITABLE_PATH=/test", "-v", dir+":/test", image, "./CLIProxyAPI", "-config", "/test/config.yaml", "--local-model")
 	lab.base = "http://" + strings.TrimSpace(labDocker(t, "port", name, "8317/tcp"))
 	deadline := time.After(25 * time.Second)
 
