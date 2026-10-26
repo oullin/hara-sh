@@ -1,5 +1,5 @@
 # hara-sh — make up | portless | down | purge | status | logs [service], or make <area> [action]. Run `make` for the list.
-# Private credentials are read through Docker; 1Password is optional.
+# Private credentials are read from local state, with Docker fallback; 1Password is optional.
 
 SHELL      := /bin/bash
 # Host clients use loopback; containerized tools map it to the proxy service.
@@ -10,7 +10,7 @@ CODEX_MODEL ?= gpt-5.5
 
 export OP_ACCOUNT OP_VAULT OP_ITEM_NAME
 
-# The host helper (scripts/hara, built into bin/) reads private Docker state; HARA_SECRET_PROVIDER=op opts into 1Password.
+# The host helper reads private local state; HARA_SECRET_PROVIDER=op opts into 1Password.
 HARA         = $(CURDIR)/bin/hara
 HARA_SOURCES = $(filter-out %_test.go,$(wildcard scripts/hara/*.go)) scripts/hara/go.mod scripts/hara/go.sum
 API_KEY      = $$($(HARA) key claude-api-key)
@@ -31,8 +31,8 @@ ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
 ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), rotate local keys or import optional 1Password credentials
 web_ACTIONS    := dev install test coverage build docs deploy
 web_HELP       := The landing page and docs on hara.sh: Vite dev server, dependencies, tests, coverage (fails under 100%), type-check, test and deploy
-code_ACTIONS   := check test complexity panel public
-code_HELP      := check runs what CI runs (Go tests, web build and coverage, privacy guard); Go tests; complexity limits; rebuild the panel (needs bun); public-file privacy guard
+code_ACTIONS   := check test resilience complexity panel public
+code_HELP      := check runs Go tests, web build and coverage, privacy guard; resilience tests the pinned proxy image with injected faults (Docker and Go); complexity limits; rebuild the panel (needs bun); public-file privacy guard
 
 # `make ops quota`, `make logs proxy`: the words after an area (or logs) name its action or service,
 # not targets, so they get an empty rule here; anything else fails with the choices.
@@ -233,6 +233,9 @@ format-all:
 
 code/test:
 	docker build --target verify -f scripts/tools/Dockerfile .
+
+code/resilience:
+	cd scripts/hara && HARA_PROXY_INTEGRATION=1 go test -count=1 -run TestProxyImage -v -timeout 2m .
 
 code/complexity:
 	fmtkit complexity --ts web/src web/worker

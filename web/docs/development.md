@@ -29,6 +29,7 @@ make web docs   # Docs at http://localhost:5174/.
 ```bash
 make format-all
 make code check
+make code resilience
 ```
 
 `make format-all` is the only formatter and lint: it runs fmtkit over the TS/Vue sources and every Go module (with go vet). `make code check` covers containerised Go tests and credential tests, the web build, 100% application coverage and the publication guard. Development checks need Docker, fmtkit, Go, Node.js, and installed web dependencies. Server users need only Docker: without host Go, `make` builds the `bin/hara` host helper in a container.
@@ -62,7 +63,7 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 | `panel.go`    | Management panel build                                             |
 | `settings.go` | Checkout discovery, `credentials.env` parsing, private directories |
 
-Tests replace the child processes with a recorder, so they need no Docker or network. Run them with `cd scripts/hara && go test ./...`; `make code check` also runs them in the tools image.
+Unit tests replace the child processes with a recorder, so they need no Docker or network. Run them with `cd scripts/hara && go test ./...`; `make code check` also runs them in the tools image. `make code resilience` additionally starts disposable containers from the pinned proxy image and injects synthetic upstream failures. These opt-in image tests run on the Docker host and are skipped by the ordinary unit suite.
 
 ## Deploy your fork
 

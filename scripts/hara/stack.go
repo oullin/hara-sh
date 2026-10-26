@@ -160,14 +160,22 @@ func (h host) portless() error {
 	return h.call(h.command("portless", "alias", "hara", h.port(), "--force"))
 }
 
-// up never regenerates existing keys; readers restart after the configuration is rendered.
+// up prepares images before touching the running stack, then waits for readiness.
+// Existing keys are preserved; readers restart after the configuration is rendered.
 func (h host) up() error {
 	if !h.quiet(h.command("docker", "info")) {
 		return errors.New("Docker is not running")
 	}
 
-	if err := h.call(h.compose("up", "-d", "--build", "--force-recreate")); err != nil {
-		return err
+	for _, args := range [][]string{
+		{"config", "--quiet"},
+		{"build", "init"},
+		{"pull", "proxy"},
+		{"up", "-d", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "60"},
+	} {
+		if err := h.call(h.compose(args...)); err != nil {
+			return err
+		}
 	}
 
 	if err := h.tools([]string{"health"}); err != nil {

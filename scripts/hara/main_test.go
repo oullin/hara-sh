@@ -291,7 +291,10 @@ func TestUpStartsTheStackAndPortless(t *testing.T) {
 
 	assertCalls(t, h.fake.calls,
 		"docker info",
-		"compose up -d --build --force-recreate",
+		"compose config --quiet",
+		"compose build init",
+		"compose pull proxy",
+		"compose up -d --no-build --force-recreate --wait --wait-timeout 60",
 		"compose run --rm --no-deps -T tools health",
 		"portless proxy start --lan",
 		"portless alias hara 9000 --force",
@@ -302,6 +305,29 @@ func TestUpStartsTheStackAndPortless(t *testing.T) {
 
 	if !strings.Contains(h.out.String(), "Host endpoint: http://localhost:9000") {
 		t.Errorf("output: %s", h.out)
+	}
+}
+
+func TestUpStopsAtFailedPreparationOrReadiness(t *testing.T) {
+	steps := []string{
+		"docker info",
+		"compose config --quiet",
+		"compose build init",
+		"compose pull proxy",
+		"compose up -d --no-build --force-recreate --wait --wait-timeout 60",
+	}
+
+	for i, step := range steps[1:] {
+		t.Run(step, func(t *testing.T) {
+			h := newTestHost(t, nil, "portless")
+			h.fake.respond = failing(step)
+
+			if err := h.dispatch([]string{"up"}); err == nil {
+				t.Fatal("failed preparation or readiness reported success")
+			}
+
+			assertCalls(t, h.fake.calls, steps[:i+2]...)
+		})
 	}
 }
 

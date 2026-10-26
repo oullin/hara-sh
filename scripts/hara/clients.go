@@ -38,7 +38,7 @@ var (
 	authCommandLine = regexp.MustCompile(`^\s*auth\.command\s*=\s*"((?:[^"\\]|\\.)*)"`)
 )
 
-// key prints a client credential from local Docker state; HARA_SECRET_PROVIDER=op reads 1Password instead.
+// key prints a credential from private local state; HARA_SECRET_PROVIDER=op reads 1Password instead.
 // Codex runs it as its auth command, so standard output carries the credential and nothing else.
 func (h host) key(args []string) error {
 	if len(args) > 1 {
@@ -51,23 +51,21 @@ func (h host) key(args []string) error {
 		field = args[0]
 	}
 
-	cmd, err := h.keyCommand(field)
+	value, err := h.secret(field)
 
 	if err != nil {
 		return err
 	}
 
-	return h.call(cmd)
+	_, err = fmt.Fprintln(h.stdout, value)
+
+	return err
 }
 
 // keyCommand returns the command that prints field on standard output, building the tools image first if needed.
 func (h host) keyCommand(field string) (*exec.Cmd, error) {
-	switch field {
-	case apiField, managementField:
-	case "--refresh", "--clear":
-		return nil, errors.New("use make ops import-op to sync 1Password, or make ops keys to rotate local keys")
-	default:
-		return nil, errors.New("unknown credential field")
+	if err := validateCredentialField(field); err != nil {
+		return nil, err
 	}
 
 	if h.getenv("HARA_SECRET_PROVIDER") == "op" {
@@ -89,6 +87,14 @@ func (h host) keyCommand(field string) (*exec.Cmd, error) {
 
 // secret returns a client credential for a child process's environment.
 func (h host) secret(field string) (string, error) {
+	if h.getenv("HARA_SECRET_PROVIDER") != "op" {
+		value, err := localCredential(h.state, field)
+
+		if !errors.Is(err, os.ErrNotExist) {
+			return value, err
+		}
+	}
+
 	cmd, err := h.keyCommand(field)
 
 	if err != nil {

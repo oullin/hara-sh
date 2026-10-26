@@ -38,5 +38,8 @@ jobs:
 
       - run: make code check
 
+      - name: Test the pinned proxy against upstream faults
+        run: make code resilience
+
       - name: Build the runtime tools image
         run: docker compose -f local/compose.yaml build init

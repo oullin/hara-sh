@@ -42,8 +42,15 @@ routing:
   # Upstream default, explicit: subagents run on the parent's account (cache reuse over
   # parallelism). false spreads them across the pool.
   session-affinity-subagents: true
+  # A transient outage may borrow another account for one turn without moving the
+  # conversation's warm prompt cache. Quota/auth failures still rebind normally.
+  session-affinity-rebind-on: "quota"
 
   retry:
+    # Try every eligible account, then at most one additional round. Clients also
+    # retry, so the upstream default of three extra rounds compounds outage latency.
+    request-retry: 1
+    max-retry-credentials: 0
     # When every account is cooling down, wait at most this many seconds between retry rounds
     # (upstream default 30). Claude and Codex limits reset in hours, so a long wait rarely ends
     # in an answer; failing fast lets the client report it. Rounds without a wait are unchanged.
@@ -53,8 +60,21 @@ routing:
     # Persist each account's cooldown next to its auth file (~/.hara-sh/proxy/auths/*.cds),
     # so a restart does not send one request per exhausted account just to relearn its limit.
     save-cooldown-status: true
+    # Brief circuit breaker for 408/5xx failures. Real usage-limit reset times are
+    # unchanged; a dropped connection should not bench a healthy account for 60s.
+    transient-error-cooldown-seconds: 5
 
 requests:
+  # Bound silent upstream TLS handshakes so retry/failover can proceed. This does
+  # not limit inference or the duration of an established stream (requires v8.0.29+).
+  tls-handshake-timeout-seconds: 15
+  streaming:
+    # Keep established SSE/WebSocket streams alive through idle network proxies.
+    keepalive-seconds: 15
+    # Recover one failure before output; never replay a partially delivered turn.
+    bootstrap-retries: 1
+    # Keep the pre-output retry window open instead of committing heartbeat bytes.
+    send-keepalive-before-ft: false
   payload:
     # Fast mode for every Codex request ("2x speed, increased usage"). The Codex app sends no
     # service_tier to a custom provider. The proxy drops any client tier other than "priority"

@@ -21,10 +21,11 @@ type sample struct {
 
 // api is one wire protocol: how to build its request and read its stream.
 type api struct {
-	name  string
-	path  string
-	build func(model, prefix, nonce string) any
-	auth  func(h http.Header, key string)
+	name     string
+	path     string
+	terminal string
+	build    func(model, prefix, nonce string) any
+	auth     func(h http.Header, key string)
 	// event reads one SSE data payload: whether it is the first text, and any usage it carries.
 	event func(data []byte, s *sample) (text bool)
 }
@@ -34,8 +35,9 @@ const prompt = "Reply with exactly: pong"
 // messages is the Anthropic Messages API, as Claude Code speaks it. The prefix is marked for
 // caching the way Claude Code marks its system prompt.
 var messages = api{
-	name: "claude",
-	path: "/v1/messages",
+	name:     "claude",
+	path:     "/v1/messages",
+	terminal: "message_stop",
 	build: func(model, prefix, _ string) any {
 		return map[string]any{
 			"model":      model,
@@ -80,8 +82,9 @@ var messages = api{
 // responses is the OpenAI Responses API, as Codex speaks it over HTTP. prompt_cache_key keeps the
 // run on one account, the way Codex's session does.
 var responses = api{
-	name: "codex",
-	path: "/v1/responses",
+	name:     "codex",
+	path:     "/v1/responses",
+	terminal: "response.completed",
 	build: func(model, prefix, nonce string) any {
 		return map[string]any{
 			"model":            model,
@@ -156,6 +159,7 @@ func (a api) run(client *http.Client, base, key, model, prefix, nonce string) (s
 // read consumes the SSE stream, noting when the first text arrived.
 func (a api) read(r io.Reader, start time.Time) (sample, error) {
 	var s sample
+	complete := false
 
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 64<<10), 4<<20)
@@ -166,6 +170,14 @@ func (a api) read(r io.Reader, start time.Time) (sample, error) {
 		if !ok {
 			continue
 		}
+
+		done, err := streamStatus([]byte(strings.TrimSpace(data)), a.terminal)
+
+		if err != nil {
+			return s, err
+		}
+
+		complete = complete || done
 
 		if a.event([]byte(strings.TrimSpace(data)), &s) && s.firstToken == 0 {
 			s.firstToken = time.Since(start)
@@ -178,6 +190,10 @@ func (a api) read(r io.Reader, start time.Time) (sample, error) {
 
 	if s.firstToken == 0 {
 		return s, fmt.Errorf("the stream ended without any text")
+	}
+
+	if !complete {
+		return s, fmt.Errorf("the stream ended before %s", a.terminal)
 	}
 
 	s.total = time.Since(start)

@@ -181,6 +181,30 @@ func TestUnreachableAddress(t *testing.T) {
 	}
 }
 
+func TestReadRejectsPartialAndFailedStreams(t *testing.T) {
+	for _, a := range []api{messages, responses} {
+		t.Run(a.name, func(t *testing.T) {
+			text := `{"type":"response.output_text.delta","delta":"partial"}`
+
+			if a.name == messages.name {
+				text = `{"type":"content_block_delta","delta":{"type":"text_delta","text":"partial"}}`
+			}
+
+			for _, terminal := range []string{"", "error", "response.failed", "response.incomplete"} {
+				stream := "data: " + text + "\n\n"
+
+				if terminal != "" {
+					stream += fmt.Sprintf("data: {\"type\":%q}\n\n", terminal)
+				}
+
+				if _, err := a.read(strings.NewReader(stream), time.Now()); err == nil {
+					t.Errorf("stream ending with %q was reported successful", terminal)
+				}
+			}
+		})
+	}
+}
+
 func TestSummaries(t *testing.T) {
 	ms := time.Millisecond
 
