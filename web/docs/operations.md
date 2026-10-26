@@ -95,6 +95,20 @@ Client backups are separate from server backups and remain outside Git. `URL` se
 
 Use `make ops bench N=5 CODEX_MODEL=MODEL` for the benchmark and `make ops logs LINES=500` for recent server logs. `MODEL` selects the Claude smoke/benchmark model. Run `make` to list every action and its options.
 
+## Latency and recovery
+
+Hara keeps conversations on their original account to reuse prompt caches. A transient failure can use another account for one turn while retaining the original binding; quota and authentication failures still move the binding. Temporary upstream failures cool an account for five seconds instead of the upstream default of 60 seconds. Usage-limit reset times are unchanged.
+
+Every eligible account can be tried, with at most one additional retry round. Streaming allows one recovery attempt before any output and sends heartbeats every 15 seconds after the stream starts. Partially delivered responses are never replayed, and pre-output heartbeats stay off so they do not prematurely commit the response. Upstream TLS handshakes have a 15-second limit; generation and established streams have no new time limit. Response buffering remains off to preserve first-token latency.
+
+`make up` validates Compose configuration, builds the tools image, and pulls the pinned proxy image before recreating services. Preparation failures leave the running containers in place. Startup waits up to 60 seconds for readiness before reporting success. Recreation interrupts active requests, so finish important turns first. Runtime container logs rotate separately from the proxy's own log files.
+
+Use `make code resilience` on a Docker host with Go to exercise the pinned image against synthetic upstream failures. It uses disposable containers, synthetic credentials, and a local stub; it does not call AI providers or read your account files. CI runs the same checks. Use `make ops bench` to measure real inference latency and cache reuse separately.
+
+The host auth helper reads the existing private credential file directly, so starting a T3 provider session does not start an extra Docker container just to retrieve the key. It bounds and validates the credential before printing it, retains the container fallback when the file is missing, and keeps the explicit 1Password mode. Credentials stay outside the checkout.
+
+For T3 latency, check the effort level selected in T3 itself: per-request options can override provider-home defaults. Auxiliary title and branch-name generation rarely need the same effort level as difficult coding work. Lower effort or a smaller model is a quality/cost tradeoff; Hara does not change these choices. Keep prompt-cache affinity and benchmark before reducing compaction windows or changing endpoints. A local HTTPS hop is often much smaller than model reasoning time.
+
 You can also run the helper directly from any directory; it finds the checkout from its own location. Run `./bin/hara` without arguments to list its commands:
 
 ```bash

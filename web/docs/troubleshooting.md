@@ -113,6 +113,14 @@ docker compose -f local/compose.yaml run --rm --no-deps -T tools wssmoke http://
 
 Then run `make codex smoke`. Reinstall the profile if the checkout moved. Server logs show `GET /v1/responses` for WebSockets and `POST /v1/responses` for HTTP. Check provider availability if the socket opens but cannot serve a turn.
 
+## GPT provider accounts ask to sign in again
+
+Distinguish a rejected Hara client key from an expired provider login. An upstream OAuth refresh failure with `refresh_token_invalidated` and `Your session has ended. Please log in again.` means OpenAI rejected that provider session's refresh token. It is separate from model quota and the panel password.
+
+The pinned proxy includes fixes that prevent stale refresh results from overwriting newer credentials, refresh GPT credentials earlier, and restore re-authenticated credentials to rotation. Keep the auth directory on the persistent private volume and let one proxy instance own token refresh. Do not copy a rotating token file into several independent clients or proxy instances. Use the proxy's credential refresh operation so refreshed tokens are persisted by the same process that uses them.
+
+A successful inference request alone does not prove refresh works: an existing access token can remain valid after its refresh token has been rejected. If OpenAI has invalidated the refresh token, connect that account again through the management panel; restarting or clearing cooldowns cannot restore it. Never delete the entire auth directory as a repair.
+
 ## Host helper errors
 
 - **`expected NAME=value` with a line number**: fix that line in `credentials.env`. See the supported [setting forms](./configuration#host-helper-settings).
