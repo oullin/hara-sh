@@ -51,11 +51,11 @@ If you need service while credits are unavailable, turn off `/fast` in the clien
 
 ```yaml
 override:
-  - models:
-      - name: "claude-*"
-        protocol: "claude"
-    params:
-      speed: "standard"
+    - models:
+          - name: 'claude-*'
+            protocol: 'claude'
+      params:
+          speed: 'standard'
 ```
 
 Remove this override once the accounts have fast-mode credits; leaving it in place forces standard speed even when the client requests fast mode.
@@ -103,7 +103,7 @@ See [Pair a phone](./clients#pair-a-phone).
 
 Codex's instant interruption sends `response.interrupt` when new input arrives during a response. CLIProxyAPI v8.0.15 rejects that event. Hara's Codex profile disables `features.instant_interrupt`, so steering input waits for the current response to finish and WebSockets remain enabled.
 
-Run `make codex profile` for the proxy profile and `make t3` for T3 Code's Codex home, then restart the affected app. If your Codex app uses a Hara provider defined directly in `~/.codex/config.toml`, add `instant_interrupt = false` to its existing `[features]` table as well. Stopping a turn still works; only instant steering is disabled.
+Run `make codex profile` for the proxy profile and `make t3` for T3 Code's Codex home, then restart the affected app. If the Codex app uses Hara from `~/.codex/config.toml`, run `make codex app` as well; it sets `instant_interrupt = false` in the existing `[features]` table. Stopping a turn still works; only instant steering is disabled.
 
 ## Codex falls back to HTTP
 
@@ -127,7 +127,7 @@ A successful inference request alone does not prove refresh works: an existing a
 - **`private state moved to ~/.hara-sh`**: move the old directory as shown, or set `LOCAL_DIR` to it.
 - **`must be outside the repository`**: point `LOCAL_DIR` or `BACKUP_DIR` at a directory outside the checkout, including through symlinks.
 - **`run hara from the hara-sh checkout`**: run Make from the repository root, or rebuild `bin/hara` with any Make action.
-- **Codex cannot fetch its key after an update**: Codex logs `provider auth command .../scripts/hara-key failed to start` and the proxy answers `401` with `Missing API key`. Run `make codex profile`, and `make t3` if you use T3 Code, so the profiles call `bin/hara`. Fix any `config.toml` line that `make codex profile` names, then restart Codex or T3 Code; a running session keeps the old command.
+- **Codex cannot fetch its key after an update**: Codex logs `provider auth command .../scripts/hara-key failed to start` and the proxy answers `401` with `Missing API key`. Run `make codex profile`, and `make t3` if you use T3 Code, so the profiles call `bin/hara`. Run `make codex app` for any `config.toml` line that `make codex profile` names, then restart Codex or T3 Code; a running session keeps the old command.
 - **The helper seems out of date**: delete `bin/hara`; the next Make action rebuilds it.
 
 ## Panel settings disappear

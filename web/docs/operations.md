@@ -86,6 +86,7 @@ These commands run the same Docker tools as above:
 | Remove containers and images | `make purge` (private state kept)                          |
 | Accounts / models / quota    | `make ops accounts` / `make ops models` / `make ops quota` |
 | Request / WebSocket check    | `make ops smoke` / `make ops ws-smoke IDLE=2m`             |
+| Codex profile / Codex app    | `make codex profile` / `make codex app`                    |
 | Real Codex transport check   | `make codex smoke`                                         |
 | Prepare / check T3 Code      | `make t3` / `make t3 smoke`                                |
 | Rotate / import keys         | `make ops keys` / `make ops import-op`                     |
@@ -125,7 +126,7 @@ Besides the [stack settings](./configuration#settings) such as `LOCAL_DIR` and `
 | `URL`                                                                                         | Target for `tools`, `ws-smoke` and `bench`; host loopback maps to `http://proxy:8317`      |
 | `HARA_SECRET_PROVIDER=op`                                                                     | `key` reads 1Password through `OP_ACCOUNT`, `OP_VAULT` and `OP_ITEM_NAME`                  |
 | `BACKUP_DIR`                                                                                  | Client backup destination (default `$LOCAL_DIR/backups`)                                   |
-| `CODEX_HOME`                                                                                  | Codex settings directory for `codex-profile` and `codex-smoke`                             |
+| `CODEX_HOME`                                                                                  | Codex settings directory for `codex-profile`, `codex-app` and `codex-smoke`                |
 | `CODEX_PROFILE`, `PROXY_URL`                                                                  | Profile and proxy address checked by `make codex smoke`                                    |
 | `T3_URL`, `T3_CODEX_HOME`, `T3_CLAUDE_HOME`, `T3_CURSOR_HOME`, `T3_HOME`, `T3_TAILSCALE_PORT` | Address, Codex, Claude and Cursor homes, T3 Code settings and Tailscale port for `make t3` |
 | `PANEL_TAG`, `PANEL_REPO`                                                                     | Upstream panel release and repository for `make code panel`                                |

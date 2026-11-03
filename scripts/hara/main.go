@@ -1,5 +1,5 @@
 // Command hara is the host helper behind make: it drives the Docker Compose stack, prints client
-// credentials, installs the Codex profile, backs up client settings and rebuilds the panel.
+// credentials, installs the Codex profile or the Codex app provider, backs up client settings and rebuilds the panel.
 //
 //	hara up|portless|init|import-op|rotate|status|down|purge
 //	hara logs [SERVICE]
@@ -8,7 +8,7 @@
 //	hara bench [N] CLAUDE_MODEL CODEX_MODEL
 //	hara key [claude-api-key|management-password]
 //	hara backup claude|codex
-//	hara codex-profile | codex-smoke
+//	hara codex-profile | codex-app | codex-smoke
 //	hara t3 [setup|smoke|executor]
 //	hara panel
 //
@@ -45,7 +45,7 @@ type host struct {
 	client *http.Client
 }
 
-const usage = "usage: hara up|portless|init|import-op|rotate|status|tools COMMAND|ws-smoke|bench|logs [service]|down|purge|key [field]|backup claude|codex|codex-profile|codex-smoke|t3 setup|smoke|executor|panel"
+const usage = "usage: hara up|portless|init|import-op|rotate|status|tools COMMAND|ws-smoke|bench|logs [service]|down|purge|key [field]|backup claude|codex|codex-profile|codex-app|codex-smoke|t3 setup|smoke|executor|panel"
 
 func main() {
 	err := run(os.Args[1:])
@@ -126,6 +126,8 @@ func (h host) dispatch(args []string) error {
 		return h.backup(rest)
 	case "codex-profile":
 		return h.codexProfile()
+	case "codex-app":
+		return h.codexApp()
 	case "codex-smoke":
 		return h.codexSmoke()
 	case "t3":
