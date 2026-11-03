@@ -15,13 +15,15 @@ import (
 )
 
 // codexCheck is one Codex smoke run: the Codex home, its profile (empty uses config.toml), the
-// proxy to probe, the command that installs the config and extra child environment.
+// proxy to probe, the command that installs the config, whether that command wrote it from
+// codex/proxy.config.toml, and extra child environment.
 type codexCheck struct {
-	home     string
-	profile  string
-	proxyURL string
-	hint     string
-	env      []string
+	home      string
+	profile   string
+	proxyURL  string
+	hint      string
+	installed bool
+	env       []string
 }
 
 const (
@@ -31,11 +33,13 @@ const (
 	keyPlaceholder  = "__HARA_KEY_COMMAND__"
 	fallbackWarning = "Falling back from WebSockets"
 	defaultCodexURL = "http://localhost:8317/v1"
+	proxyProfile    = "proxy"
 )
 
 var (
 	baseURLLine     = regexp.MustCompile(`(?m)^base_url = .*$`)
 	authCommandLine = regexp.MustCompile(`^\s*auth\.command\s*=\s*"((?:[^"\\]|\\.)*)"`)
+	providerLine    = regexp.MustCompile(`^\s*model_provider\s*=\s*"((?:[^"\\]|\\.)*)"`)
 )
 
 // key prints a credential from private local state; HARA_SECRET_PROVIDER=op reads 1Password instead.
@@ -171,7 +175,7 @@ func copyPrivate(source, dest string) error {
 
 // codexProfile installs the public profile template as the `proxy` profile of the usual Codex home.
 func (h host) codexProfile() error {
-	dest := filepath.Join(h.codexHome(), "proxy.config.toml")
+	dest := filepath.Join(h.codexHome(), proxyProfile+".config.toml")
 
 	if err := h.installCodexConfig(dest, defaultCodexURL); err != nil {
 		return err
@@ -282,11 +286,14 @@ func writePrivate(path string, content []byte) error {
 // codexSmoke checks the proxy profile of the usual Codex home.
 // Env: CODEX_PROFILE (default proxy), PROXY_URL (default http://localhost:8317).
 func (h host) codexSmoke() error {
+	profile := cmp.Or(h.getenv("CODEX_PROFILE"), proxyProfile)
+
 	return h.checkCodex(codexCheck{
-		home:     h.codexHome(),
-		profile:  cmp.Or(h.getenv("CODEX_PROFILE"), "proxy"),
-		proxyURL: cmp.Or(h.getenv("PROXY_URL"), "http://localhost:8317"),
-		hint:     "make codex profile",
+		home:      h.codexHome(),
+		profile:   profile,
+		proxyURL:  cmp.Or(h.getenv("PROXY_URL"), "http://localhost:8317"),
+		hint:      "make codex profile",
+		installed: profile == proxyProfile,
 	})
 }
 
@@ -304,6 +311,12 @@ func (h host) checkCodex(check codexCheck) error {
 
 	if info, err := os.Stat(config); err != nil || !info.Mode().IsRegular() {
 		return fmt.Errorf("no Codex config at %s; run: %s", config, check.hint)
+	}
+
+	if check.installed {
+		if err := h.checkCodexProvider(config, check.hint); err != nil {
+			return err
+		}
 	}
 
 	if !h.healthy(check.proxyURL) {
@@ -350,6 +363,57 @@ func (h host) checkCodex(check codexCheck) error {
 	h.log("ok: Codex answered pong over the WebSocket (%s, %s)", config, check.proxyURL)
 
 	return nil
+}
+
+// checkCodexProvider fails unless a config installed from codex/proxy.config.toml still selects the
+// template's provider. Without it Codex uses its built-in OpenAI provider and the smoke turn never
+// reaches Hara; this happens when Codex recreates a missing profile file with only its own state.
+// Profiles chosen with CODEX_PROFILE are the user's own and may name their provider differently.
+func (h host) checkCodexProvider(config, hint string) error {
+	template := filepath.Join(h.root, "codex", "proxy.config.toml")
+	want, err := codexModelProvider(template)
+
+	if err != nil {
+		return err
+	}
+
+	if want == "" {
+		return errors.New(template + " sets no model_provider")
+	}
+
+	got, err := codexModelProvider(config)
+
+	if err != nil {
+		return err
+	}
+
+	if got != want {
+		return fmt.Errorf("%s does not route Codex through Hara (model_provider is %q, want %q); run: %s", config, got, want, hint)
+	}
+
+	return nil
+}
+
+// codexModelProvider returns the top-level model_provider of a Codex config, or "" when it sets none.
+func codexModelProvider(path string) (string, error) {
+	content, err := os.ReadFile(path)
+
+	if err != nil {
+		return "", err
+	}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		// Keys after the first table header belong to that table, not to the top level.
+		if strings.HasPrefix(strings.TrimSpace(line), "[") {
+			break
+		}
+
+		if match := providerLine.FindStringSubmatch(line); match != nil {
+			return tomlUnescape(match[1]), nil
+		}
+	}
+
+	return "", nil
 }
 
 func (h host) healthy(proxyURL string) bool {

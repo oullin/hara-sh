@@ -128,6 +128,7 @@ A successful inference request alone does not prove refresh works: an existing a
 - **`must be outside the repository`**: point `LOCAL_DIR` or `BACKUP_DIR` at a directory outside the checkout, including through symlinks.
 - **`run hara from the hara-sh checkout`**: run Make from the repository root, or rebuild `bin/hara` with any Make action.
 - **Codex cannot fetch its key after an update**: Codex logs `provider auth command .../scripts/hara-key failed to start` and the proxy answers `401` with `Missing API key`. Run `make codex profile`, and `make t3` if you use T3 Code, so the profiles call `bin/hara`. Fix any `config.toml` line that `make codex profile` names, then restart Codex or T3 Code; a running session keeps the old command.
+- **`does not route Codex through Hara`**: the installed profile or T3 Code's Codex home no longer selects the provider named in `codex/proxy.config.toml`, so Codex would use its own OpenAI login and fail with `401` against `api.openai.com`. This happens when `~/.codex` is reset: Codex recreates a missing profile file holding only its own state. Run the command the error names, `make codex profile` or `make t3`, then restart Codex or T3 Code.
 - **The helper seems out of date**: delete `bin/hara`; the next Make action rebuilds it.
 
 ## Panel settings disappear
