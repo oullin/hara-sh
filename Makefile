@@ -23,8 +23,8 @@ SERVICES := proxy tailscale quota
 
 claude_ACTIONS := run backup
 claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
-codex_ACTIONS  := run profile smoke backup
-codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; smoke fails on the HTTP fallback; backup copies client settings outside the repository
+codex_ACTIONS  := run profile app smoke backup
+codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; app makes it the default of the Codex app's config.toml; smoke fails on the HTTP fallback; backup copies client settings outside the repository
 t3_ACTIONS     := setup smoke executor
 t3_HELP        := T3 Code: setup prepares Hara providers; smoke checks inference; executor installs authenticated MCP access for Claude, Codex, Cursor and Antigravity
 ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
@@ -94,7 +94,7 @@ $(HARA): $(HARA_SOURCES)
 	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src golang:1.27-alpine go build -trimpath -o /out/hara .; \
 	fi
 
-init up portless down purge status logs claude/run claude/backup codex/profile codex/smoke codex/backup t3/setup t3/smoke t3/executor code/panel: $(HARA)
+init up portless down purge status logs claude/run claude/backup codex/profile codex/app codex/smoke codex/backup t3/setup t3/smoke t3/executor code/panel: $(HARA)
 $(addprefix ops/,$(ops_ACTIONS)): $(HARA)
 
 ## --- The Docker Compose stack (Tailscale is optional) -----------------------------------
@@ -122,7 +122,8 @@ logs:
 
 ## --- claude, codex: the clients -----------------------------------------------------------
 # Claude Code speaks HTTP (with SSE streaming) to the proxy. Codex goes through it with the `proxy`
-# profile (codex/proxy.config.toml) over the Responses WebSocket; plain `codex` keeps its ChatGPT login.
+# profile (codex/proxy.config.toml) over the Responses WebSocket; plain `codex` keeps its ChatGPT login
+# until `make codex app` merges the provider into config.toml, which the Codex app reads from the Dock.
 
 claude/run:
 	@NODE_EXTRA_CA_CERTS=$(PORTLESS_CA) ANTHROPIC_BASE_URL=$(URL) ANTHROPIC_AUTH_TOKEN="$(API_KEY)" claude $(ARGS)
@@ -136,6 +137,10 @@ codex/run:
 
 codex/profile:
 	$(HARA) codex-profile
+
+# The Codex app takes no --profile: backs config.toml up, then sets the Hara provider in it, keeping the rest.
+codex/app:
+	$(HARA) codex-app
 
 codex/smoke:
 	$(HARA) codex-smoke

@@ -54,9 +54,21 @@ After connecting an account, verify that Codex stays on WebSockets:
 make codex smoke
 ```
 
-For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. It rewrites only `proxy.config.toml`: if you copied the provider into `config.toml`, it prints the file and line of each `auth.command` that no longer exists, and you edit those yourself. If you use T3 Code, run `make t3` again for the same reason. Codex reads the command when it starts, so restart Codex, or T3 Code, afterwards. Without Make, configure the URL and key directly in your client.
+For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. It rewrites only `proxy.config.toml`: if the provider is also in `config.toml`, it prints the file and line of each `auth.command` that no longer exists, and `make codex app` refreshes them. If you use T3 Code, run `make t3` again for the same reason. Codex reads the command when it starts, so restart Codex, or T3 Code, afterwards. Without Make, configure the URL and key directly in your client.
 
 Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback. Before sending a turn, it also checks that the installed profile still selects Hara's provider. A profile chosen with `CODEX_PROFILE` is yours, so its provider is not checked.
+
+### The Codex app
+
+The Codex app bundled with ChatGPT reads `~/.codex/config.toml` only: started from the Dock, it takes no `--profile`, and Codex 0.164 and later ignore a top-level `profile` key. Make Hara its provider instead:
+
+```bash
+make codex app
+```
+
+It first copies `config.toml` to the private backups (`make codex backup`), then merges the profile into it: `model_provider = "hara-proxy"`, `instant_interrupt = false` in `[features]`, and the `[model_providers.hara-proxy]` table with this checkout's `bin/hara` as `auth.command`. Every other key the app wrote (`notify`, `[desktop]`, marketplaces, plugins, `[mcp_servers]`) stays where it is, and the file keeps its comments. Running it again changes nothing but a moved helper path, so repeat it after moving the checkout. The file must be valid TOML; if the provider is set in a way the merge does not recognize, such as an inline table, it reports the line and leaves the file alone.
+
+Quit the Codex app with Cmd-Q and reopen it afterwards; it reads the file when it starts. From then on plain `codex` in a terminal uses Hara as well, with or without `--profile proxy`. To return to your ChatGPT login, delete `model_provider` from `config.toml`, or restore the backup.
 
 ## T3 Code
 

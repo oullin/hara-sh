@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // codexCheck is one Codex smoke run: the Codex home, its profile (empty uses config.toml), the
@@ -26,6 +28,14 @@ type codexCheck struct {
 	env       []string
 }
 
+// tomlTable is one [header] line of a TOML file with the lines that follow it, up to the next header,
+// and the comment lines right above the header.
+type tomlTable struct {
+	name     string
+	comments []string
+	lines    []string
+}
+
 const (
 	apiField        = "claude-api-key"
 	managementField = "management-password"
@@ -34,12 +44,17 @@ const (
 	fallbackWarning = "Falling back from WebSockets"
 	defaultCodexURL = "http://localhost:8317/v1"
 	proxyProfile    = "proxy"
+	// Hara's own table in a Codex config, replaced whole by `make codex app`.
+	haraProviderTable = "model_providers.hara-proxy"
 )
 
 var (
 	baseURLLine     = regexp.MustCompile(`(?m)^base_url = .*$`)
 	authCommandLine = regexp.MustCompile(`^\s*auth\.command\s*=\s*"((?:[^"\\]|\\.)*)"`)
 	providerLine    = regexp.MustCompile(`^\s*model_provider\s*=\s*"((?:[^"\\]|\\.)*)"`)
+	tomlHeaderLine  = regexp.MustCompile(`^\s*\[\[?\s*([^\]]*?)\s*\]\]?\s*(?:#.*)?$`)
+	tomlKeyLine     = regexp.MustCompile(`^\s*("?[\w.-]+"?)\s*=\s*(.*?)\s*$`)
+	tomlNameQuotes  = strings.NewReplacer(`"`, "", `'`, "", " ", "")
 )
 
 // key prints a credential from private local state; HARA_SECRET_PROVIDER=op reads 1Password instead.
@@ -124,7 +139,7 @@ func (h host) backup(args []string) error {
 		files  []string
 	}{
 		"claude": {"Claude", filepath.Join(h.home, ".claude"), []string{"settings.local.json", "CLAUDE.md", ".claude.json", "settings.json"}},
-		"codex":  {"Codex", filepath.Join(h.home, ".codex"), []string{"config.toml", "openai.config.toml", "proxy.config.toml"}},
+		"codex":  {"Codex", h.codexHome(), []string{"config.toml", "openai.config.toml", "proxy.config.toml"}},
 	}
 
 	if len(args) != 1 {
@@ -187,6 +202,210 @@ func (h host) codexProfile() error {
 	return nil
 }
 
+// codexApp makes Hara the provider of the Codex app, which reads config.toml of the usual Codex home
+// and takes no --profile from the Dock. The template's model_provider, [features] keys and
+// [model_providers.hara-proxy] table are merged into the file in place; every other line stays, and the
+// previous file goes to the private backups first.
+func (h host) codexApp() error {
+	if err := h.backup([]string{"codex"}); err != nil {
+		return err
+	}
+
+	rendered, err := h.renderCodexConfig(defaultCodexURL)
+
+	if err != nil {
+		return err
+	}
+
+	dest := filepath.Join(h.codexHome(), "config.toml")
+	current, err := os.ReadFile(dest)
+
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	merged, err := mergeCodexApp(string(current), rendered)
+
+	if err != nil {
+		return fmt.Errorf("%s: %w", dest, err)
+	}
+
+	if err := checkCodexApp(merged, filepath.Join(h.root, "bin", "hara"), defaultCodexURL); err != nil {
+		return fmt.Errorf("%s: %w", dest, err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+		return err
+	}
+
+	if err := writePrivate(dest, []byte(merged)); err != nil {
+		return err
+	}
+
+	h.log("installed the Hara provider in %s; quit and reopen the Codex app (plain codex uses it too)", dest)
+	h.warnMissingAuthCommands(h.codexHome())
+
+	return nil
+}
+
+// mergeCodexApp applies the rendered template to current: top-level keys and the keys of tables the
+// app also writes, such as [features], are set in place, Hara's own provider table is replaced whole,
+// and what the template lacks is left alone. A file that is not TOML is reported, not rewritten.
+func mergeCodexApp(current, rendered string) (string, error) {
+	if strings.TrimSpace(current) != "" {
+		if err := toml.Unmarshal([]byte(current), &map[string]any{}); err != nil {
+			return "", fmt.Errorf("not valid TOML: %w", err)
+		}
+	}
+
+	preamble, tables := splitTOML(current)
+	keys, additions := splitTOML(rendered)
+	preamble = mergeTOMLKeys(preamble, keys)
+
+	for _, addition := range additions {
+		i := slices.IndexFunc(tables, func(table tomlTable) bool { return table.name == addition.name })
+
+		switch {
+		case i < 0:
+			tables = append(tables, addition)
+		case addition.name == haraProviderTable:
+			tables[i].lines = addition.lines
+		default:
+			tables[i].lines = mergeTOMLKeys(tables[i].lines, addition.lines)
+		}
+	}
+
+	return joinTOML(preamble, tables), nil
+}
+
+// checkCodexApp parses content and confirms that Codex would reach Hara through it; the merge keeps
+// the file's own layout, so a key set in a way it does not see, such as an inline table, surfaces here.
+func checkCodexApp(content, command, baseURL string) error {
+	config := map[string]any{}
+
+	if err := toml.Unmarshal([]byte(content), &config); err != nil {
+		return fmt.Errorf("the merged file is not valid TOML (%w); add the provider by hand", err)
+	}
+
+	for _, want := range []struct {
+		path  string
+		value any
+	}{
+		{"model_provider", "hara-proxy"},
+		{"features.instant_interrupt", false},
+		{haraProviderTable + ".base_url", baseURL},
+		{haraProviderTable + ".auth.command", command},
+	} {
+		if got := tomlLookup(config, want.path); got != want.value {
+			return fmt.Errorf("the merged file sets %s = %v, not %v; add the provider by hand", want.path, got, want.value)
+		}
+	}
+
+	return nil
+}
+
+func tomlLookup(config map[string]any, path string) any {
+	var value any = config
+
+	for _, key := range strings.Split(path, ".") {
+		table, ok := value.(map[string]any)
+
+		if !ok {
+			return nil
+		}
+
+		value = table[key]
+	}
+
+	return value
+}
+
+// splitTOML returns the lines before the first table header and each table with its header line.
+// Comments and blank lines stay with the lines they follow, except comments right above a header,
+// which describe that table. Names drop quotes: [a."b"] is a.b.
+func splitTOML(content string) ([]string, []tomlTable) {
+	var (
+		preamble []string
+		tables   []tomlTable
+	)
+
+	previous := &preamble
+
+	for _, line := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
+		if match := tomlHeaderLine.FindStringSubmatch(line); match != nil {
+			var comments []string
+
+			*previous, comments = detachComments(*previous)
+			tables = append(tables, tomlTable{name: tomlNameQuotes.Replace(match[1]), comments: comments, lines: []string{line}})
+			previous = &tables[len(tables)-1].lines
+		} else {
+			*previous = append(*previous, line)
+		}
+	}
+
+	return preamble, tables
+}
+
+// detachComments splits the run of comment lines that ends lines off it.
+func detachComments(lines []string) ([]string, []string) {
+	end := len(lines)
+
+	for end > 0 && strings.HasPrefix(strings.TrimSpace(lines[end-1]), "#") {
+		end--
+	}
+
+	return lines[:end], lines[end:]
+}
+
+// joinTOML is the inverse of splitTOML, with one blank line between the parts.
+func joinTOML(preamble []string, tables []tomlTable) string {
+	chunks := []string{strings.Join(trimBlankLines(preamble), "\n")}
+
+	for _, table := range tables {
+		chunks = append(chunks, strings.Join(append(slices.Clone(table.comments), trimBlankLines(table.lines)...), "\n"))
+	}
+
+	return strings.Join(slices.DeleteFunc(chunks, func(chunk string) bool { return chunk == "" }), "\n\n") + "\n"
+}
+
+// mergeTOMLKeys sets each key assigned in from on into, replacing its line or appending one.
+func mergeTOMLKeys(into, from []string) []string {
+	for _, line := range from {
+		if match := tomlKeyLine.FindStringSubmatch(line); match != nil {
+			into = setTOMLKey(into, strings.Trim(match[1], `"`), match[2])
+		}
+	}
+
+	return into
+}
+
+func setTOMLKey(lines []string, key, value string) []string {
+	assigned := regexp.MustCompile(`^\s*"?` + regexp.QuoteMeta(key) + `"?\s*=`)
+
+	if i := slices.IndexFunc(lines, assigned.MatchString); i >= 0 {
+		lines[i] = key + " = " + value
+
+		return lines
+	}
+
+	return append(trimBlankLines(lines), key+" = "+value)
+}
+
+func trimBlankLines(lines []string) []string {
+	blank := func(line string) bool { return strings.TrimSpace(line) == "" }
+	start, end := 0, len(lines)
+
+	for start < end && blank(lines[start]) {
+		start++
+	}
+
+	for end > start && blank(lines[end-1]) {
+		end--
+	}
+
+	return lines[start:end]
+}
+
 // warnMissingAuthCommands names each Codex config in home whose auth command no longer exists. An
 // install rewrites only its own file, so a provider added to config.toml by hand keeps calling a removed
 // helper, such as the scripts/hara-key that bin/hara replaced, and Codex then sends no key.
@@ -219,33 +438,43 @@ func (h host) codexHome() string {
 	return cmp.Or(h.getenv("CODEX_HOME"), filepath.Join(h.home, ".codex"))
 }
 
-// installCodexConfig writes codex/proxy.config.toml to dest with this checkout's absolute helper
-// path, and baseURL (ending in /v1) in place of the template's base_url.
+// installCodexConfig writes the rendered codex/proxy.config.toml to dest.
 func (h host) installCodexConfig(dest, baseURL string) error {
-	command := filepath.Join(h.root, "bin", "hara")
-
-	if info, err := os.Stat(command); err != nil || !info.Mode().IsRegular() {
-		return errors.New("bin/hara is missing; build it with any make action, such as make codex profile")
-	}
-
-	template, err := os.ReadFile(filepath.Join(h.root, "codex", "proxy.config.toml"))
+	profile, err := h.renderCodexConfig(baseURL)
 
 	if err != nil {
 		return err
 	}
-
-	if !bytes.Contains(template, []byte(keyPlaceholder)) {
-		return errors.New("codex/proxy.config.toml has no " + keyPlaceholder + " placeholder")
-	}
-
-	profile := strings.ReplaceAll(string(template), keyPlaceholder, tomlEscape(command))
-	profile = baseURLLine.ReplaceAllLiteralString(profile, `base_url = "`+tomlEscape(baseURL)+`"`)
 
 	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 		return err
 	}
 
 	return writePrivate(dest, []byte(profile))
+}
+
+// renderCodexConfig returns codex/proxy.config.toml with this checkout's absolute helper path, and
+// baseURL (ending in /v1) in place of the template's base_url.
+func (h host) renderCodexConfig(baseURL string) (string, error) {
+	command := filepath.Join(h.root, "bin", "hara")
+
+	if info, err := os.Stat(command); err != nil || !info.Mode().IsRegular() {
+		return "", errors.New("bin/hara is missing; build it with any make action, such as make codex profile")
+	}
+
+	template, err := os.ReadFile(filepath.Join(h.root, "codex", "proxy.config.toml"))
+
+	if err != nil {
+		return "", err
+	}
+
+	if !bytes.Contains(template, []byte(keyPlaceholder)) {
+		return "", errors.New("codex/proxy.config.toml has no " + keyPlaceholder + " placeholder")
+	}
+
+	profile := strings.ReplaceAll(string(template), keyPlaceholder, tomlEscape(command))
+
+	return baseURLLine.ReplaceAllLiteralString(profile, `base_url = "`+tomlEscape(baseURL)+`"`), nil
 }
 
 func tomlEscape(value string) string {
