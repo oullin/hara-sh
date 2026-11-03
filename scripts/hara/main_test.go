@@ -10,10 +10,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // fake records each command as one line, with the Compose prefix shortened to "compose".
@@ -596,6 +599,247 @@ func TestCodexProfileWarnsAboutMissingAuthCommands(t *testing.T) {
 
 	if lines := strings.Count(h.out.String(), "no longer exists"); lines != 1 || !strings.Contains(h.out.String(), want) {
 		t.Errorf("output:\n%s\nwant one warning:\n%s", h.out, want)
+	}
+}
+
+// appTemplate is codex/proxy.config.toml as `make codex app` reads it: a top-level key, a table the
+// Codex app writes too, and Hara's own provider table.
+const appTemplate = `# Codex profile: select with codex --profile proxy.
+model_provider = "hara-proxy"
+
+[features]
+# Queue steering input until the current response finishes.
+instant_interrupt = false
+
+[model_providers.hara-proxy]
+name = "hara local proxy"
+base_url = "http://localhost:8317/v1"
+wire_api = "responses"
+supports_websockets = true
+# The proxy's client key through bin/hara.
+auth.command = "` + keyPlaceholder + `"
+auth.args = ["key", "claude-api-key"]
+`
+
+// appConfig is a config.toml as the Codex app writes it, plus a stale Hara provider added by hand.
+const appConfig = `notify = ["/Applications/Codex.app/Contents/MacOS/notify", "turn-ended"]
+model_provider = "openai"
+
+[features]
+web_search_request = true
+instant_interrupt = true
+
+[desktop]
+followUpQueueMode = "queue"
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[mcp_servers.node_repl]
+args = []
+command = "/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node_repl"
+
+[mcp_servers.node_repl.env]
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"/opt/codex/browser-service.mjs"}'
+CODEX_HOME = "/opt/codex"
+
+# Hara, added by hand.
+[model_providers."hara-proxy"]
+name = "old name"
+base_url = "http://localhost:9999/v1"
+auth.command = "/old/checkout/scripts/hara-key"
+stale = true
+
+[model_providers.other]
+name = "another provider"
+`
+
+func newCodexAppHost(t *testing.T, config string) (testHost, string) {
+	t.Helper()
+
+	codexHome := filepath.Join(t.TempDir(), `quote"and\slash`, "codex")
+	h := newTestHost(t, map[string]string{"CODEX_HOME": codexHome})
+
+	for path, content := range map[string]string{"codex/proxy.config.toml": appTemplate, "bin/hara": ""} {
+		if err := os.WriteFile(filepath.Join(h.root, path), []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if config != "" {
+		if err := os.MkdirAll(codexHome, 0o700); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return h, filepath.Join(codexHome, "config.toml")
+}
+
+func parseTOML(t *testing.T, path string) map[string]any {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := map[string]any{}
+
+	if err := toml.Unmarshal(content, &config); err != nil {
+		t.Fatalf("%s: %v\n%s", path, err, content)
+	}
+
+	return config
+}
+
+func TestCodexAppWritesAFreshConfig(t *testing.T) {
+	h, config := newCodexAppHost(t, "")
+
+	if err := h.dispatch([]string{"codex-app"}); err != nil {
+		t.Fatal(err)
+	}
+
+	content, _ := os.ReadFile(config)
+	escaped := strings.ReplaceAll(strings.ReplaceAll(filepath.Join(h.root, "bin", "hara"), `\`, `\\`), `"`, `\"`)
+	want := strings.ReplaceAll(strings.TrimPrefix(appTemplate, "# Codex profile: select with codex --profile proxy.\n"), keyPlaceholder, escaped)
+
+	if string(content) != want {
+		t.Errorf("config.toml:\n%s\nwant:\n%s", content, want)
+	}
+
+	if info, _ := os.Stat(config); info.Mode().Perm() != 0o600 {
+		t.Errorf("mode = %v", info.Mode().Perm())
+	}
+
+	if parsed := parseTOML(t, config); tomlLookup(parsed, "model_providers.hara-proxy.auth.command") != filepath.Join(h.root, "bin", "hara") {
+		t.Errorf("auth.command = %v", tomlLookup(parsed, "model_providers.hara-proxy.auth.command"))
+	}
+
+	if !strings.Contains(h.out.String(), "installed the Hara provider in "+config+"; quit and reopen the Codex app") {
+		t.Errorf("output:\n%s", h.out)
+	}
+
+	if _, err := os.Stat(filepath.Join(h.state, "backups", "codex", "config.toml")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("backed up a config that did not exist: %v", err)
+	}
+}
+
+func TestCodexAppKeepsWhatTheAppWrote(t *testing.T) {
+	h, config := newCodexAppHost(t, appConfig)
+
+	if err := h.dispatch([]string{"codex-app"}); err != nil {
+		t.Fatal(err)
+	}
+
+	backup, _ := os.ReadFile(filepath.Join(h.state, "backups", "codex", "config.toml"))
+
+	if string(backup) != appConfig {
+		t.Errorf("backup:\n%s", backup)
+	}
+
+	content, _ := os.ReadFile(config)
+	before, after := parseTOML(t, filepath.Join(h.state, "backups", "codex", "config.toml")), parseTOML(t, config)
+
+	for _, path := range []string{"notify", "features.web_search_request", "desktop.followUpQueueMode", "plugins.browser@openai-bundled.enabled",
+		"mcp_servers.node_repl.command", "mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES", "model_providers.other.name"} {
+		if want, got := tomlLookup(before, path), tomlLookup(after, path); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s = %v, want %v", path, got, want)
+		}
+	}
+
+	for path, want := range map[string]any{
+		"model_provider":                          "hara-proxy",
+		"features.instant_interrupt":              false,
+		"model_providers.hara-proxy.name":         "hara local proxy",
+		"model_providers.hara-proxy.base_url":     defaultCodexURL,
+		"model_providers.hara-proxy.auth.command": filepath.Join(h.root, "bin", "hara"),
+		"model_providers.hara-proxy.stale":        nil,
+	} {
+		if got := tomlLookup(after, path); got != want {
+			t.Errorf("%s = %v, want %v", path, got, want)
+		}
+	}
+
+	for _, line := range []string{"# Hara, added by hand.\n[model_providers.hara-proxy]\n", "web_search_request = true\ninstant_interrupt = false\n", "# The proxy's client key through bin/hara.\n"} {
+		if !strings.Contains(string(content), line) {
+			t.Errorf("config.toml lacks %q:\n%s", line, content)
+		}
+	}
+
+	if strings.Count(string(content), "[features]") != 1 || strings.Count(string(content), "model_provider = ") != 1 {
+		t.Errorf("config.toml repeats a key or table:\n%s", content)
+	}
+}
+
+func TestCodexAppRunsAgainAndRefreshesTheHelperPath(t *testing.T) {
+	h, config := newCodexAppHost(t, appConfig)
+
+	if err := h.dispatch([]string{"codex-app"}); err != nil {
+		t.Fatal(err)
+	}
+
+	first, _ := os.ReadFile(config)
+
+	if err := h.dispatch([]string{"codex-app"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if second, _ := os.ReadFile(config); string(second) != string(first) {
+		t.Errorf("the second run changed the file:\n%s\nfirst:\n%s", second, first)
+	}
+
+	moved := filepath.Join(t.TempDir(), "moved")
+
+	if err := os.Rename(h.root, moved); err != nil {
+		t.Fatal(err)
+	}
+
+	h.root = moved
+
+	if err := h.dispatch([]string{"codex-app"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := tomlLookup(parseTOML(t, config), "model_providers.hara-proxy.auth.command"); got != filepath.Join(moved, "bin", "hara") {
+		t.Errorf("auth.command = %v after the move", got)
+	}
+
+	if strings.Contains(h.out.String(), "no longer exists") {
+		t.Errorf("warned about the provider it just installed:\n%s", h.out)
+	}
+}
+
+func TestCodexAppLeavesAConfigItCannotMerge(t *testing.T) {
+	for _, tc := range []struct{ config, want string }{
+		{"model_provider = [unterminated\n", "not valid TOML"},
+		{"features = { instant_interrupt = true }\n", "not valid TOML"},
+		{"[model_providers]\nhara-proxy = { base_url = \"http://elsewhere/v1\" }\n", "add the provider by hand"},
+	} {
+		h, config := newCodexAppHost(t, tc.config)
+		err := h.dispatch([]string{"codex-app"})
+
+		if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), config) {
+			t.Errorf("%q: err = %v, want %s", tc.config, err, tc.want)
+		}
+
+		if content, _ := os.ReadFile(config); string(content) != tc.config {
+			t.Errorf("%q was rewritten:\n%s", tc.config, content)
+		}
+	}
+
+	h, _ := newCodexAppHost(t, "")
+
+	if err := os.Remove(filepath.Join(h.root, "bin", "hara")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := h.dispatch([]string{"codex-app"}); err == nil || !strings.Contains(err.Error(), "bin/hara is missing") {
+		t.Fatalf("installed without the helper: %v", err)
 	}
 }
 
