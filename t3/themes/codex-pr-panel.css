@@ -1,0 +1,17 @@
+/* PR-only appearance. Global interface remains 18px.
+   Apply these two rules using DevTools Elements > Styles, not Console.
+   DevTools rules last until T3 reloads and must then be reapplied. */
+html body [aria-label="Workspace panel: Pull requests"] {
+  --text-sm: 16.5px;
+  --text-xs: 14px;
+  --text-2xs: 13px;
+  --text-base: 19px;
+  --spacing: 5px;
+  padding: 0 !important;
+}
+html body [aria-label="Workspace panel: Pull requests"] [class~="group/pr-row"] {
+  margin-inline: 12px;
+  margin-bottom: 12px;
+  width: calc(100% - 24px);
+  box-sizing: border-box;
+}

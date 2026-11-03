@@ -282,10 +282,11 @@ func (h host) t3Smoke(settings t3Settings) error {
 	}
 
 	return h.checkCodex(codexCheck{
-		home:     settings.codexHome,
-		proxyURL: settings.local,
-		hint:     "make t3",
-		env:      append(settings.caEnv(), "CODEX_HOME="+settings.codexHome),
+		home:      settings.codexHome,
+		proxyURL:  settings.local,
+		hint:      "make t3",
+		installed: true,
+		env:       append(settings.caEnv(), "CODEX_HOME="+settings.codexHome),
 	})
 }
 

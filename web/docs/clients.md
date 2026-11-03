@@ -56,7 +56,7 @@ make codex smoke
 
 For another host or port, edit `base_url` in the installed profile. `URL=` does not rewrite it. Run `make codex profile` again if you move this checkout or if an update changes the helper; profiles installed before `bin/hara` call the removed `scripts/hara-key`. It rewrites only `proxy.config.toml`: if the provider is also in `config.toml`, it prints the file and line of each `auth.command` that no longer exists, and `make codex app` refreshes them. If you use T3 Code, run `make t3` again for the same reason. Codex reads the command when it starts, so restart Codex, or T3 Code, afterwards. Without Make, configure the URL and key directly in your client.
 
-Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback.
+Plain `codex` continues to use your usual login. Select the `proxy` profile only when you want Hara. A working answer does not prove WebSocket transport; the smoke check rejects HTTP fallback. Before sending a turn, it also checks that the installed profile still selects Hara's provider. A profile chosen with `CODEX_PROFILE` is yours, so its provider is not checked.
 
 ### The Codex app
 

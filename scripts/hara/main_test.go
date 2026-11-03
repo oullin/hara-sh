@@ -854,15 +854,74 @@ func TestCodexSmoke(t *testing.T) {
 	codexHome := t.TempDir()
 	env := map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": healthy.URL}
 
+	// The expected provider comes from the checkout's template, so the test names its own.
+	smokeHost := func(env map[string]string, template string) testHost {
+		h := newTestHost(t, env)
+
+		if err := os.WriteFile(filepath.Join(h.root, "codex", "proxy.config.toml"), []byte(template), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		h.fake.respond = func(_ string, cmd *exec.Cmd) error {
+			fmt.Fprintln(cmd.Stdout, "pong")
+
+			return nil
+		}
+
+		return h
+	}
+
+	template := "# Hara\nmodel_provider = \"hara-test\"\n\n[model_providers.hara-test]\nname = \"hara\"\n"
+
 	if err := newTestHost(t, env).dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "no Codex config at "+filepath.Join(codexHome, "proxy.config.toml")+"; run: make codex profile") {
 		t.Fatalf("err = %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(codexHome, "proxy.config.toml"), nil, 0o600); err != nil {
+	profile := filepath.Join(codexHome, "proxy.config.toml")
+
+	// Configs that leave Codex on its built-in OpenAI provider fail before any turn is sent.
+	for _, tc := range []struct{ content, provider string }{
+		{"", ""},
+		{"[tui]\nscreen_reader_detection_done = true\n", ""},
+		{"[profiles.work]\nmodel_provider = \"hara-test\"\n", ""},
+		{"model_provider = \"openai\"\n", "openai"},
+	} {
+		if err := os.WriteFile(profile, []byte(tc.content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		h := smokeHost(env, template)
+		want := fmt.Sprintf("%s does not route Codex through Hara (model_provider is %q, want \"hara-test\"); run: make codex profile", profile, tc.provider)
+
+		if err := h.dispatch([]string{"codex-smoke"}); err == nil || err.Error() != want {
+			t.Errorf("config %q: err = %v, want %q", tc.content, err, want)
+		}
+
+		if len(h.fake.calls) != 0 {
+			t.Errorf("config %q ran %v", tc.content, h.fake.calls)
+		}
+	}
+
+	if err := smokeHost(env, "base_url = \"x\"\n").dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "sets no model_provider") {
+		t.Errorf("template without a provider: err = %v", err)
+	}
+
+	// A profile chosen with CODEX_PROFILE is the user's own, so its provider name is not checked.
+	if err := os.WriteFile(filepath.Join(codexHome, "mine.config.toml"), []byte("model_provider = \"my-hara\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	down := newTestHost(t, map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": "http://127.0.0.1:1"})
+	mine := smokeHost(map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": healthy.URL, "CODEX_PROFILE": "mine"}, template)
+
+	if err := mine.dispatch([]string{"codex-smoke"}); err != nil {
+		t.Errorf("custom profile: %v", err)
+	}
+
+	if err := os.WriteFile(profile, []byte(template), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	down := smokeHost(map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": "http://127.0.0.1:1"}, template)
 
 	if err := down.dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "does not answer") {
 		t.Fatalf("err = %v", err)
@@ -873,7 +932,7 @@ func TestCodexSmoke(t *testing.T) {
 		{"Pong.\n", "did not answer pong"},
 		{"thinking\npong\n", ""},
 	} {
-		h := newTestHost(t, env)
+		h := smokeHost(env, template)
 		h.fake.respond = func(_ string, cmd *exec.Cmd) error {
 			fmt.Fprint(cmd.Stdout, tc.output)
 

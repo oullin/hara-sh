@@ -306,6 +306,20 @@ func TestT3Smoke(t *testing.T) {
 		t.Errorf("output: %s", h.out)
 	}
 
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("[tui]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	h.fake.calls = nil
+
+	if err := h.dispatch([]string{"t3", "smoke"}); err == nil || !strings.Contains(err.Error(), `does not route Codex through Hara (model_provider is "", want "hara-proxy"); run: make t3`) {
+		t.Errorf("smoke accepted a Codex home without the Hara provider: %v", err)
+	}
+
+	if slices.Contains(h.fake.calls, codex) {
+		t.Errorf("smoke sent a Codex turn: %v", h.fake.calls)
+	}
+
 	skip := newT3Host(t, env)
 
 	if err := skip.dispatch([]string{"t3", "setup"}); err != nil {

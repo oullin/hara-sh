@@ -1,0 +1,64 @@
+{
+  "source": "/Applications/ChatGPT.app/Contents/Resources/app.asar",
+  "preset": "Codex",
+  "presets": {
+    "dark": {
+      "accent": "#339cff",
+      "contrast": 60,
+      "fonts": {
+        "code": null,
+        "ui": null
+      },
+      "ink": "#ffffff",
+      "opaqueWindows": false,
+      "semanticColors": {
+        "diffAdded": "#40c977",
+        "diffRemoved": "#fa423e",
+        "skill": "#ad7bf9"
+      },
+      "surface": "#181818"
+    },
+    "light": {
+      "accent": "#339cff",
+      "contrast": 45,
+      "fonts": {
+        "code": null,
+        "ui": null
+      },
+      "ink": "#1a1c1f",
+      "opaqueWindows": false,
+      "semanticColors": {
+        "diffAdded": "#00a240",
+        "diffRemoved": "#ba2623",
+        "skill": "#924ff7"
+      },
+      "surface": "#ffffff"
+    }
+  },
+  "appearanceMode": "system",
+  "fontSizeInterface": 18,
+  "fontSizePrompt": 16,
+  "fontSizeCode": 14,
+  "fontSizeTerminal": 14,
+  "fontSmoothing": true,
+  "limitations": [
+    "T3 determines component layout, spacing, and syntax highlighting.",
+    "T3 has no dedicated content font size setting.",
+    "Message, search, warning, and scrollbar roles use the nearest available Codex equivalent."
+  ],
+  "chatWidth": "comfortable",
+  "sidebarDark": "#292929",
+  "sidebarSource": "Sampled from user-provided Codex icon rail screenshot",
+  "backgroundDark": "#1e1e1e",
+  "backgroundSource": "Codex thread sidebar from user screenshot; T3 shares this color between the right panel and chat canvas.",
+  "interfaceScaleNote": "Global interface restored to 18px. Temporary PR-only DevTools stylesheet saved as codex-pr-panel.css; reapplied after reload.",
+  "prPanel": {
+    "titleSizeVariable": "16.5px",
+    "metadataSizeVariable": "14px",
+    "smallSizeVariable": "13px",
+    "rowSideMargins": "12px",
+    "rowBottomMargin": "12px",
+    "outerPadding": "0",
+    "persistence": "Manual reapply after reload, using codex-pr-panel.css and backup RESTORE.txt"
+  }
+}
