@@ -5,8 +5,8 @@ import { onKeyStroke, useSessionStorage, watchDebounced } from '@vueuse/core';
 import { defineAsyncComponent, nextTick, ref } from 'vue';
 import { withBase } from 'vitepress';
 import VPNavBarSearchButton from 'vitepress/dist/client/theme-default/components/VPNavBarSearchButton.vue';
-import type { Result } from '../../../worker/types.ts';
-import { SemanticSearch } from './search.ts';
+import type { Result } from '@worker/types.ts';
+import { SemanticSearch } from '@docs/.vitepress/theme/search.ts';
 
 const VPLocalSearchBox = defineAsyncComponent(() => import('vitepress/dist/client/theme-default/components/VPLocalSearchBox.vue'));
 

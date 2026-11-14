@@ -9,7 +9,11 @@ export default defineConfig(
 	{
 		plugins: [vue(), tailwindcss(), cloudflare()],
 		resolve: {
-			alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+			alias: {
+				'@': fileURLToPath(new URL('./src', import.meta.url)),
+				'@docs': fileURLToPath(new URL('./docs', import.meta.url)),
+				'@worker': fileURLToPath(new URL('./worker', import.meta.url)),
+			},
 		},
 	},
 );

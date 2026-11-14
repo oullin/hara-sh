@@ -12,7 +12,11 @@
     "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "paths": {
+      "@docs/*": ["./docs/*"],
+      "@worker/*": ["./worker/*"]
+    }
   },
   "include": ["worker/**/*.ts", ".cloudflare/types/index.d.ts"]
 }

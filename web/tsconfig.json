@@ -13,9 +13,10 @@
   ],
   "compilerOptions": {
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@docs/*": ["./docs/*"],
+      "@test/*": ["./test/*"],
+      "@worker/*": ["./worker/*"]
     }
   }
 }

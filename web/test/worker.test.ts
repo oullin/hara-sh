@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CANONICAL_HOST, DOCS_HOST } from '@/../worker/host';
-import worker from '@/../worker/index';
-import { search } from './fakes';
+import { CANONICAL_HOST, DOCS_HOST } from '@worker/host';
+import worker from '@worker/index';
+import { search } from '@test/fakes';
 
 function env() {
 	return { ...search(), ASSETS: { fetch: vi.fn((request: Request) => Promise.resolve(new Response(`asset ${new URL(request.url).pathname}`))) } };

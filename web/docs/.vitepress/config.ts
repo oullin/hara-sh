@@ -129,7 +129,11 @@ export default defineConfig({
 	vite: {
 		// VitePress's documented way to replace a theme component: Search.vue asks the Worker first, then falls back to local search.
 		resolve: {
-			alias: [{ find: /^.*\/VPNavBarSearch\.vue$/, replacement: fileURLToPath(new URL('./theme/Search.vue', import.meta.url)) }],
+			alias: [
+				{ find: /^.*\/VPNavBarSearch\.vue$/, replacement: fileURLToPath(new URL('./theme/Search.vue', import.meta.url)) },
+				{ find: '@docs', replacement: fileURLToPath(new URL('..', import.meta.url)) },
+				{ find: '@worker', replacement: fileURLToPath(new URL('../../worker', import.meta.url)) },
+			],
 		},
 	},
 });

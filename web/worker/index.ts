@@ -1,5 +1,5 @@
-import { CANONICAL_HOST, DOCS_HOST } from './host.ts';
-import { api, type SearchEnv } from './search.ts';
+import { CANONICAL_HOST, DOCS_HOST } from '@worker/host.ts';
+import { api, type SearchEnv } from '@worker/search.ts';
 
 // Public landing page and documentation share static assets; the proxy runs separately.
 type AssetsEnv = {

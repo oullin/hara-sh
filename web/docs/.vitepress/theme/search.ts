@@ -1,4 +1,4 @@
-import type { Nullable, Result } from '../../../worker/types.ts';
+import type { Nullable, Result } from '@worker/types.ts';
 
 export type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 

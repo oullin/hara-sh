@@ -1,5 +1,5 @@
-import { type Chunk, documents } from './docs.ts';
-import type { Nullable, Result } from './types.ts';
+import { type Chunk, documents } from '@worker/docs.ts';
+import type { Nullable, Result } from '@worker/types.ts';
 
 export const MODEL = '@cf/google/embeddinggemma-2';
 

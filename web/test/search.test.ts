@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DOCS_HOST } from '@/../worker/host';
-import worker from '@/../worker/index';
-import { chunks, documents } from '@/../worker/docs';
-import { Search } from '@/../worker/search';
-import { search } from './fakes';
+import { DOCS_HOST } from '@worker/host';
+import worker from '@worker/index';
+import { chunks, documents } from '@worker/docs';
+import { Search } from '@worker/search';
+import { search } from '@test/fakes';
 
 function env() {
 	return { ...search(), ASSETS: { fetch: vi.fn(() => Promise.resolve(new Response('asset'))) } };

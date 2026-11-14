@@ -1,5 +1,5 @@
 // Bundled at build time, so the index matches the Markdown that VitePress renders.
-const files = import.meta.glob<string>('../docs/*.md', { eager: true, import: 'default', query: '?raw' });
+const files = import.meta.glob<string>('@docs/*.md', { eager: true, import: 'default', query: '?raw' });
 
 // Even at 1.5 characters per token, 12,000 characters stay under the model's 8,192-token window.
 export const CHUNK_CHARS = 12_000;

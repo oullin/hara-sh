@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SemanticSearch } from '@/../docs/.vitepress/theme/search';
-import { DOCS_HOST } from '@/../worker/host';
-import worker from '@/../worker/index';
-import { search } from './fakes';
+import { SemanticSearch } from '@docs/.vitepress/theme/search';
+import { DOCS_HOST } from '@worker/host';
+import worker from '@worker/index';
+import { search } from '@test/fakes';
 
 // Sends the docs client's requests to the real Worker handler with in-memory bindings.
 function client() {

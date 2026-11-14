@@ -1,4 +1,4 @@
-import type { Bindings } from './index.ts';
+import type { Bindings } from '@worker/index.ts';
 
 // Checked by `npm run worker:types` only: fails when cloudflare.config.ts stops providing what the handler reads.
 type Assert<T extends true> = T;

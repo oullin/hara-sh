@@ -1,4 +1,4 @@
-import type { Embedder, Store } from '@/../worker/search';
+import type { Embedder, Store } from '@worker/search';
 
 const DIMENSIONS = 768;
 

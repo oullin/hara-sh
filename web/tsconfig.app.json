@@ -11,9 +11,10 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@docs/*": ["./docs/*"],
+      "@test/*": ["./test/*"],
+      "@worker/*": ["./worker/*"]
     }
   },
   "include": [
