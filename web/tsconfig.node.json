@@ -19,5 +19,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "cloudflare.config.ts", "worker/**/*.ts", "docs/.vitepress/**/*.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "cloudflare.config.ts", "worker/**/*.ts", "docs/.vitepress/**/*.ts"],
+  // Needs the generated Cloudflare types; `npm run worker:types` checks it.
+  "exclude": ["worker/check.ts"]
 }

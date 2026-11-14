@@ -126,4 +126,10 @@ export default defineConfig({
 		// Page head data is also managed during client-side navigation.
 		pageData.frontmatter.head = [...(pageData.frontmatter.head ?? []), ...head];
 	},
+	vite: {
+		// VitePress's documented way to replace a theme component: Search.vue asks the Worker first, then falls back to local search.
+		resolve: {
+			alias: [{ find: /^.*\/VPNavBarSearch\.vue$/, replacement: fileURLToPath(new URL('./theme/Search.vue', import.meta.url)) }],
+		},
+	},
 });
