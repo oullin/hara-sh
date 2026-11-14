@@ -1,9 +1,12 @@
-import { CANONICAL_HOST, DOCS_HOST } from './host.ts';
+import { CANONICAL_HOST, DOCS_HOST } from '@worker/host.ts';
+import { api, type SearchEnv } from '@worker/search.ts';
 
 // Public landing page and documentation share static assets; the proxy runs separately.
 type AssetsEnv = {
 	ASSETS: { fetch(request: Request): Promise<Response> };
 };
+
+export type Bindings = AssetsEnv & SearchEnv;
 
 function canonicalOriginRedirect(url: URL): Response | undefined {
 	if (url.hostname === `www.${CANONICAL_HOST}`) {
@@ -58,8 +61,28 @@ async function fetchDocsAsset(url: URL, request: Request, env: AssetsEnv): Promi
 	return response;
 }
 
+function serveDocs(url: URL, request: Request, env: AssetsEnv): Response | Promise<Response> {
+	const canonicalPath =
+		url.pathname
+			.replace(/\/index\.html$/, '/')
+			.replace(/\.html$/, '')
+			.replace(/\/+$/, '') || '/';
+
+	if (canonicalPath !== url.pathname) {
+		url.pathname = canonicalPath;
+
+		return Response.redirect(url.toString(), 308);
+	}
+
+	const path = url.pathname === '/' ? '/index.html' : /\/[^/.]+$/.test(url.pathname) ? `${url.pathname}.html` : url.pathname;
+
+	url.pathname = `/docs${path}`;
+
+	return fetchDocsAsset(url, request, env);
+}
+
 export default {
-	fetch(request: Request, env: AssetsEnv): Response | Promise<Response> {
+	fetch(request: Request, env: Bindings): Response | Promise<Response> {
 		const url = new URL(request.url);
 
 		const originRedirect = canonicalOriginRedirect(url);
@@ -68,24 +91,12 @@ export default {
 			return originRedirect;
 		}
 
+		if (url.pathname.startsWith('/api/search/')) {
+			return api(request, env, url.pathname);
+		}
+
 		if (url.hostname === DOCS_HOST) {
-			const canonicalPath =
-				url.pathname
-					.replace(/\/index\.html$/, '/')
-					.replace(/\.html$/, '')
-					.replace(/\/+$/, '') || '/';
-
-			if (canonicalPath !== url.pathname) {
-				url.pathname = canonicalPath;
-
-				return Response.redirect(url.toString(), 308);
-			}
-
-			const path = url.pathname === '/' ? '/index.html' : /\/[^/.]+$/.test(url.pathname) ? `${url.pathname}.html` : url.pathname;
-
-			url.pathname = `/docs${path}`;
-
-			return fetchDocsAsset(url, request, env);
+			return serveDocs(url, request, env);
 		}
 
 		if (url.pathname === '/docs' || url.pathname.startsWith('/docs/')) {

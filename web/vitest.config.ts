@@ -5,7 +5,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	plugins: [vue()],
 	resolve: {
-		alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+		alias: {
+			'@': fileURLToPath(new URL('./src', import.meta.url)),
+			'@docs': fileURLToPath(new URL('./docs', import.meta.url)),
+			'@test': fileURLToPath(new URL('./test', import.meta.url)),
+			'@worker': fileURLToPath(new URL('./worker', import.meta.url)),
+		},
 	},
 	test: {
 		coverage: {

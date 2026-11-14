@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CANONICAL_HOST, DOCS_HOST } from '@/../worker/host';
-import worker from '@/../worker/index';
+import { CANONICAL_HOST, DOCS_HOST } from '@worker/host';
+import worker from '@worker/index';
+import { search } from '@test/fakes';
 
 function env() {
-	return { ASSETS: { fetch: vi.fn((request: Request) => Promise.resolve(new Response(`asset ${new URL(request.url).pathname}`))) } };
+	return { ...search(), ASSETS: { fetch: vi.fn((request: Request) => Promise.resolve(new Response(`asset ${new URL(request.url).pathname}`))) } };
 }
 
 describe('landing page worker', () => {
@@ -25,7 +26,7 @@ describe('landing page worker', () => {
 	});
 
 	it.each([CANONICAL_HOST, DOCS_HOST])('keeps missing pages on %s out of search results', async (host) => {
-		const assets = { ASSETS: { fetch: vi.fn(() => Promise.resolve(new Response('Missing', { status: 404 }))) } };
+		const assets = { ...search(), ASSETS: { fetch: vi.fn(() => Promise.resolve(new Response('Missing', { status: 404 }))) } };
 
 		const response = await worker.fetch(new Request(`https://${host}/does-not-exist`), assets);
 
@@ -133,6 +134,7 @@ describe('landing page worker', () => {
 		['/docs', '/'],
 	])('keeps internal asset redirects out of public docs URLs', async (location, expected) => {
 		const assets = {
+			...search(),
 			ASSETS: { fetch: vi.fn(() => Promise.resolve(new Response(null, { headers: { location }, status: 307 }))) },
 		};
 

@@ -14,7 +14,8 @@
     "coverage": "vitest run --coverage",
     "deploy": "npm run build && vitest run --coverage && cf deploy",
     "docs:dev": "vitepress dev docs --host 127.0.0.1 --port 5174",
-    "docs:build": "vitepress build docs"
+    "docs:build": "vitepress build docs",
+    "worker:types": "cf workers types && tsc -p tsconfig.worker.json"
   },
   "dependencies": {
     "@lucide/vue": "^1.52.0",

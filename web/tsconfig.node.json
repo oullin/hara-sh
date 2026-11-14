@@ -17,7 +17,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@docs/*": ["./docs/*"],
+      "@worker/*": ["./worker/*"]
+    }
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "cloudflare.config.ts", "worker/**/*.ts", "docs/.vitepress/**/*.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "cloudflare.config.ts", "worker/**/*.ts", "docs/.vitepress/**/*.ts"],
+  // Needs the generated Cloudflare types; `npm run worker:types` checks it.
+  "exclude": ["worker/check.ts"]
 }
