@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -28,17 +29,18 @@ func (h host) t3Backup(args []string) error {
 	recipient := flags.String("recipient", "", "age public recipient; omit for an interactive passphrase")
 	dryRun := flags.Bool("dry-run", false, "check source roots and destination without copying data or creating an archive")
 
-	if err := flags.Parse(args); err != nil {
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
 		return err
 	}
-	if flags.NArg() > 1 {
+	if len(positional) > 1 {
 		return errors.New("usage: t3/backup.sh [--recipient age1...] [--dry-run] [destination-folder]")
 	}
-	if flags.NArg() == 1 {
-		*output = flags.Arg(0)
+	if len(positional) == 1 {
+		*output = positional[0]
 	}
 	sources, err := h.t3BackupSources()
 	if err != nil {
@@ -60,9 +62,48 @@ func (h host) t3Backup(args []string) error {
 	if err := h.t3BackupStopped(); err != nil {
 		return err
 	}
+	h.t3BackupWarnBusy()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	return h.writeT3Backup(ctx, destination, *recipient, sources)
+}
+
+// parseInterspersed accepts flags before and after the destination, as in "backup /dest --recipient age1...".
+func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
+	var positional []string
+	for {
+		if err := flags.Parse(args); err != nil {
+			return nil, err
+		}
+		rest := flags.Args()
+		if consumed := len(args) - len(rest); consumed > 0 && args[consumed-1] == "--" {
+			return append(positional, rest...), nil
+		}
+		if len(rest) == 0 {
+			return positional, nil
+		}
+		positional = append(positional, rest[0])
+		args = rest[1:]
+	}
+}
+
+// t3BackupWarnBusy reports provider CLIs that may change their homes while they are copied; it never blocks the backup.
+func (h host) t3BackupWarnBusy() {
+	var running []string
+	for name, pattern := range map[string][]string{
+		"claude":       {"-x", "claude"},
+		"codex":        {"-x", "codex"},
+		"cursor-agent": {"-f", "(^|/)cursor-agent( |$)"},
+	} {
+		output, err := h.output(exec.Command("pgrep", pattern...))
+		if err == nil && strings.TrimSpace(output) != "" {
+			running = append(running, name)
+		}
+	}
+	if len(running) > 0 {
+		slices.Sort(running)
+		fmt.Fprintf(h.stderr, "Warning: %s still running; files removed during the backup are skipped, and files rewritten in place stop it.\n", strings.Join(running, ", "))
+	}
 }
 
 func (h host) t3BackupHome() string {
@@ -115,6 +156,14 @@ func (h host) t3BackupSources() ([]backupSource, error) {
 	if err != nil {
 		return nil, errors.New("cannot resolve the user home")
 	}
+	// The T3 home is the point of the backup; other roots outside the home are skipped with a warning.
+	t3Real, err := filepath.EvalSymlinks(t3Home)
+	if err != nil {
+		return nil, errors.New("cannot resolve the T3 home")
+	}
+	if t3Real == home || !insidePath(t3Real, home) {
+		return nil, errors.New("the T3 home must be inside the user home; back up a custom T3_HOME separately")
+	}
 	for i, path := range paths {
 		if insidePath(path, h.home) {
 			relative, _ := filepath.Rel(h.home, path)
@@ -150,7 +199,8 @@ func (h host) t3BackupSources() ([]backupSource, error) {
 		}
 		relative, err := filepath.Rel(home, path)
 		if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return nil, errors.New("a backup source is outside the user home; review that source separately")
+			fmt.Fprintf(h.stderr, "Warning: skipping %s because it is outside the user home; back it up separately.\n", path)
+			continue
 		}
 		sources = append(sources, backupSource{Path: path, Name: filepath.ToSlash(filepath.Join("home", relative))})
 	}
@@ -190,21 +240,15 @@ func backupDestination(path string, sources []backupSource) (string, error) {
 func (h host) t3BackupStopped() error {
 	content, err := os.ReadFile(filepath.Join(h.t3BackupHome(), "userdata", "server-runtime.json"))
 	var runtime struct {
-		PID int `json:"pid"`
+		PID       int    `json:"pid"`
+		StartedAt string `json:"startedAt"`
 	}
 	if err == nil {
 		if json.Unmarshal(content, &runtime) != nil {
 			return errors.New("cannot verify T3 server state; quit T3 and check its runtime state")
 		}
-		if runtime.PID > 0 {
-			process, findErr := os.FindProcess(runtime.PID)
-			if findErr == nil {
-				signalErr := process.Signal(syscall.Signal(0))
-				process.Release()
-				if signalErr == nil || errors.Is(signalErr, os.ErrPermission) {
-					return errors.New("T3 server is running; finish agents, quit T3 and stop its background service before backing up")
-				}
-			}
+		if runtime.PID > 0 && h.t3ServerAlive(runtime.PID, runtime.StartedAt) {
+			return errors.New("T3 server is running; finish agents, quit T3 and stop its background service before backing up (if T3 is already stopped, delete userdata/server-runtime.json in the T3 home)")
 		}
 	} else if !os.IsNotExist(err) {
 		return errors.New("cannot read T3 server state")
@@ -220,6 +264,58 @@ func (h host) t3BackupStopped() error {
 		}
 	}
 	return nil
+}
+
+// t3ServerAlive reports whether the recorded server PID still belongs to T3. A PID is reused only after T3 exits,
+// so a live process that started well after T3 recorded its start is a different program. Unknown states count as alive.
+func (h host) t3ServerAlive(pid int, startedAt string) bool {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	signalErr := process.Signal(syscall.Signal(0))
+	process.Release()
+	if signalErr != nil && !errors.Is(signalErr, os.ErrPermission) {
+		return false
+	}
+	started, err := time.Parse(time.RFC3339Nano, startedAt)
+	if err != nil {
+		return true
+	}
+	output, err := h.output(exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "etime="))
+	if err != nil {
+		return true
+	}
+	elapsed, ok := parseElapsed(strings.TrimSpace(output))
+	if !ok {
+		return true
+	}
+	return !time.Now().Add(-elapsed).After(started.Add(time.Minute))
+}
+
+// parseElapsed reads the portable ps etime format, [[dd-]hh:]mm:ss.
+func parseElapsed(value string) (time.Duration, bool) {
+	days := 0
+	if before, after, found := strings.Cut(value, "-"); found {
+		count, err := strconv.Atoi(before)
+		if err != nil || count < 0 {
+			return 0, false
+		}
+		days, value = count, after
+	}
+	parts := strings.Split(value, ":")
+	if len(parts) < 2 || len(parts) > 3 {
+		return 0, false
+	}
+	seconds := 0
+	for _, part := range parts {
+		count, err := strconv.Atoi(part)
+		if err != nil || count < 0 {
+			return 0, false
+		}
+		seconds = seconds*60 + count
+	}
+	return time.Duration(days)*24*time.Hour + time.Duration(seconds)*time.Second, true
 }
 
 func (h host) writeT3Backup(ctx context.Context, destination, recipient string, sources []backupSource) error {
@@ -250,7 +346,7 @@ func (h host) writeT3Backup(ctx context.Context, destination, recipient string, 
 		input.Close()
 		return err
 	}
-	archiveErr := streamT3Archive(ctx, input, sources)
+	archiveErr := streamT3Archive(ctx, input, sources, h.stderr)
 	input.Close()
 	encryptErr := command.Wait()
 	if archiveErr != nil {

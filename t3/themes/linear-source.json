@@ -34,7 +34,10 @@
     "lightTheme": "linear",
     "darkTheme": "linear"
   },
-  "backup": "backups/2026-11-18/",
+  "backup": {
+    "palette": "codex.json",
+    "selection": "backups/2026-11-18/selection-before-linear-light.json"
+  },
   "install": "Copy linear.json into ~/.t3/userdata/themes/ and select both Linear previews in T3 Code Settings > Appearance. Keep Follow the system appearance selected.",
   "limitations": [
     "T3 keeps its own typography, layout, spacing and syntax highlighting."

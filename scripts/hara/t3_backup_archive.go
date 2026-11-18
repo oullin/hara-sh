@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -14,7 +15,8 @@ import (
 	"strings"
 )
 
-func streamT3Archive(ctx context.Context, output io.Writer, sources []backupSource) error {
+// streamT3Archive writes a gzip tar of sources to output. Files removed while the walk runs are reported to warnings and skipped.
+func streamT3Archive(ctx context.Context, output io.Writer, sources []backupSource, warnings io.Writer) error {
 	scratch, err := os.MkdirTemp("", "t3-backup-snapshots-")
 	if err != nil {
 		return err
@@ -36,7 +38,7 @@ func streamT3Archive(ctx context.Context, output io.Writer, sources []backupSour
 		return err
 	}
 	for _, source := range sources {
-		if err := archiveT3Source(ctx, tarWriter, source, scratch); err != nil {
+		if err := archiveT3Source(ctx, tarWriter, source, scratch, warnings); err != nil {
 			return err
 		}
 	}
@@ -53,10 +55,18 @@ func backupTransient(path string) bool {
 		strings.HasSuffix(name, "-journal")
 }
 
-func archiveT3Source(ctx context.Context, writer *tar.Writer, source backupSource, scratch string) error {
+func archiveT3Source(ctx context.Context, writer *tar.Writer, source backupSource, scratch string, warnings io.Writer) error {
+	vanished := func(path string) error {
+		relative, _ := filepath.Rel(source.Path, path)
+		fmt.Fprintf(warnings, "Warning: skipped %s; it was removed during the backup.\n", filepath.ToSlash(filepath.Join(source.Name, relative)))
+		return nil
+	}
 	return filepath.WalkDir(source.Path, func(path string, entry fs.DirEntry, walkErr error) error {
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		if walkErr != nil && path != source.Path && errors.Is(walkErr, fs.ErrNotExist) {
+			return vanished(path)
 		}
 		if walkErr != nil {
 			return errors.New("could not read a backup source; no complete archive created")
@@ -65,6 +75,9 @@ func archiveT3Source(ctx context.Context, writer *tar.Writer, source backupSourc
 			return nil
 		}
 		info, err := entry.Info()
+		if errors.Is(err, fs.ErrNotExist) {
+			return vanished(path)
+		}
 		if err != nil {
 			return err
 		}
@@ -74,6 +87,9 @@ func archiveT3Source(ctx context.Context, writer *tar.Writer, source backupSourc
 		target := ""
 		if info.Mode()&os.ModeSymlink != 0 {
 			target, err = os.Readlink(path)
+			if errors.Is(err, fs.ErrNotExist) {
+				return vanished(path)
+			}
 			if err != nil {
 				return err
 			}
@@ -88,14 +104,24 @@ func archiveT3Source(ctx context.Context, writer *tar.Writer, source backupSourc
 		}
 		header.Name = filepath.ToSlash(filepath.Join(source.Name, relative))
 		if info.Mode().IsRegular() {
-			return archiveT3File(ctx, writer, header, path, scratch)
+			err := archiveT3File(ctx, writer, header, path, scratch)
+			if errors.Is(err, errVanished) {
+				return vanished(path)
+			}
+			return err
 		}
 		return writer.WriteHeader(header)
 	})
 }
 
+// errVanished marks a source file removed before its header was written, which is safe to skip.
+var errVanished = errors.New("backup file vanished")
+
 func archiveT3File(ctx context.Context, writer *tar.Writer, header *tar.Header, path, scratch string) error {
 	file, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return errVanished
+	}
 	if err != nil {
 		return err
 	}
@@ -111,8 +137,7 @@ func archiveT3File(ctx context.Context, writer *tar.Writer, header *tar.Header, 
 	if err := writer.WriteHeader(header); err != nil {
 		return err
 	}
-	_, err = io.CopyN(writer, file, header.Size)
-	return err
+	return copyArchived(writer, file, header.Size)
 }
 
 func archiveT3SQLite(ctx context.Context, writer *tar.Writer, header *tar.Header, path, scratch string) error {
@@ -140,6 +165,14 @@ func archiveT3SQLite(ctx context.Context, writer *tar.Writer, header *tar.Header
 	if err := writer.WriteHeader(header); err != nil {
 		return err
 	}
-	_, err = io.CopyN(writer, file, header.Size)
+	return copyArchived(writer, file, header.Size)
+}
+
+// copyArchived copies exactly size bytes after the header is written; a file truncated in place cannot be skipped any more.
+func copyArchived(writer io.Writer, file io.Reader, size int64) error {
+	_, err := io.CopyN(writer, file, size)
+	if errors.Is(err, io.EOF) {
+		return errors.New("a file shrank while it was copied; close applications using provider homes and retry")
+	}
 	return err
 }
