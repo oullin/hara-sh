@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "kind": "portable-settings",
+  "providerHomes": "Configure providers.template.json locally before applying environment.json. Provider environment variables, login state, endpoints and custom launch arguments are deliberately omitted.",
+  "omitted": [
+    "credentials and credential references",
+    "account labels, emails and identifiers",
+    "absolute machine paths and network hostnames",
+    "project overrides and mappings",
+    "free-form instructions and custom vocabulary",
+    "browser profiles, attachments, sessions, logs and usage history"
+  ],
+  "restore": "Review and merge these preferences into T3 settings; do not replace the whole userdata directory. Appearance choices are a separate device preference. The encrypted recovery archive preserves original private state."
+}

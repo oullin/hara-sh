@@ -1,0 +1,64 @@
+{
+  "providerInstances": {
+    "antigravity": {
+      "driver": "antigravity",
+      "enabled": true,
+      "config": {
+        "binaryPath": "antigravity"
+      }
+    },
+    "claudeAgent": {
+      "driver": "claudeAgent",
+      "enabled": true,
+      "config": {
+        "binaryPath": "claude",
+        "homePath": "__CONFIGURE_LOCALLY__"
+      }
+    },
+    "claude_direct": {
+      "driver": "claudeAgent",
+      "enabled": false,
+      "config": {
+        "binaryPath": "claude",
+        "homePath": "__CONFIGURE_LOCALLY__"
+      }
+    },
+    "codex": {
+      "driver": "codex",
+      "enabled": true,
+      "config": {
+        "binaryPath": "codex",
+        "homePath": "__CONFIGURE_LOCALLY__"
+      }
+    },
+    "codex_direct": {
+      "driver": "codex",
+      "enabled": true,
+      "config": {
+        "binaryPath": "codex",
+        "homePath": "__CONFIGURE_LOCALLY__"
+      }
+    },
+    "cursor": {
+      "driver": "cursor",
+      "enabled": true,
+      "config": {
+        "binaryPath": "cursor-agent"
+      }
+    },
+    "grok": {
+      "driver": "grok",
+      "enabled": false,
+      "config": {
+        "binaryPath": "grok"
+      }
+    },
+    "opencode": {
+      "driver": "opencode",
+      "enabled": false,
+      "config": {
+        "binaryPath": "opencode"
+      }
+    }
+  }
+}
