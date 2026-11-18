@@ -9,10 +9,14 @@ Keep private state outside the repository. The website publishes only static ass
 ## Keep out of Git
 
 - Secret files, rendered config, and private provider templates.
-- OAuth logins, Tailscale identity, client settings, and backups.
+- OAuth logins, Tailscale identity, raw client settings, and recovery backups.
 - Operational logs, callbacks, and screenshots containing account details.
 
 Ignore rules do not remove files already committed. Local Compose mounts are not encrypted storage; protect the host disk and backups.
+
+The reviewed `t3/settings/` snapshot contains selected portable preferences and
+provider placeholders. It omits account details, credentials, machine paths and
+free-form instructions; it is separate from a complete encrypted recovery backup.
 
 ## Check the current snapshot
 

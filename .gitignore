@@ -4,6 +4,8 @@ node_modules/
 .cloudflare/
 worker-configuration.d.ts
 coverage/
+t3-backup-*.tar.gz.age
+t3-backup-*.tar.gz.age.partial
 # The host helper, built by make from scripts/hara.
 /bin/
 

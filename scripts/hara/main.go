@@ -9,7 +9,7 @@
 //	hara key [claude-api-key|management-password]
 //	hara backup claude|codex
 //	hara codex-profile | codex-app | codex-smoke
-//	hara t3 [setup|smoke|executor]
+//	hara t3 [setup|smoke|executor|backup]
 //	hara panel
 //
 // Env: LOCAL_DIR (private state, default ~/.hara-sh), HARA_PORT, URL, HARA_SECRET_PROVIDER=op, OP_*.
@@ -45,7 +45,7 @@ type host struct {
 	client *http.Client
 }
 
-const usage = "usage: hara up|portless|init|import-op|rotate|status|tools COMMAND|ws-smoke|bench|logs [service]|down|purge|key [field]|backup claude|codex|codex-profile|codex-app|codex-smoke|t3 setup|smoke|executor|panel"
+const usage = "usage: hara up|portless|init|import-op|rotate|status|tools COMMAND|ws-smoke|bench|logs [service]|down|purge|key [field]|backup claude|codex|codex-profile|codex-app|codex-smoke|t3 setup|smoke|executor|backup|panel"
 
 func main() {
 	err := run(os.Args[1:])

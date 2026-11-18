@@ -40,8 +40,12 @@ type agentAttribution struct {
 // T3_CODEX_HOME (default ~/.codex-t3-hara), T3_CLAUDE_HOME (default ~/.claude-hara), T3_CURSOR_HOME (default ~/.cursor),
 // T3_HOME (default ~/.t3), T3_TAILSCALE_PORT (default 8443), MODEL (Claude model for smoke).
 func (h host) t3(args []string) error {
+	if len(args) > 0 && args[0] == "backup" {
+		return h.t3Backup(args[1:])
+	}
+
 	if len(args) > 1 {
-		return errors.New("usage: hara t3 setup|smoke|executor")
+		return errors.New("usage: hara t3 setup|smoke|executor|backup")
 	}
 
 	settings, err := h.t3Settings()
@@ -64,7 +68,7 @@ func (h host) t3(args []string) error {
 	case "executor":
 		return h.t3Executor(settings)
 	default:
-		return errors.New("usage: hara t3 setup|smoke|executor")
+		return errors.New("usage: hara t3 setup|smoke|executor|backup")
 	}
 }
 

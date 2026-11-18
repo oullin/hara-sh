@@ -1,0 +1,19 @@
+# fmtkit 2 configuration; `make format-all` formats, lints, scores complexity and runs go vet.
+
+[files]
+# Built by `make code panel`; reformatting it breaks nothing but bloats it by a third.
+exclude = ["node_modules/", "vendor/", "panel/management.html"]
+
+[lint]
+# Generated shadcn-vue components and build output stay as their tools write them.
+ignore = ["web/src/components/ui/", "web/dist/", "web/.cloudflare/", "web/coverage/"]
+
+[lint.rules]
+# Vue composables are named use*, which the React hooks rules misread as hooks.
+"react-hooks/exhaustive-deps" = "off"
+"react-hooks/rules-of-hooks" = "off"
+
+[[lint.exempt]]
+rule = "eslint/no-undef"
+reason = "Vue compiler macros such as defineProps and withDefaults are undeclared globals; vue-tsc in the web build still rejects undefined names."
+paths = ["*.vue"]

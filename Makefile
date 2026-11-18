@@ -24,15 +24,15 @@ SERVICES := proxy tailscale quota
 claude_ACTIONS := run backup
 claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
 codex_ACTIONS  := run profile app smoke backup
-codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; app makes it the default of the Codex app's config.toml; smoke fails on the HTTP fallback; backup copies client settings outside the repository
-t3_ACTIONS     := setup smoke executor
-t3_HELP        := T3 Code: setup prepares Hara providers; smoke checks inference; executor installs authenticated MCP access for Claude, Codex, Cursor and Antigravity
+codex_HELP     := Codex through the proxy over WebSockets (flags in ARGS="..."); profile installs it; app makes it the default in the Codex app config.toml; smoke fails on the HTTP fallback; backup copies client settings outside the repository
+t3_ACTIONS     := setup smoke executor backup
+t3_HELP        := T3 Code: setup prepares providers; smoke checks inference; executor installs MCP access; backup encrypts recovery state into BACKUP_DIR (default this directory)
 ops_ACTIONS    := quota accounts models logs smoke ws-smoke bench keys import-op
 ops_HELP       := Usage per account, accounts, models, server log (LINES), one Claude request (MODEL), WebSockets (IDLE, TS_URL), first-token timing (N, CODEX_MODEL), rotate local keys or import optional 1Password credentials
 web_ACTIONS    := dev install test coverage build docs deploy
 web_HELP       := The landing page and docs on hara.sh: Vite dev server, dependencies, tests, coverage (fails under 100%), type-check, test and deploy
-code_ACTIONS   := check test resilience complexity panel public
-code_HELP      := check runs Go tests, web build and coverage, privacy guard; resilience tests the pinned proxy image with injected faults (Docker and Go); complexity limits; rebuild the panel (needs bun); public-file privacy guard
+code_ACTIONS   := check test resilience panel public
+code_HELP      := check runs Go tests, web build and coverage, privacy guard; resilience tests the pinned proxy image with injected faults (Docker and Go); rebuild the panel (needs bun); public-file privacy guard
 
 # `make ops quota`, `make logs proxy`: the words after an area (or logs) name its action or service,
 # not targets, so they get an empty rule here; anything else fails with the choices.
@@ -78,7 +78,7 @@ help:
 	  '  status    Check containers, proxy, panel, keys and accounts; print available addresses' \
 	  '  logs      Follow the container logs: all, or one of $(SERVICES) (Ctrl-C to stop)' \
 	  '' \
-	  'make format-all                                                      the only formatter and lint: fmtkit for TS/Vue and every Go module'
+	  'make format-all                                                      fmtkit: format, lint, complexity limits and go vet for every file'
 	@$(foreach a,$(AREAS),printf '\n  \033[36m%-7s\033[0m %s\n          %s\n' '$(a)' '$(subst $(space), | ,$($(a)_ACTIONS))' '$($(a)_HELP)';)
 
 ## --- The host helper --------------------------------------------------------------------
@@ -94,7 +94,7 @@ $(HARA): $(HARA_SOURCES)
 	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src golang:1.27-alpine go build -trimpath -o /out/hara .; \
 	fi
 
-init up portless down purge status logs claude/run claude/backup codex/profile codex/app codex/smoke codex/backup t3/setup t3/smoke t3/executor code/panel: $(HARA)
+init up portless down purge status logs claude/run claude/backup codex/profile codex/app codex/smoke codex/backup t3/setup t3/smoke t3/executor t3/backup code/panel: $(HARA)
 $(addprefix ops/,$(ops_ACTIONS)): $(HARA)
 
 ## --- The Docker Compose stack (Tailscale is optional) -----------------------------------
@@ -157,6 +157,9 @@ t3/setup:
 
 t3/smoke:
 	@MODEL="$(MODEL)" $(HARA) t3 smoke
+
+t3/backup:
+	@$(HARA) t3 backup --output "$(or $(BACKUP_DIR),$(CURDIR))" $(ARGS)
 
 t3/executor:
 	@$(HARA) t3 executor
@@ -225,26 +228,19 @@ web/deploy:
 
 ## --- code: checks, formatting and the panel build ------------------------------------------
 
-GO_MODULES := scripts/hara scripts/ops scripts/quota scripts/wssmoke scripts/bench scripts/tools scripts/public
-
 # What CI runs (.github/workflows/ci.yml). Formatting and lint stay in `make format-all`.
 code/check: code/test code/public
 	cd web && npm run build && npm run coverage
 
-# Go is formatted from its module directory, so fmtkit also runs go vet there.
+# The one fmtkit target (settings in fmtkit.toml); go vet runs for every Go module.
 format-all:
-	fmtkit format-all --ts
-	@for m in $(GO_MODULES); do (cd $$m && fmtkit format-all --go) || exit 1; done
+	fmtkit format --all
 
 code/test:
 	docker build --target verify -f scripts/tools/Dockerfile .
 
 code/resilience:
 	cd scripts/hara && HARA_PROXY_INTEGRATION=1 go test -count=1 -run TestProxyImage -v -timeout 2m .
-
-code/complexity:
-	fmtkit complexity --ts web/src web/worker
-	@for m in $(GO_MODULES); do (cd $$m && fmtkit complexity --go .) || exit 1; done
 
 # Upstream panel + panel/ledger.patch; commit it, then `make up`.
 code/panel:
