@@ -147,18 +147,10 @@ func importKeys(input io.Reader) ([]string, error) {
 
 func (runtime toolRuntime) credentials(mode string, input io.Reader) ([]string, error) {
 	fields := []string{apiField, managementField}
-	present := 0
+	present, err := runtime.presentCredentials(fields)
 
-	for _, field := range fields {
-		info, err := os.Stat(filepath.Join(runtime.state, "secrets", field))
-
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-
-		if err == nil && info.Mode().IsRegular() {
-			present++
-		}
+	if err != nil {
+		return nil, err
 	}
 
 	if mode == "import" {
@@ -174,30 +166,68 @@ func (runtime toolRuntime) credentials(mode string, input io.Reader) ([]string, 
 	}
 
 	if present == len(fields) && mode != "rotate" {
-		values := make([]string, len(fields))
-
-		for i, field := range fields {
-			value, err := runtime.readKey(field)
-
-			if err != nil {
-				return nil, err
-			}
-
-			values[i] = value
-		}
-
-		return values, nil
+		return runtime.readKeys(fields)
 	}
 
-	if _, err := os.Stat(filepath.Join(runtime.state, "proxy", "config.yaml")); err == nil {
-		if mode != "rotate" {
-			return nil, errors.New("existing installation: import its two credentials before starting; see the migration guide")
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
+	if err := runtime.requireNoInstallation(mode); err != nil {
 		return nil, err
 	}
 
+	return generateKeys(len(fields))
+}
+
+// presentCredentials counts the credential files already stored as regular files.
+func (runtime toolRuntime) presentCredentials(fields []string) (int, error) {
+	present := 0
+
+	for _, field := range fields {
+		info, err := os.Stat(filepath.Join(runtime.state, "secrets", field))
+
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return 0, err
+		}
+
+		if err == nil && info.Mode().IsRegular() {
+			present++
+		}
+	}
+
+	return present, nil
+}
+
+func (runtime toolRuntime) readKeys(fields []string) ([]string, error) {
 	values := make([]string, len(fields))
+
+	for i, field := range fields {
+		value, err := runtime.readKey(field)
+
+		if err != nil {
+			return nil, err
+		}
+
+		values[i] = value
+	}
+
+	return values, nil
+}
+
+// requireNoInstallation refuses to mint new credentials over an existing proxy configuration unless rotating.
+func (runtime toolRuntime) requireNoInstallation(mode string) error {
+	_, err := os.Stat(filepath.Join(runtime.state, "proxy", "config.yaml"))
+
+	if err == nil && mode != "rotate" {
+		return errors.New("existing installation: import its two credentials before starting; see the migration guide")
+	}
+
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	return nil
+}
+
+func generateKeys(count int) ([]string, error) {
+	values := make([]string, count)
 
 	for i := range values {
 		value, err := generateKey()
@@ -225,43 +255,74 @@ func (runtime toolRuntime) initialise(mode string, input io.Reader, output io.Wr
 		}
 	}
 
-	template, err := os.ReadFile(runtime.template)
+	config, err := runtime.renderConfig(values[0], values[1])
 
 	if err != nil {
 		return err
 	}
 
+	if err := runtime.prepareState(); err != nil {
+		return err
+	}
+
+	for i, field := range []string{apiField, managementField} {
+		if err := runtime.privateWrite(filepath.Join(runtime.state, "secrets", field), values[i]+"\n"); err != nil {
+			return err
+		}
+	}
+
+	if err := runtime.privateWrite(filepath.Join(runtime.state, "proxy", "config.yaml"), config); err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(output, "Private configuration ready. Existing credentials and provider logins are preserved unless import or rotate was requested.")
+
+	return err
+}
+
+// renderConfig fills the template's two quoted placeholders with the client key and the management password hash.
+func (runtime toolRuntime) renderConfig(apiKey, managementPassword string) (string, error) {
+	template, err := os.ReadFile(runtime.template)
+
+	if err != nil {
+		return "", err
+	}
+
 	config := string(template)
 
 	if strings.Count(config, "__API_KEY__") != 1 || strings.Count(config, "__MANAGEMENT_PASSWORD_BCRYPT__") != 1 {
-		return errors.New("configuration template must contain both credential placeholders exactly once")
+		return "", errors.New("configuration template must contain both credential placeholders exactly once")
 	}
 
 	if !strings.Contains(config, `"__API_KEY__"`) || !strings.Contains(config, `"__MANAGEMENT_PASSWORD_BCRYPT__"`) {
-		return errors.New("credential placeholders must be quoted")
+		return "", errors.New("credential placeholders must be quoted")
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(values[1]), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(managementPassword), bcrypt.DefaultCost)
 
 	if err != nil {
-		return errors.New("hash management password")
+		return "", errors.New("hash management password")
 	}
 
-	apiJSON, err := json.Marshal(values[0])
+	apiJSON, err := json.Marshal(apiKey)
 
 	if err != nil {
-		return errors.New("encode client key")
+		return "", errors.New("encode client key")
 	}
 
 	hashJSON, err := json.Marshal(string(hash))
 
 	if err != nil {
-		return errors.New("encode management password hash")
+		return "", errors.New("encode management password hash")
 	}
 
 	config = strings.Replace(config, `"__API_KEY__"`, string(apiJSON), 1)
-	config = strings.Replace(config, `"__MANAGEMENT_PASSWORD_BCRYPT__"`, string(hashJSON), 1)
 
+	return strings.Replace(config, `"__MANAGEMENT_PASSWORD_BCRYPT__"`, string(hashJSON), 1), nil
+}
+
+// prepareState creates the private state directory and its owner-only subdirectories.
+func (runtime toolRuntime) prepareState() error {
 	if err := os.MkdirAll(runtime.state, 0o700); err != nil {
 		return err
 	}
@@ -286,19 +347,7 @@ func (runtime toolRuntime) initialise(mode string, input io.Reader, output io.Wr
 		}
 	}
 
-	for i, field := range []string{apiField, managementField} {
-		if err := runtime.privateWrite(filepath.Join(runtime.state, "secrets", field), values[i]+"\n"); err != nil {
-			return err
-		}
-	}
-
-	if err := runtime.privateWrite(filepath.Join(runtime.state, "proxy", "config.yaml"), config); err != nil {
-		return err
-	}
-
-	_, err = fmt.Fprintln(output, "Private configuration ready. Existing credentials and provider logins are preserved unless import or rotate was requested.")
-
-	return err
+	return nil
 }
 
 func (runtime toolRuntime) request(path, field string) ([]byte, error) {

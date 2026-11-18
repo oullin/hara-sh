@@ -13,11 +13,7 @@ const items = providers.map((provider) => ({ ...provider, dots: glyphDots(provid
 		</div>
 		<ul class="provider-grid">
 			<li v-for="item in items" :key="item.name">
-				<span class="provider-glyph"><DotGrid :dots="item.dots" :size="5" /></span
-				><span
-					><strong>{{ item.name }}</strong
-					><small>{{ item.via }}</small></span
-				>
+				<span class="provider-glyph"><DotGrid :dots="item.dots" :size="5" /></span><span><strong>{{ item.name }}</strong><small>{{ item.via }}</small></span>
 			</li>
 		</ul>
 		<div class="routing-strip">
