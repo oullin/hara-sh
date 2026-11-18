@@ -1,0 +1,42 @@
+{
+  "source": "Linear macOS app > Preferences > Interface and theme",
+  "observedOn": "2026-11-18",
+  "interfaceTheme": "System preference",
+  "variants": {
+    "light": {
+      "interfaceTheme": "Light",
+      "codeTheme": "Linear Light",
+      "palette": {
+        "canvas": "#f7f7f9",
+        "sidebar": "#eeeef0",
+        "surfaceRaised": "#ffffff",
+        "text": "#28282d",
+        "textMuted": "#62626b",
+        "accent": "#5e6ad2"
+      }
+    },
+    "dark": {
+      "interfaceTheme": "Dark",
+      "codeTheme": "Linear Dark",
+      "palette": {
+        "canvas": "#111113",
+        "sidebar": "#09090b",
+        "surfaceRaised": "#1b1b1e",
+        "text": "#f1f1f3",
+        "textMuted": "#a0a0aa",
+        "accent": "#5e6ad2"
+      }
+    }
+  },
+  "mapping": "Visual adaptation of both live Linear palettes to T3 semantic color roles; not an exported Linear theme.",
+  "selection": {
+    "appearanceMode": "system",
+    "lightTheme": "linear",
+    "darkTheme": "linear"
+  },
+  "backup": "backups/2026-11-18/",
+  "install": "Copy linear.json into ~/.t3/userdata/themes/ and select both Linear previews in T3 Code Settings > Appearance. Keep Follow the system appearance selected.",
+  "limitations": [
+    "T3 keeps its own typography, layout, spacing and syntax highlighting."
+  ]
+}
