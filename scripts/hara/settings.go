@@ -52,7 +52,8 @@ func repository() (string, error) {
 // configure applies the optional private settings file and returns the private state directory.
 // Starting on an empty default directory would generate new keys and orphan existing logins.
 func configure(home string, getenv func(string) string, setenv func(string, string) error) (string, error) {
-	if getenv("LOCAL_DIR") == "" && !exists(filepath.Join(home, ".hara-sh")) && isDir(filepath.Join(home, ".cli-proxy-api")) {
+	if getenv("LOCAL_DIR") == "" && !exists(filepath.Join(home, ".hara-sh")) &&
+		isDir(filepath.Join(home, ".cli-proxy-api")) {
 		return "", errors.New("private state moved to ~/.hara-sh; run: mv ~/.cli-proxy-api ~/.hara-sh")
 	}
 

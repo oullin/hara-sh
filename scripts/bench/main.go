@@ -105,7 +105,16 @@ func newClient() *http.Client {
 func (b bench) run(w io.Writer, bases []string) bool {
 	ok := true
 
-	fmt.Fprintf(w, "%-28s %-7s %3s  %-22s %-22s %s\n", "address", "api", "n", "first token p50 / max", "total p50 / max", "prompt cache")
+	fmt.Fprintf(
+		w,
+		"%-28s %-7s %3s  %-22s %-22s %s\n",
+		"address",
+		"api",
+		"n",
+		"first token p50 / max",
+		"total p50 / max",
+		"prompt cache",
+	)
 
 	for _, base := range bases {
 		for _, a := range b.apis {
@@ -152,7 +161,9 @@ func summarize(base, name string, samples []sample) string {
 		first[i], total[i] = s.firstToken, s.total
 	}
 
-	return fmt.Sprintf("%-28s %-7s %3d  %-22s %-22s %s", base, name, len(samples), spread(first), spread(total), cacheUse(samples))
+	return fmt.Sprintf("%-28s %-7s %3d  %-22s %-22s %s", base, name, len(
+		samples,
+	), spread(first), spread(total), cacheUse(samples))
 }
 
 // spread is "p50 / max", in milliseconds.
@@ -207,7 +218,11 @@ func cachePrefix(nonce string) string {
 	fmt.Fprintf(&sb, "Benchmark run %s. The reference lines below are context only; do not discuss them.\n", nonce)
 
 	for i := range 420 {
-		fmt.Fprintf(&sb, "Reference line %04d: the proxy forwards this request and measures how quickly the answer begins.\n", i)
+		fmt.Fprintf(
+			&sb,
+			"Reference line %04d: the proxy forwards this request and measures how quickly the answer begins.\n",
+			i,
+		)
 	}
 
 	return sb.String()

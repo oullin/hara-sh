@@ -43,7 +43,8 @@ func inferencePath(requestPath string) bool {
 		return true
 	}
 
-	if requestPath != path.Clean(requestPath) || strings.Contains(requestPath, `\`) || requestPath == "/v1/tunnel" || strings.HasPrefix(requestPath, "/v1/tunnel/") {
+	if requestPath != path.Clean(requestPath) || strings.Contains(requestPath, `\`) ||
+		requestPath == "/v1/tunnel" || strings.HasPrefix(requestPath, "/v1/tunnel/") {
 		return false
 	}
 

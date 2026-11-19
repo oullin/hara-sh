@@ -102,7 +102,7 @@ Logs rotate in 10 MB files with a 512 MB total cap. Protect the whole state dire
 
 ## Upgrade
 
-Back up private state, update the proxy image tag and digest in `local/compose.yaml`, and recreate services. Run [status and smoke checks](./operations#check-a-request) afterwards.
+Back up private state, pull the updated checkout, and recreate services with `make up` or Docker Compose with `--build`. Run [status and smoke checks](./operations#check-a-request) afterwards.
 
 If you upgrade with Docker Compose directly and previously used Portless, remove the old alias with `portless alias --remove hara` before restarting. Recreate it on the [inference-only port](./networking#optional-lan-access) to keep LAN access. `make up` handles the old alias for you.
 

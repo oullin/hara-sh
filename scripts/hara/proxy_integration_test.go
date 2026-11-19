@@ -34,7 +34,7 @@ type proxyLab struct {
 // Ordinary unit tests (including the containerised suite) never start Docker.
 func TestProxyImage(t *testing.T) {
 	if os.Getenv("HARA_PROXY_INTEGRATION") != "1" {
-		t.Skip("set HARA_PROXY_INTEGRATION=1 to test the pinned Docker image")
+		t.Skip("use make code resilience to build and test the proxy image")
 	}
 
 	t.Run("transient_failover_preserves_warm_binding", func(t *testing.T) {
@@ -230,7 +230,11 @@ func (lab *proxyLab) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !payload.Stream {
-		_, _ = fmt.Fprintf(w, `{"id":"msg_test","type":"message","role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":%q}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`, id)
+		_, _ = fmt.Fprintf(
+			w,
+			`{"id":"msg_test","type":"message","role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":%q}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`,
+			id,
+		)
 
 		return
 	}
@@ -290,24 +294,27 @@ func startProxyLab(t *testing.T) *proxyLab {
 	t.Cleanup(upstream.Close)
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	root := filepath.Join("..", "..")
-	compose, err := os.ReadFile(filepath.Join(root, "local", "compose.yaml"))
 
-	if err != nil {
+	var compose struct {
+		Services map[string]struct {
+			Image string `json:"image"`
+		} `json:"services"`
+	}
+
+	configJSON := labDocker(t, "compose", "-f", filepath.Join(
+		root,
+		"local",
+		"compose.yaml",
+	), "config", "--format", "json", "proxy")
+
+	if err := json.Unmarshal([]byte(configJSON), &compose); err != nil {
 		t.Fatal(err)
 	}
 
-	var image string
-
-	for line := range strings.SplitSeq(string(compose), "\n") {
-		if value, ok := strings.CutPrefix(strings.TrimSpace(line), "image: eceasy/cli-proxy-api:"); ok {
-			image = "eceasy/cli-proxy-api:" + value
-
-			break
-		}
-	}
+	image := compose.Services["proxy"].Image
 
 	if image == "" {
-		t.Fatal("could not find the pinned proxy image")
+		t.Fatal("could not find the Compose proxy image")
 	}
 
 	template, err := os.ReadFile(filepath.Join(root, "config.yaml"))
@@ -324,7 +331,13 @@ func startProxyLab(t *testing.T) *proxyLab {
 	config += "\napi-keys:\n  claude:\n"
 
 	for _, id := range []string{"a", "b"} {
-		config += fmt.Sprintf("    - name: %s\n      base-url: http://host.docker.internal:%s/%s\n      models:\n        - name: claude-opus-5-5\n      keys:\n        - api-key: synthetic-upstream-%s\n", id, port, id, id)
+		config += fmt.Sprintf(
+			"    - name: %s\n      base-url: http://host.docker.internal:%s/%s\n      models:\n        - name: claude-opus-5-5\n      keys:\n        - api-key: synthetic-upstream-%s\n",
+			id,
+			port,
+			id,
+			id,
+		)
 	}
 
 	dir := t.TempDir()
@@ -347,7 +360,28 @@ func startProxyLab(t *testing.T) *proxyLab {
 	// On Linux a root container would leave owner-only auth/log directories that
 	// the host's TempDir cleanup cannot remove. Docker Desktop masks that mismatch.
 	owner := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
-	labDocker(t, "run", "-d", "--name", name, "--user", owner, "--add-host", "host.docker.internal:host-gateway", "-p", "127.0.0.1::8317", "-e", "WRITABLE_PATH=/test", "-v", dir+":/test", image, "./CLIProxyAPI", "-config", "/test/config.yaml", "--local-model")
+	labDocker(
+		t,
+		"run",
+		"-d",
+		"--name",
+		name,
+		"--user",
+		owner,
+		"--add-host",
+		"host.docker.internal:host-gateway",
+		"-p",
+		"127.0.0.1::8317",
+		"-e",
+		"WRITABLE_PATH=/test",
+		"-v",
+		dir+":/test",
+		image,
+		"./CLIProxyAPI",
+		"-config",
+		"/test/config.yaml",
+		"--local-model",
+	)
 	lab.base = "http://" + strings.TrimSpace(labDocker(t, "port", name, "8317/tcp"))
 	deadline := time.After(25 * time.Second)
 
@@ -391,8 +425,13 @@ func labDocker(t *testing.T, args ...string) string {
 func (lab *proxyLab) rawRequest(t *testing.T, stream bool, speed string) (int, string) {
 	t.Helper()
 
-	body := fmt.Sprintf(`{"model":"claude-opus-5-5","stream":%t,"speed":%q,"max_tokens":32,"messages":[{"role":"user","content":"synthetic test"}]}`, stream, speed)
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, lab.base+"/v1/messages", strings.NewReader(body))
+	body := fmt.Sprintf(
+		`{"model":"claude-opus-5-5","stream":%t,"speed":%q,"max_tokens":32,"messages":[{"role":"user","content":"synthetic test"}]}`,
+		stream,
+		speed,
+	)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, lab.base+
+		"/v1/messages", strings.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)

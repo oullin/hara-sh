@@ -118,11 +118,21 @@ func TestFreshInstallPreservesCredentialsAndProviderLogins(t *testing.T) {
 
 	initialiseForTest(t, runtime, "init", "")
 
-	if keyForTest(t, runtime, apiField) != api || keyForTest(t, runtime, managementField) != management || string(readForTest(t, account)) != "private provider state" {
+	if keyForTest(t, runtime, apiField) != api || keyForTest(t, runtime, managementField) != management ||
+		string(readForTest(t, account)) != "private provider state" {
 		t.Fatal("reinitialisation changed credentials or provider logins")
 	}
 
-	for _, name := range []string{"", "secrets", "proxy", "tailscale", "secrets/" + apiField, "secrets/" + managementField, "proxy/config.yaml"} {
+	for _, name := range []string{
+		"",
+		"secrets",
+		"proxy",
+		"tailscale",
+		"secrets/" +
+			apiField,
+		"secrets/" + managementField,
+		"proxy/config.yaml",
+	} {
 		info, err := os.Stat(filepath.Join(runtime.state, name))
 
 		if err != nil {
@@ -162,10 +172,12 @@ func TestLegacyAndPartialInstallationsAreNotRegenerated(t *testing.T) {
 
 		err := runtime.run([]string{"init"}, strings.NewReader(""), io.Discard)
 
-		if err == nil || !strings.Contains(err.Error(), "existing installation") || string(readForTest(t, config)) != "old configuration" {
+		if err == nil || !strings.Contains(err.Error(), "existing installation") ||
+			string(readForTest(t, config)) != "old configuration" {
 			t.Fatal("legacy installation was not preserved")
 		}
 	})
+
 	t.Run("partial", func(t *testing.T) {
 		runtime := newTestRuntime(t)
 		initialiseForTest(t, runtime, "init", "")
@@ -204,7 +216,16 @@ func TestInitialisationPreservesMountedStateOwner(t *testing.T) {
 
 	initialiseForTest(t, runtime, "init", "")
 
-	for _, path := range []string{"", "secrets", "proxy", "tailscale", "secrets/" + apiField, "secrets/" + managementField, "proxy/config.yaml"} {
+	for _, path := range []string{
+		"",
+		"secrets",
+		"proxy",
+		"tailscale",
+		"secrets/" +
+			apiField,
+		"secrets/" + managementField,
+		"proxy/config.yaml",
+	} {
 		info, err := os.Stat(filepath.Join(runtime.state, path))
 
 		if err != nil {
@@ -270,7 +291,8 @@ func TestInvalidInputDoesNotChangeExistingCredentialsOrConfig(t *testing.T) {
 	}
 
 	for _, input := range []string{
-		"short\nshort\n", strings.Repeat("a", 73) + "\n" + strings.Repeat("b", 32) + "\n",
+		"short\nshort\n",
+		strings.Repeat("a", 73) + "\n" + strings.Repeat("b", 32) + "\n",
 		strings.Repeat("a", 32) + "\n" + strings.Repeat("b", 32) + "\nextra",
 		strings.Repeat("a", 32) + "\x00\n" + strings.Repeat("b", 32) + "\n",
 		strings.Repeat("界", 25) + "\n" + strings.Repeat("b", 32) + "\n",
@@ -289,7 +311,12 @@ func TestInvalidInputDoesNotChangeExistingCredentialsOrConfig(t *testing.T) {
 		assertUnchanged(t)
 	}
 
-	for _, template := range []string{"missing placeholders", testTemplate + "__API_KEY__", strings.ReplaceAll(testTemplate, `"`, "")} {
+	for _, template := range []string{
+		"missing placeholders",
+		testTemplate +
+			"__API_KEY__",
+		strings.ReplaceAll(testTemplate, `"`, ""),
+	} {
 		if err := os.WriteFile(runtime.template, []byte(template), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -316,8 +343,27 @@ func TestLaunchLoadsOnlyRequiredCredentialsAndPreservesArguments(t *testing.T) {
 	}{
 		{"quota", []string{"-route"}, []string{"quota", "-route"}, false, true},
 		{"ops", []string{"models"}, []string{"ops", "models", "-url", runtime.url}, true, true},
-		{"ops", []string{"models", "-url=http://custom:8317"}, []string{"ops", "models", "-url=http://custom:8317"}, true, true},
-		{"ops", []string{"models", "-url", "http://custom:8317"}, []string{"ops", "models", "-url", "http://custom:8317"}, true, true},
+		{
+			"ops",
+			[]string{
+				"models",
+				"-url=http://custom:8317",
+			},
+			[]string{"ops", "models", "-url=http://custom:8317"},
+			true,
+			true,
+		},
+		{
+			"ops",
+			[]string{
+				"models",
+				"-url",
+				"http://custom:8317",
+			},
+			[]string{"ops", "models", "-url", "http://custom:8317"},
+			true,
+			true,
+		},
 		{"wssmoke", []string{"-idle", "2m", runtime.url}, []string{"wssmoke", "-idle", "2m", runtime.url}, true, false},
 		{"bench", []string{"-n", "2", runtime.url}, []string{"bench", "-n", "2", runtime.url}, true, false},
 	} {
@@ -334,7 +380,8 @@ func TestLaunchLoadsOnlyRequiredCredentialsAndPreservesArguments(t *testing.T) {
 					name, field string
 					required    bool
 				}{
-					{"API_KEY", apiField, tc.api}, {"MGMT_KEY", managementField, tc.management},
+					{"API_KEY", apiField, tc.api},
+					{"MGMT_KEY", managementField, tc.management},
 				} {
 					found := slices.Contains(env, field.name+"="+keyForTest(t, runtime, field.field))
 
@@ -342,7 +389,10 @@ func TestLaunchLoadsOnlyRequiredCredentialsAndPreservesArguments(t *testing.T) {
 						t.Errorf("incorrect credential scope for %s", field.name)
 					}
 
-					if !field.required && slices.ContainsFunc(env, func(value string) bool { return strings.HasPrefix(value, field.name+"=") }) {
+					if !field.required &&
+						slices.ContainsFunc(env, func(value string) bool {
+							return strings.HasPrefix(value, field.name+"=")
+						}) {
 						t.Fatal("an inherited credential reached a tool that does not need it")
 					}
 				}
@@ -356,7 +406,16 @@ func TestLaunchLoadsOnlyRequiredCredentialsAndPreservesArguments(t *testing.T) {
 		})
 	}
 
-	for _, args := range [][]string{{"ops"}, {"ops", "status"}, {"key"}, {"key", "../other"}, {"init", "unexpected"}, {"unknown"}} {
+	for _, args := range [][]string{
+		{
+			"ops",
+		},
+		{"ops", "status"},
+		{"key"},
+		{"key", "../other"},
+		{"init", "unexpected"},
+		{"unknown"},
+	} {
 		if err := runtime.run(args, strings.NewReader(""), io.Discard); err == nil {
 			t.Fatal("invalid command was accepted")
 		}
@@ -398,7 +457,10 @@ func TestStatusAuthenticatesAndDoesNotExposeKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(output.String(), "1 models") || !strings.Contains(output.String(), "2 provider accounts") || strings.Contains(output.String(), api) || strings.Contains(output.String(), management) {
+	if !strings.Contains(output.String(), "1 models") || !strings.Contains(
+		output.String(),
+		"2 provider accounts",
+	) || strings.Contains(output.String(), api) || strings.Contains(output.String(), management) {
 		t.Fatal("status output is incorrect or exposed a credential")
 	}
 
@@ -415,10 +477,14 @@ func TestRequestsDoNotForwardCredentialsOnRedirect(t *testing.T) {
 	forwarded := false
 	target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { forwarded = true }))
 	t.Cleanup(target.Close)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, http.StatusFound) }))
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, http.StatusFound) },
+	))
 	t.Cleanup(server.Close)
 	runtime.url = server.URL
-	runtime.client = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	runtime.client = &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 
 	if _, err := runtime.request("/v1/models", apiField); err == nil || forwarded {
 		t.Fatal("authenticated redirect was followed")
@@ -442,7 +508,8 @@ func TestReadKeyAndExecutionErrorsFailClosed(t *testing.T) {
 
 	var output bytes.Buffer
 
-	if err := runtime.run([]string{"key", apiField}, strings.NewReader(""), &output); err != nil || strings.TrimSuffix(output.String(), "\n") != keyForTest(t, runtime, apiField) {
+	if err := runtime.run([]string{"key", apiField}, strings.NewReader(""), &output); err != nil ||
+		strings.TrimSuffix(output.String(), "\n") != keyForTest(t, runtime, apiField) {
 		t.Fatal("explicit key command did not return its selected credential")
 	}
 }

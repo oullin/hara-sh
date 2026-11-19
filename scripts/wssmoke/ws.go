@@ -97,7 +97,15 @@ func (c *conn) handshake(u *url.URL, key string, timeout time.Duration) error {
 
 	challenge := base64.StdEncoding.EncodeToString(nonce)
 
-	req := &http.Request{Method: http.MethodGet, URL: &url.URL{Path: u.Path, RawQuery: u.RawQuery}, Host: u.Host, Header: http.Header{}}
+	req := &http.Request{
+		Method: http.MethodGet,
+		URL: &url.URL{
+			Path:     u.Path,
+			RawQuery: u.RawQuery,
+		},
+		Host:   u.Host,
+		Header: http.Header{},
+	}
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Sec-WebSocket-Version", "13")

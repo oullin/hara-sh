@@ -29,5 +29,9 @@ export function useCopy(resetMs = 1600) {
 
 	onBeforeUnmount(() => clearTimeout(timer));
 
-	return { copied, copy, failed };
+	return {
+		copied,
+		copy,
+		failed,
+	};
 }

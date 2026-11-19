@@ -52,7 +52,11 @@ func (h host) port() string {
 }
 
 func (h host) compose(args ...string) *exec.Cmd {
-	return h.command("docker", append([]string{"compose", "-f", filepath.Join(h.root, "local", "compose.yaml")}, args...)...)
+	return h.command("docker", append([]string{
+		"compose",
+		"-f",
+		filepath.Join(h.root, "local", "compose.yaml"),
+	}, args...)...)
 }
 
 // tools runs one containerised tool; host loopback URLs become the proxy's Docker service address.
@@ -94,7 +98,19 @@ func (h host) bench(args []string) error {
 	values := make([]string, 3)
 	copy(values, args)
 
-	return h.tools([]string{"bench", "-n", cmp.Or(values[0], "5"), "-claude-model", values[1], "-codex-model", values[2], h.toolsURL()})
+	return h.tools([]string{
+		"bench",
+		"-n",
+		cmp.Or(
+			values[0],
+			"5",
+		),
+		"-claude-model",
+		values[1],
+		"-codex-model",
+		values[2],
+		h.toolsURL(),
+	})
 }
 
 func (h host) status() error {
@@ -186,7 +202,9 @@ func (h host) removePortlessAlias() error {
 	command.Stderr = &stderr
 
 	if err := h.call(command); err != nil && !strings.Contains(stderr.String(), "No alias found for") {
-		return fmt.Errorf("remove the existing Hara Portless alias before starting: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("remove the existing Hara Portless alias before starting: %w: %s", err, strings.TrimSpace(
+			stderr.String(),
+		))
 	}
 
 	return nil
@@ -201,8 +219,7 @@ func (h host) up() error {
 
 	for _, args := range [][]string{
 		{"config", "--quiet"},
-		{"build", "init"},
-		{"pull", "proxy"},
+		{"build", "init", "proxy"},
 	} {
 		if err := h.call(h.compose(args...)); err != nil {
 			return err
@@ -213,7 +230,9 @@ func (h host) up() error {
 		return err
 	}
 
-	if err := h.call(h.compose("up", "-d", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "60")); err != nil {
+	if err := h.call(
+		h.compose("up", "-d", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "60"),
+	); err != nil {
 		return err
 	}
 
@@ -240,7 +259,17 @@ func (h host) initialise() error {
 
 // purge leaves Docker to rebuild or pull everything on the next up; private state in LOCAL_DIR is kept.
 func (h host) purge() error {
-	if err := h.call(h.compose("--profile", "tailscale", "--profile", "tools", "down", "--rmi", "all", "--volumes", "--remove-orphans")); err != nil {
+	if err := h.call(h.compose(
+		"--profile",
+		"tailscale",
+		"--profile",
+		"tools",
+		"down",
+		"--rmi",
+		"all",
+		"--volumes",
+		"--remove-orphans",
+	)); err != nil {
 		return err
 	}
 

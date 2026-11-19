@@ -6,9 +6,18 @@ describe('glyphDots', () => {
 		const dots = glyphDots('#....|.....|.....|.....|....#');
 
 		expect(dots).toHaveLength(25);
-		expect(dots[0]).toEqual({ class: 'dot dot-on', delay: 0 });
-		expect(dots[1]).toEqual({ class: 'dot', delay: 0 });
-		expect(dots[24]).toEqual({ class: 'dot dot-on', delay: (8 % 7) * 160 });
+		expect(dots[0]).toEqual({
+			class: 'dot dot-on',
+			delay: 0,
+		});
+		expect(dots[1]).toEqual({
+			class: 'dot',
+			delay: 0,
+		});
+		expect(dots[24]).toEqual({
+			class: 'dot dot-on',
+			delay: (8 % 7) * 160,
+		});
 	});
 
 	it('staggers lit dots along the diagonal', () => {
@@ -24,7 +33,10 @@ describe('ringField', () => {
 		const field = ringField(5);
 
 		expect(field).toHaveLength(25);
-		expect(field[12]).toEqual({ class: 'dot dot-core', delay: 0 });
+		expect(field[12]).toEqual({
+			class: 'dot dot-core',
+			delay: 0,
+		});
 		expect(
 			field.filter((dot) => dot.class === 'dot dot-core'),
 		).toHaveLength(1);
@@ -33,8 +45,17 @@ describe('ringField', () => {
 	it('lights a checkerboard that pulses inward, outer rings first', () => {
 		const field = ringField(5);
 
-		expect(field[0]).toEqual({ class: 'dot dot-on', delay: 0 });
-		expect(field[6]).toEqual({ class: 'dot dot-on', delay: 160 });
-		expect(field[1]).toEqual({ class: 'dot', delay: 0 });
+		expect(field[0]).toEqual({
+			class: 'dot dot-on',
+			delay: 0,
+		});
+		expect(field[6]).toEqual({
+			class: 'dot dot-on',
+			delay: 160,
+		});
+		expect(field[1]).toEqual({
+			class: 'dot',
+			delay: 0,
+		});
 	});
 });

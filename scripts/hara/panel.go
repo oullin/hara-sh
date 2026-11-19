@@ -30,13 +30,27 @@ func (h host) panel() error {
 
 	h.log("cloning %s@%s", repo, tag)
 
-	if err := h.call(h.command("git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1", "--branch", tag, repo, dir)); err != nil {
+	if err := h.call(h.command(
+		"git",
+		"-c",
+		"advice.detachedHead=false",
+		"clone",
+		"--quiet",
+		"--depth",
+		"1",
+		"--branch",
+		tag,
+		repo,
+		dir,
+	)); err != nil {
 		return err
 	}
 
 	h.log("applying panel/ledger.patch")
 
-	if err := h.call(h.command("git", "-C", dir, "apply", "--whitespace=nowarn", filepath.Join(h.root, "panel", "ledger.patch"))); err != nil {
+	if err := h.call(
+		h.command("git", "-C", dir, "apply", "--whitespace=nowarn", filepath.Join(h.root, "panel", "ledger.patch")),
+	); err != nil {
 		return err
 	}
 

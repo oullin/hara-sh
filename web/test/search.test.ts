@@ -6,11 +6,21 @@ import { Search } from '@worker/search';
 import { search, stubSearchCache } from '@test/fakes';
 
 function env() {
-	return { ...search(), ASSETS: { fetch: vi.fn(() => Promise.resolve(new Response('asset'))) } };
+	return {
+		...search(),
+		ASSETS: { fetch: vi.fn<() => Promise<Response>>(() => Promise.resolve(new Response('asset'))) },
+	};
 }
 
 function post(path: string, body: string, headers: Record<string, string> = {}) {
-	return new Request(`https://${DOCS_HOST}${path}`, { body, headers, method: 'POST' });
+	return new Request(
+		`https://${DOCS_HOST}${path}`,
+		{
+			body,
+			headers,
+			method: 'POST',
+		},
+	);
 }
 
 function index(token = 'test-token') {
@@ -40,13 +50,19 @@ describe('docs search', () => {
 
 		expect(indexed.status).toBe(200);
 
-		expect(await indexed.json()).toEqual({ pages: 11, vectors: 11 });
+		expect(await indexed.json()).toEqual({
+			pages: 11,
+			vectors: 11,
+		});
 		// Ten chunks per embedding request.
 		expect(
 			bindings.AI.inputs.map((input) => input.length),
 		).toEqual([10, 1]);
 		expect(bindings.AI.inputs[0]![0]).toMatch(/^title: .+ \| text: # /);
-		expect(bindings.VECTORIZE.vectors.get('/networking#0')?.metadata).toEqual({ title: 'Network and TLS', url: '/networking' });
+		expect(bindings.VECTORIZE.vectors.get('/networking#0')?.metadata).toEqual({
+			title: 'Network and TLS',
+			url: '/networking',
+		});
 
 		const response = await worker.fetch(query('  Tailscale HTTPS on my tailnet  '), bindings);
 
@@ -57,7 +73,10 @@ describe('docs search', () => {
 			bindings.AI.inputs.at(-1),
 		).toEqual(['task: search result | query: Tailscale HTTPS on my tailnet']);
 		expect(results).toHaveLength(5);
-		expect(results[0]).toMatchObject({ title: 'Network and TLS', url: '/networking' });
+		expect(results[0]).toMatchObject({
+			title: 'Network and TLS',
+			url: '/networking',
+		});
 		expect(results[0]!.score).toBeGreaterThan(results[1]!.score);
 		expect(new Set(results.map(({ url }) => url)).size).toBe(5);
 		expect(bindings.ASSETS.fetch).not.toHaveBeenCalled();
@@ -68,9 +87,24 @@ describe('docs search', () => {
 		const engine = new Search(bindings.AI, bindings.VECTORIZE);
 
 		await engine.index([
-			{ id: '/a#0', text: 'proxy keys', title: 'A', url: '/a' },
-			{ id: '/a#1', text: 'proxy keys rotate', title: 'A', url: '/a' },
-			{ id: '/b#0', text: 'proxy', title: 'B', url: '/b' },
+			{
+				id: '/a#0',
+				text: 'proxy keys',
+				title: 'A',
+				url: '/a',
+			},
+			{
+				id: '/a#1',
+				text: 'proxy keys rotate',
+				title: 'A',
+				url: '/a',
+			},
+			{
+				id: '/b#0',
+				text: 'proxy',
+				title: 'B',
+				url: '/b',
+			},
 		]);
 
 		expect(
@@ -91,7 +125,10 @@ describe('docs search', () => {
 	});
 
 	it('refuses to index when the Worker has no token set', async () => {
-		const bindings = { ...env(), INDEX_TOKEN: undefined };
+		const bindings = {
+			...env(),
+			INDEX_TOKEN: undefined,
+		};
 
 		const response = await worker.fetch(index('undefined'), bindings);
 
@@ -226,8 +263,16 @@ describe('docs chunks', () => {
 				{ '../docs/index.md': '---\ndescription: x\n---\n\n# Overview\n\nBody' },
 			),
 		).toEqual([
-			{ id: '/#0', text: 'title: Overview | text: # Overview\n\nBody', title: 'Overview', url: '/' },
+			{
+				id: '/#0',
+				text: 'title: Overview | text: # Overview\n\nBody',
+				title: 'Overview',
+				url: '/',
+			},
 		]);
-		expect(documents({ '../docs/notes.md': 'No heading' })[0]).toMatchObject({ title: 'notes', url: '/notes' });
+		expect(documents({ '../docs/notes.md': 'No heading' })[0]).toMatchObject({
+			title: 'notes',
+			url: '/notes',
+		});
 	});
 });

@@ -136,13 +136,26 @@ func (m *mockProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch r.URL.Path {
 	case "/v0/management/auth-files":
-		json.NewEncoder(w).Encode(map[string]any{"files": []map[string]any{
-			{"provider": "claude", "name": "claude-one.json", "auth_index": "a1", "next_retry_after": now.Add(3 * time.Hour)},
-			{"provider": "claude", "name": "claude-two.json", "auth_index": "a2", "priority": 90},
-			{"provider": "codex", "name": "codex-one.json", "auth_index": "a3", "priority": 95, "id_token": map[string]any{"chatgpt_account_id": "acct"}},
-			{"provider": "claude", "name": "claude-three.json", "auth_index": "a5", "priority": 98},
-			{"provider": "gemini", "name": "gemini.json", "auth_index": "a4", "disabled": true},
-		}})
+		json.NewEncoder(w).Encode(map[string]any{
+			"files": []map[string]any{
+				{
+					"provider":         "claude",
+					"name":             "claude-one.json",
+					"auth_index":       "a1",
+					"next_retry_after": now.Add(3 * time.Hour),
+				},
+				{"provider": "claude", "name": "claude-two.json", "auth_index": "a2", "priority": 90},
+				{
+					"provider":   "codex",
+					"name":       "codex-one.json",
+					"auth_index": "a3",
+					"priority":   95,
+					"id_token":   map[string]any{"chatgpt_account_id": "acct"},
+				},
+				{"provider": "claude", "name": "claude-three.json", "auth_index": "a5", "priority": 98},
+				{"provider": "gemini", "name": "gemini.json", "auth_index": "a4", "disabled": true},
+			},
+		})
 	case "/v0/management/api-call":
 		var call apiCall
 
@@ -203,7 +216,8 @@ func TestShow(t *testing.T) {
 		}
 	}
 
-	if len(mock.calls) != 4 || mock.calls[0].Header["Authorization"] != "Bearer $TOKEN$" || mock.calls[2].Header["ChatGPT-Account-Id"] != "acct" {
+	if len(mock.calls) != 4 || mock.calls[0].Header["Authorization"] != "Bearer $TOKEN$" ||
+		mock.calls[2].Header["ChatGPT-Account-Id"] != "acct" {
 		t.Errorf("api-calls = %+v", mock.calls)
 	}
 

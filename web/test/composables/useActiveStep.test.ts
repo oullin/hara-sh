@@ -7,7 +7,7 @@ type Callback = (entries: Array<Partial<IntersectionObserverEntry>>) => void;
 
 function install() {
 	const observed: Array<Element> = [];
-	const disconnect = vi.fn();
+	const disconnect = vi.fn<IntersectionObserver['disconnect']>();
 
 	let callback: Callback | undefined;
 
@@ -25,7 +25,11 @@ function install() {
 
 	vi.stubGlobal('IntersectionObserver', FakeObserver);
 
-	return { disconnect, fire: (entries: Array<Partial<IntersectionObserverEntry>>) => callback?.(entries), observed };
+	return {
+		disconnect,
+		fire: (entries: Array<Partial<IntersectionObserverEntry>>) => callback?.(entries),
+		observed,
+	};
 }
 
 function host(withContainer = true) {
@@ -45,7 +49,10 @@ function host(withContainer = true) {
 		),
 	);
 
-	return { api, wrapper };
+	return {
+		api,
+		wrapper,
+	};
 }
 
 describe('useActiveStep', () => {
@@ -62,8 +69,14 @@ describe('useActiveStep', () => {
 
 		fire(
 			[
-				{ isIntersecting: false, target: observed[0] },
-				{ isIntersecting: true, target: observed[1] },
+				{
+					isIntersecting: false,
+					target: observed[0],
+				},
+				{
+					isIntersecting: true,
+					target: observed[1],
+				},
 			],
 		);
 
@@ -75,7 +88,12 @@ describe('useActiveStep', () => {
 		const { api } = host();
 
 		fire(
-			[{ isIntersecting: true, target: document.createElement('li') }],
+			[
+				{
+					isIntersecting: true,
+					target: document.createElement('li'),
+				},
+			],
 		);
 
 		expect(api.active.value).toBe('a');

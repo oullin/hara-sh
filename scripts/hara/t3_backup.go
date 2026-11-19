@@ -60,7 +60,11 @@ func (h host) t3Backup(args []string) error {
 	}
 
 	if *dryRun {
-		fmt.Fprintf(h.stdout, "Would encrypt %d source roots into the selected destination. No files copied.\n", len(sources))
+		fmt.Fprintf(
+			h.stdout,
+			"Would encrypt %d source roots into the selected destination. No files copied.\n",
+			len(sources),
+		)
 
 		return nil
 	}
@@ -126,7 +130,11 @@ func (h host) t3BackupWarnBusy() {
 	if len(running) > 0 {
 		slices.Sort(running)
 
-		fmt.Fprintf(h.stderr, "Warning: %s still running; files removed during the backup are skipped, and files rewritten in place stop it.\n", strings.Join(running, ", "))
+		fmt.Fprintf(
+			h.stderr,
+			"Warning: %s still running; files removed during the backup are skipped, and files rewritten in place stop it.\n",
+			strings.Join(running, ", "),
+		)
 	}
 }
 
@@ -148,8 +156,15 @@ func (h host) t3BackupSources() ([]backupSource, error) {
 	paths := []string{t3Home}
 
 	for _, relative := range []string{
-		".codex", ".codex-t3-hara", ".claude", ".claude-hara", ".claude.json", ".cursor", ".agents",
-		"Library/Application Support/t3code-v2", "Library/Application Support/t3code",
+		".codex",
+		".codex-t3-hara",
+		".claude",
+		".claude-hara",
+		".claude.json",
+		".cursor",
+		".agents",
+		"Library/Application Support/t3code-v2",
+		"Library/Application Support/t3code",
 	} {
 		paths = append(paths, filepath.Join(h.home, filepath.FromSlash(relative)))
 	}
@@ -291,12 +306,17 @@ func (h host) backupSourcesWithin(paths []string, home string) []backupSource {
 	var sources []backupSource
 
 	for _, path := range paths {
-		if !exists(path) || slices.ContainsFunc(sources, func(source backupSource) bool { return insidePath(path, source.Path) }) {
+		if !exists(path) ||
+			slices.ContainsFunc(sources, func(source backupSource) bool { return insidePath(path, source.Path) }) {
 			continue
 		}
 
 		if path == home || !insidePath(path, home) {
-			fmt.Fprintf(h.stderr, "Warning: skipping %s because it is outside the user home; back it up separately.\n", path)
+			fmt.Fprintf(
+				h.stderr,
+				"Warning: skipping %s because it is outside the user home; back it up separately.\n",
+				path,
+			)
 
 			continue
 		}
@@ -385,7 +405,8 @@ func (h host) t3BackupStopped() error {
 }
 
 // t3ServerAlive reports whether the recorded server PID still belongs to T3. A PID is reused only after T3 exits,
-// so a live process that started well after T3 recorded its start is a different program. Unknown states count as alive.
+// so a live process that started well after T3 recorded its start is a different program. Unknown states count
+// as alive.
 func (h host) t3ServerAlive(pid int, startedAt string) bool {
 	process, err := os.FindProcess(pid)
 
@@ -523,7 +544,12 @@ func (h host) writeT3Backup(ctx context.Context, destination, recipient string, 
 		return err
 	}
 
-	fmt.Fprintf(h.stdout, "Created %s (%d source roots). Keep its passphrase or private recipient key separately.\n", name, len(sources))
+	fmt.Fprintf(
+		h.stdout,
+		"Created %s (%d source roots). Keep its passphrase or private recipient key separately.\n",
+		name,
+		len(sources),
+	)
 
 	return nil
 }

@@ -4,20 +4,24 @@ import process from 'node:process';
 import { URL } from 'node:url';
 import { JSDOM } from 'jsdom';
 
-const assets = new URL('../.cloudflare/output/v1/workers/default/assets/', import.meta.url);
-
-const guides = (await readdir(new URL('../docs/', import.meta.url))).filter((file) => file.endsWith('.md'));
+const guides = (await readdir(new URL('.', import.meta.resolve('#docs/index.md')))).filter((file) => file.endsWith('.md'));
 
 const pages = [
-	{ file: 'index.html', url: 'https://hara.sh/' },
-	...guides.map((file) => ({ file: `docs/${file.replace(/\.md$/, '.html')}`, url: `https://docs.hara.sh/${file === 'index.md' ? '' : file.replace(/\.md$/, '')}` })),
+	{
+		file: 'index.html',
+		url: 'https://hara.sh/',
+	},
+	...guides.map((file) => ({
+		file: `docs/${file.replace(/\.md$/, '.html')}`,
+		url: `https://docs.hara.sh/${file === 'index.md' ? '' : file.replace(/\.md$/, '')}`,
+	})),
 ];
 
 const descriptions = new Set<string>();
 const titles = new Set<string>();
 
 for (const { file, url } of pages) {
-	const dom = new JSDOM(await readFile(new URL(file, assets), 'utf8'));
+	const dom = new JSDOM(await readFile(new URL(import.meta.resolve(`#assets/${file}`)), 'utf8'));
 
 	const { document } = dom.window;
 	const meta = (selector: string): string | null | undefined => document.querySelector(selector)?.getAttribute('content');
@@ -49,11 +53,15 @@ for (const { file, url } of pages) {
 	assert.equal(meta('meta[name="twitter:image"]'), 'https://hara.sh/og.png', `${file}: Twitter image`);
 	assert.match(meta('meta[name="robots"]') ?? '', /^index, follow/, `${file}: indexing`);
 
-	const schemas = Array.from(document.querySelectorAll('script[type="application/ld+json"]'), (script): unknown => JSON.parse(script.textContent ?? ''));
+	const schemas = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
 
 	assert(schemas.length, `${file}: structured data`);
 	assert(
-		schemas.every((schema) => typeof schema === 'object' && schema !== null && '@context' in schema && schema['@context'] === 'https://schema.org'),
+		schemas.every((script) => {
+			const schema: unknown = JSON.parse(script.textContent ?? '');
+
+			return typeof schema === 'object' && schema !== null && '@context' in schema && schema['@context'] === 'https://schema.org';
+		}),
 		`${file}: schema context`,
 	);
 	assert(!/\b(?:center|behavior|recognizable|authorize|favors|sanitized|containerized)\b/i.test(document.body.textContent ?? ''), `${file}: British English`);
@@ -66,22 +74,18 @@ for (const [file, origin] of [
 	['sitemap.xml', 'https://hara.sh'],
 	['docs/sitemap.xml', 'https://docs.hara.sh'],
 ] as const) {
-	const dom = new JSDOM(await readFile(new URL(file, assets), 'utf8'), { contentType: 'application/xml' });
+	const dom = new JSDOM(
+		await readFile(new URL(import.meta.resolve(`#assets/${file}`)), 'utf8'),
+		{ contentType: 'application/xml' },
+	);
 
 	const urls = Array.from(dom.window.document.querySelectorAll('loc'), (node) => node.textContent ?? '');
 
-	assert.deepEqual(
-		urls.toSorted(),
-		pages
-			.filter((page) => new URL(page.url).origin === origin)
-			.map((page) => page.url)
-			.toSorted(),
-		`${file}: sitemap routes`,
-	);
+	assert.deepEqual(urls.toSorted(), pages.flatMap(({ url }) => (new URL(url).origin === origin ? [url] : [])).toSorted(), `${file}: sitemap routes`);
 	dom.window.close();
 }
 
-const missing = new JSDOM(await readFile(new URL('docs/404.html', assets), 'utf8'));
+const missing = new JSDOM(await readFile(new URL(import.meta.resolve('#assets/docs/404.html')), 'utf8'));
 
 assert.match(missing.window.document.querySelector('meta[name="robots"]')?.getAttribute('content') ?? '', /noindex/, '404 must not be indexed');
 assert.equal(missing.window.document.querySelector('link[rel="canonical"]'), null, '404 must not claim a canonical page');

@@ -138,8 +138,15 @@ func (h host) backup(args []string) error {
 		source string
 		files  []string
 	}{
-		"claude": {"Claude", filepath.Join(h.home, ".claude"), []string{"settings.local.json", "CLAUDE.md", ".claude.json", "settings.json"}},
-		"codex":  {"Codex", h.codexHome(), []string{"config.toml", "openai.config.toml", "proxy.config.toml"}},
+		"claude": {
+			"Claude",
+			filepath.Join(
+				h.home,
+				".claude",
+			),
+			[]string{"settings.local.json", "CLAUDE.md", ".claude.json", "settings.json"},
+		},
+		"codex": {"Codex", h.codexHome(), []string{"config.toml", "openai.config.toml", "proxy.config.toml"}},
 	}
 
 	if len(args) != 1 {
@@ -297,7 +304,12 @@ func checkCodexApp(content, command, baseURL string) error {
 		{haraProviderTable + ".auth.command", command},
 	} {
 		if got := tomlLookup(config, want.path); got != want.value {
-			return fmt.Errorf("the merged file sets %s = %v, not %v; add the provider by hand", want.path, got, want.value)
+			return fmt.Errorf(
+				"the merged file sets %s = %v, not %v; add the provider by hand",
+				want.path,
+				got,
+				want.value,
+			)
 		}
 	}
 
@@ -336,7 +348,11 @@ func splitTOML(content string) ([]string, []tomlTable) {
 			var comments []string
 
 			*previous, comments = detachComments(*previous)
-			tables = append(tables, tomlTable{name: tomlNameQuotes.Replace(match[1]), comments: comments, lines: []string{line}})
+			tables = append(tables, tomlTable{
+				name:     tomlNameQuotes.Replace(match[1]),
+				comments: comments,
+				lines:    []string{line},
+			})
 			previous = &tables[len(tables)-1].lines
 		} else {
 			*previous = append(*previous, line)
@@ -617,7 +633,13 @@ func (h host) checkCodexProvider(config, hint string) error {
 	}
 
 	if got != want {
-		return fmt.Errorf("%s does not route Codex through Hara (model_provider is %q, want %q); run: %s", config, got, want, hint)
+		return fmt.Errorf(
+			"%s does not route Codex through Hara (model_provider is %q, want %q); run: %s",
+			config,
+			got,
+			want,
+			hint,
+		)
 	}
 
 	return nil

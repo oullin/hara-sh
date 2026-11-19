@@ -31,7 +31,7 @@ export class FakeAi implements Embedder {
 
 	failing = false;
 
-	run(model: string, { input }: { input: Array<string> }): Promise<unknown> {
+	run(model: string, { input }: { input: Array<string> }) {
 		if (this.failing) {
 			return Promise.reject(new Error(`${model} is unavailable`));
 		}
@@ -50,11 +50,18 @@ export class FakeIndex implements Store {
 
 	query(vector: Array<number>, { topK }: { topK: number }) {
 		const matches = [...this.vectors.values()]
-			.map(({ id, metadata, values }) => ({ id, metadata, score: cosine(vector, values) }))
+			.map(({ id, metadata, values }) => ({
+				id,
+				metadata,
+				score: cosine(vector, values),
+			}))
 			.sort((a, b) => b.score - a.score)
 			.slice(0, topK);
 
-		return Promise.resolve({ count: matches.length, matches });
+		return Promise.resolve({
+			count: matches.length,
+			matches,
+		});
 	}
 
 	upsert(vectors: Array<Vector>) {
@@ -62,7 +69,10 @@ export class FakeIndex implements Store {
 			this.vectors.set(vector.id, vector);
 		}
 
-		return Promise.resolve({ count: vectors.length, ids: vectors.map(({ id }) => id) });
+		return Promise.resolve({
+			count: vectors.length,
+			ids: vectors.map(({ id }) => id),
+		});
 	}
 }
 
@@ -70,8 +80,8 @@ export function search() {
 	return {
 		AI: new FakeAi(),
 		INDEX_TOKEN: 'test-token',
-		SEARCH_BUDGET: { limit: vi.fn(() => Promise.resolve({ success: true })) },
-		SEARCH_LIMIT: { limit: vi.fn(() => Promise.resolve({ success: true })) },
+		SEARCH_BUDGET: { limit: vi.fn<({ key }: { key: string }) => Promise<{ success: boolean }>>(() => Promise.resolve({ success: true })) },
+		SEARCH_LIMIT: { limit: vi.fn<({ key }: { key: string }) => Promise<{ success: boolean }>>(() => Promise.resolve({ success: true })) },
 		VECTORIZE: new FakeIndex(),
 	};
 }

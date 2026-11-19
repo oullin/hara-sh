@@ -147,11 +147,14 @@ func (c check) socket(w io.Writer, base string) bool {
 	steps := []socketStep{{"ping/pong", func() error { return conn.ping(c.timeout) }}}
 
 	if c.idle > 0 {
-		steps = append(steps, socketStep{"idle " + c.idle.String(), func() error {
-			time.Sleep(c.idle)
+		steps = append(steps, socketStep{
+			"idle " + c.idle.String(),
+			func() error {
+				time.Sleep(c.idle)
 
-			return conn.ping(c.timeout)
-		}})
+				return conn.ping(c.timeout)
+			},
+		})
 	}
 
 	steps = append(steps, socketStep{"close", func() error { return conn.close(c.timeout) }})

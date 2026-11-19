@@ -9,12 +9,18 @@ const STEP_MS = 160;
 export function glyphDots(glyph: string): Array<Dot> {
 	return [...glyph.replaceAll('|', '')].map((cell, index) => {
 		if (cell !== '#') {
-			return { class: 'dot', delay: 0 };
+			return {
+				class: 'dot',
+				delay: 0,
+			};
 		}
 
 		const step = ((index % 5) + Math.floor(index / 5)) % SWEEP_STEPS;
 
-		return { class: 'dot dot-on', delay: step * STEP_MS };
+		return {
+			class: 'dot dot-on',
+			delay: step * STEP_MS,
+		};
 	});
 }
 
@@ -28,11 +34,20 @@ export function ringField(size: number): Array<Dot> {
 			const ring = Math.max(Math.abs(x - mid), Math.abs(y - mid));
 
 			if (ring === 0) {
-				cells.push({ class: 'dot dot-core', delay: 0 });
+				cells.push({
+					class: 'dot dot-core',
+					delay: 0,
+				});
 			} else if ((x + y) % 2 === 0) {
-				cells.push({ class: 'dot dot-on', delay: (mid - ring) * STEP_MS });
+				cells.push({
+					class: 'dot dot-on',
+					delay: (mid - ring) * STEP_MS,
+				});
 			} else {
-				cells.push({ class: 'dot', delay: 0 });
+				cells.push({
+					class: 'dot',
+					delay: 0,
+				});
 			}
 		}
 	}

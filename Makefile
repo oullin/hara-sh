@@ -2,6 +2,7 @@
 # Private credentials are read from local state, with Docker fallback; 1Password is optional.
 
 SHELL      := /bin/bash
+FMTKIT     ?= fmtkit
 # Host clients use loopback; containerized tools map it to the proxy service.
 URL        ?= http://localhost:$(or $(HARA_PORT),8317)
 MODEL      ?= claude-haiku-4-5-20251001
@@ -91,7 +92,8 @@ $(HARA): $(HARA_SOURCES)
 	else \
 	  docker run --rm -u "$$(id -u):$$(id -g)" -e CGO_ENABLED=0 -e GOCACHE=/tmp/go-cache \
 	    -e GOOS="$$(uname -s | tr '[:upper:]' '[:lower:]')" -e GOARCH="$$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
-	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src golang:1.27-alpine go build -trimpath -o /out/hara .; \
+	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src \
+	    golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 go build -trimpath -o /out/hara .; \
 	fi
 
 init up portless down purge status logs claude/run claude/backup codex/profile codex/app codex/smoke codex/backup t3/setup t3/smoke t3/executor t3/backup code/panel: $(HARA)
@@ -234,12 +236,13 @@ code/check: code/test code/public
 
 # The one fmtkit target (settings in fmtkit.toml); go vet runs for every Go module.
 format-all:
-	fmtkit format --all
+	$(FMTKIT) format --all
 
 code/test:
 	docker build --target verify -f scripts/tools/Dockerfile .
 
 code/resilience:
+	docker compose -f local/compose.yaml build proxy
 	cd scripts/hara && HARA_PROXY_INTEGRATION=1 go test -count=1 -run TestProxyImage -v -timeout 2m .
 
 # Upstream panel + panel/ledger.patch; commit it, then `make up`.

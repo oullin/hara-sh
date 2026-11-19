@@ -449,7 +449,10 @@ func (runtime toolRuntime) launch(command string, args []string) error {
 			return errors.New("use the status command for containerised health checks")
 		}
 
-		if !slices.ContainsFunc(args, func(arg string) bool { return arg == "-url" || strings.HasPrefix(arg, "-url=") }) {
+		if !slices.ContainsFunc(args, func(arg string) bool {
+			return arg == "-url" ||
+				strings.HasPrefix(arg, "-url=")
+		}) {
 			args = append([]string{args[0], "-url", runtime.url}, args[1:]...)
 		}
 

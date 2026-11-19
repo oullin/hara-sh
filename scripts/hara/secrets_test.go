@@ -34,7 +34,17 @@ func TestLocalCredentialSkipsDocker(t *testing.T) {
 }
 
 func TestInvalidLocalCredentialDoesNotFallBackOrLeak(t *testing.T) {
-	for _, value := range []string{"", strings.Repeat("x", 19), strings.Repeat("x", 74), "synthetic-credential\nwith-newline", "synthetic-credential\x00null", "synthetic-credential\xff"} {
+	for _, value := range []string{
+		"",
+		strings.Repeat("x", 19),
+		strings.Repeat(
+			"x",
+			74,
+		),
+		"synthetic-credential\nwith-newline",
+		"synthetic-credential\x00null",
+		"synthetic-credential\xff",
+	} {
 		h := newTestHost(t, nil)
 		path := filepath.Join(h.state, "secrets", apiField)
 

@@ -1,5 +1,9 @@
 // Bundled at build time, so the index matches the Markdown that VitePress renders.
-const files = import.meta.glob<string>('@docs/*.md', { eager: true, import: 'default', query: '?raw' });
+const files = import.meta.glob<string>('@docs/*.md', {
+	eager: true,
+	import: 'default',
+	query: '?raw',
+});
 
 // Even at 1.5 characters per token, 12,000 characters stay under the model's 8,192-token window.
 export const CHUNK_CHARS = 12_000;
@@ -38,6 +42,14 @@ export function documents(sources: Record<string, string> = files): Array<Chunk>
 		const title = /^# (.+)$/m.exec(body)?.[1] ?? slug;
 		const url = slug === 'index' ? '/' : `/${slug}`;
 
-		return chunks(body).map((text, n) => ({ id: `${url}#${n}`, text: `title: ${title} | text: ${text}`, title, url }) satisfies Chunk);
+		return chunks(body).map(
+			(text, n) =>
+				({
+					id: `${url}#${n}`,
+					text: `title: ${title} | text: ${text}`,
+					title,
+					url,
+				}) satisfies Chunk,
+		);
 	});
 }

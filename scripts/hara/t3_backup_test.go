@@ -35,7 +35,9 @@ func backupFixture(t *testing.T) testHost {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(h.home, ".t3", "userdata", "settings.json"), []byte(`{"providerInstances":{}}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(h.home, ".t3", "userdata", "settings.json"), []byte(
+		`{"providerInstances":{}}`,
+	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -225,7 +227,9 @@ func TestT3BackupEncryptionRoundTripAndFailureCleanup(t *testing.T) {
 		t.Fatal("failed encryption left an archive behind")
 	}
 
-	if err := os.WriteFile(filepath.Join(h.home, ".t3", "broken.sqlite"), []byte("SQLite format 3\x00broken"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(h.home, ".t3", "broken.sqlite"), []byte(
+		"SQLite format 3\x00broken",
+	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -281,7 +285,9 @@ func TestT3ArchivePreservesSymlinksWithoutReadingTheirTargets(t *testing.T) {
 
 	var output bytes.Buffer
 
-	if err := streamT3Archive(context.Background(), &output, []backupSource{{Path: root, Name: "home/test"}}, io.Discard); err != nil {
+	if err := streamT3Archive(context.Background(), &output, []backupSource{
+		{Path: root, Name: "home/test"},
+	}, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 
@@ -325,7 +331,9 @@ func TestT3BackupSkipsAProviderHomeOutsideTheUserHome(t *testing.T) {
 	outside := t.TempDir()
 	settings := fmt.Sprintf(`{"providerInstances":{"codex":{"config":{"homePath":%q}}}}`, outside)
 
-	if err := os.WriteFile(filepath.Join(h.home, ".t3", "userdata", "settings.json"), []byte(settings), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(h.home, ".t3", "userdata", "settings.json"), []byte(
+		settings,
+	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -385,7 +393,11 @@ func TestT3BackupDistinguishesAReusedServerPID(t *testing.T) {
 
 			content, _ := json.Marshal(map[string]any{"pid": os.Getpid(), "startedAt": test.startedAt})
 
-			if err := os.WriteFile(filepath.Join(h.home, ".t3", "userdata", "server-runtime.json"), content, 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(h.home, ".t3", "userdata", "server-runtime.json"),
+				content,
+				0o600,
+			); err != nil {
 				t.Fatal(err)
 			}
 
@@ -472,7 +484,9 @@ func TestT3ArchiveSkipsFilesRemovedDuringTheWalk(t *testing.T) {
 
 	var warnings bytes.Buffer
 
-	if err := streamT3Archive(context.Background(), output, []backupSource{{Path: root, Name: "home/test"}}, &warnings); err != nil {
+	if err := streamT3Archive(context.Background(), output, []backupSource{
+		{Path: root, Name: "home/test"},
+	}, &warnings); err != nil {
 		t.Fatal(err)
 	}
 

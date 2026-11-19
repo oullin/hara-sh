@@ -4,8 +4,14 @@ import { Button } from '@/components/ui/button';
 import { DOCS_URL } from '@/lib/content';
 
 const links = [
-	{ href: '#how', label: 'How it works' },
-	{ href: '#providers', label: 'Providers' },
+	{
+		href: '#how',
+		label: 'How it works',
+	},
+	{
+		href: '#providers',
+		label: 'Providers',
+	},
 ];
 </script>
 <template>

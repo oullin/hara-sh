@@ -108,5 +108,8 @@ func targetPriority(windows []window, now time.Time) (int, string) {
 
 	priority := boostPriority - int(soonest.Reset.Sub(now).Hours())
 
-	return priority, fmt.Sprintf("%s: %.0f%% left, resets in %s", soonest.Label, 100-soonest.Used, until(*soonest.Reset, now))
+	return priority, fmt.Sprintf("%s: %.0f%% left, resets in %s", soonest.Label, 100-soonest.Used, until(
+		*soonest.Reset,
+		now,
+	))
 }

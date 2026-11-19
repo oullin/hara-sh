@@ -102,7 +102,13 @@ func (s status) containers() []check {
 
 // container reads the state and, for the proxy, the health check result: "running/healthy".
 func (s status) container(service, label, name string) check {
-	out, err := s.sh("docker", "inspect", "-f", "{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}", name)
+	out, err := s.sh(
+		"docker",
+		"inspect",
+		"-f",
+		"{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}",
+		name,
+	)
 
 	if err != nil {
 		return check{label, fail, "not found (is Docker running?); run: make up"}
@@ -177,7 +183,11 @@ func (s status) panel() check {
 	_, code, err := proxy{client: s.short(), base: s.local}.get("/management.html", "")
 
 	if err != nil || code != http.StatusOK {
-		return check{label, fail, fmt.Sprintf("%s  %d; is panel/management.html built? run: make code panel, then make up", url, code)}
+		return check{
+			label,
+			fail,
+			fmt.Sprintf("%s  %d; is panel/management.html built? run: make code panel, then make up", url, code),
+		}
 	}
 
 	return check{label, pass, url}

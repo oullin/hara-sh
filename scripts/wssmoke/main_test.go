@@ -57,7 +57,8 @@ func (f fakeProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer nc.Close()
 
-	rw.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n")
+	rw.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n" +
+		"Connection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n")
 	rw.Flush()
 
 	for {
@@ -181,7 +182,14 @@ func TestAllStepsPass(t *testing.T) {
 		t.Fatalf("run failed:\n%s", out)
 	}
 
-	for _, want := range []string{srv.URL + "/v1/responses", "ok    handshake", "ok    ping/pong", "ok    idle 10ms", "ok    close", "ok    no key       401 as expected"} {
+	for _, want := range []string{
+		srv.URL + "/v1/responses",
+		"ok    handshake",
+		"ok    ping/pong",
+		"ok    idle 10ms",
+		"ok    close",
+		"ok    no key       401 as expected",
+	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}
@@ -275,7 +283,8 @@ func TestUnreachableAddressFails(t *testing.T) {
 
 	var out strings.Builder
 
-	if newCheck(goodKey).run(&out, []string{"http://" + addr}) || !strings.Contains(out.String(), "connection refused") {
+	if newCheck(goodKey).run(&out, []string{"http://" + addr}) ||
+		!strings.Contains(out.String(), "connection refused") {
 		t.Fatalf("want a dial failure:\n%s", out.String())
 	}
 }

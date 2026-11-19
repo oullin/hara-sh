@@ -6,9 +6,16 @@
   "engines": {
     "node": "^22.18.0 || >=24.0.0"
   },
+  "imports": {
+    "#web/package.json": "./package.json",
+    "#src/*": "./src/*",
+    "#docs/*": "./docs/*",
+    "#assets/*": "./.cloudflare/output/v1/workers/default/assets/*",
+    "#scripts/*": "./scripts/*"
+  },
   "scripts": {
     "dev": "npm run docs:build && vite",
-    "build": "vue-tsc -b && npm run docs:build && vite build && node scripts/prerender.ts && node scripts/check-seo.ts",
+    "build": "node scripts/check-aliases.ts && vue-tsc -b && npm run docs:build && vite build && node scripts/prerender.ts && node scripts/check-seo.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
