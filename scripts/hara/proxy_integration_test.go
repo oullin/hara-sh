@@ -101,8 +101,17 @@ func TestProxyImage(t *testing.T) {
 			t.Fatalf("outage reported HTTP %d", status)
 		}
 
-		if got := len(lab.attempts()); got != 4 {
-			t.Fatalf("outage made %d attempts, want two accounts in two rounds", got)
+		// The five-second cooldown and maximum retry wait coincide. A second
+		// round can see either account still cooling down.
+		attempts := lab.attempts()
+		accounts := map[string]int{}
+
+		for _, account := range attempts {
+			accounts[account]++
+		}
+
+		if len(accounts) != 2 || accounts["a"] < 1 || accounts["a"] > 2 || accounts["b"] < 1 || accounts["b"] > 2 {
+			t.Fatalf("outage attempts %v, want each account tried at least once and at most twice", attempts)
 		}
 
 		err := filepath.WalkDir(lab.state, func(path string, entry fs.DirEntry, err error) error {
