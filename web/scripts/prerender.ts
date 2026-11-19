@@ -9,7 +9,7 @@ import { renderToString } from 'vue/server-renderer';
 // Render the same components at build time so crawlers and visitors without
 // JavaScript receive the full page. No proxy state or credentials are read.
 const root = fileURLToPath(new URL('..', import.meta.url));
-const output = new URL('../.cloudflare/output/v0/workers/default/assets/index.html', import.meta.url);
+const output = new URL('../.cloudflare/output/v1/workers/default/assets/index.html', import.meta.url);
 
 const server = await createServer(
 	{

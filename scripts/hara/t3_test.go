@@ -36,7 +36,8 @@ func TestT3PicksTheProxyAddress(t *testing.T) {
 		t.Fatalf("T3_URL: %+v, %v", settings, err)
 	}
 
-	h = newT3Host(t, map[string]string{"HARA_PORT": "9000"}, "portless")
+	env := map[string]string{"HARA_PORT": "9000"}
+	h = newT3Host(t, env, "portless")
 
 	if settings, _ := h.t3Settings(); settings.url != "http://localhost:9000" || settings.ca != "" {
 		t.Fatalf("portless without its certificate authority: %+v", settings)
@@ -51,6 +52,12 @@ func TestT3PicksTheProxyAddress(t *testing.T) {
 	if err := os.WriteFile(ca, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+
+	if settings, _ := h.t3Settings(); settings.url != "http://localhost:9000" || settings.ca != "" {
+		t.Fatalf("portless without LAN opt-in: %+v", settings)
+	}
+
+	env["HARA_LAN"] = "1"
 
 	if settings, _ := h.t3Settings(); settings.url != "https://hara.local" || settings.ca != ca {
 		t.Fatalf("portless: %+v", settings)

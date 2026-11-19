@@ -14,17 +14,19 @@ The initialiser renders `$LOCAL_DIR/proxy/config.yaml`, replacing `__API_KEY__` 
 
 ## Settings
 
-| Variable               | Default                  | Use                                      |
-| ---------------------- | ------------------------ | ---------------------------------------- |
-| `LOCAL_DIR`            | `$HOME/.hara-sh`         | Private state; set explicitly on Windows |
-| `HARA_PORT`            | `8317`                   | Published host port                      |
-| `HARA_CONFIG_TEMPLATE` | Repository `config.yaml` | Absolute path to a private template      |
-| `TZ`                   | `UTC`                    | Container timezone                       |
-| `COMPOSE_PROFILES`     | unset                    | `tailscale` enables private HTTPS        |
-| `TS_HOSTNAME`          | `cliproxy`               | Tailscale device name                    |
-| `TS_AUTHKEY`           | unset                    | Optional private enrolment key           |
-| `TOOLS_URL`            | `http://proxy:8317`      | Target for Compose tools                 |
-| `URL`                  | `http://localhost:8317`  | Target for Make operations and Claude    |
+| Variable               | Default                  | Use                                                        |
+| ---------------------- | ------------------------ | ---------------------------------------------------------- |
+| `LOCAL_DIR`            | `$HOME/.hara-sh`         | Private state; set explicitly on Windows                   |
+| `HARA_PORT`            | `8317`                   | Published host port                                        |
+| `HARA_INGRESS_PORT`    | `8318`                   | Loopback port for the inference-only listener              |
+| `HARA_LAN`             | unset                    | Set to `1` to register the Portless LAN alias on `make up` |
+| `HARA_CONFIG_TEMPLATE` | Repository `config.yaml` | Absolute path to a private template                        |
+| `TZ`                   | `UTC`                    | Container timezone                                         |
+| `COMPOSE_PROFILES`     | unset                    | `tailscale` enables private HTTPS                          |
+| `TS_HOSTNAME`          | `cliproxy`               | Tailscale device name                                      |
+| `TS_AUTHKEY`           | unset                    | Optional private enrolment key                             |
+| `TOOLS_URL`            | `http://proxy:8317`      | Target for Compose tools                                   |
+| `URL`                  | `http://localhost:8317`  | Target for Make operations and Claude                      |
 
 Set variables in your shell, a private Compose `.env` file, or the [host helper settings](#host-helper-settings) used by Make. Keep keys out of them. Use absolute paths outside Git for state and private templates. Changing the host port requires updating client URLs; it does not change container port 8317 or the installed Codex profile.
 
@@ -79,7 +81,7 @@ Each line is `NAME=value`, `export NAME=value` or `: "${NAME:=value}"`; comments
 - Round-robin for new sessions; one-hour affinity for conversations and subagents.
 - Persistent, model-specific cooldowns; at most five seconds between retries when all accounts are cooling down.
 - `service_tier: priority` for Codex models. Remove that payload rule for standard-tier usage.
-- File logs capped at 512 MB; debug and request logging disabled.
+- Application log files are capped at 512 MB. `server.commercial-mode: true` disables request and response body logging, including error captures.
 
 Quota priorities are updated hourly. Plugin binaries installed inside the container are lost on recreation unless you configure persistence.
 
@@ -100,7 +102,11 @@ Logs rotate in 10 MB files with a 512 MB total cap. Protect the whole state dire
 
 ## Upgrade
 
-Back up private state, update the proxy image tag in `local/compose.yaml`, and recreate services. Run [status and smoke checks](./operations#check-a-request) afterwards.
+Back up private state, update the proxy image tag and digest in `local/compose.yaml`, and recreate services. Run [status and smoke checks](./operations#check-a-request) afterwards.
+
+If you upgrade with Docker Compose directly and previously used Portless, remove the old alias with `portless alias --remove hara` before restarting. Recreate it on the [inference-only port](./networking#optional-lan-access) to keep LAN access. `make up` handles the old alias for you.
+
+If you use `HARA_CONFIG_TEMPLATE`, add `commercial-mode: true` under `server:` to disable body logging. Existing error logs can still contain prompts and responses. Review them before sharing a diagnostic bundle.
 
 The default state directory was previously `~/.cli-proxy-api`. Stop the services and move it before starting this version, or set `LOCAL_DIR` to the old path:
 

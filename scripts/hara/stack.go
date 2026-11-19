@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -151,13 +154,42 @@ func (h host) portless() error {
 		return nil
 	}
 
+	published, err := h.output(h.compose("port", "ingress", "8318"))
+
+	if err != nil {
+		return fmt.Errorf("start the inference listener with make up: %w", err)
+	}
+
+	address, ingressPort, err := net.SplitHostPort(strings.TrimSpace(published))
+
+	if err != nil || address != "127.0.0.1" || ingressPort == "" || ingressPort == "0" {
+		return errors.New("the inference listener must publish a loopback port; run make up")
+	}
+
 	if h.call(h.command("portless", "proxy", "start", "--lan")) != nil {
 		h.log("! portless proxy did not start; https://hara.local is unavailable")
 
 		return nil
 	}
 
-	return h.call(h.command("portless", "alias", "hara", h.port(), "--force"))
+	return h.call(h.command("portless", "alias", "hara", ingressPort, "--force"))
+}
+
+// Older installs pointed this alias directly at the management listener.
+func (h host) removePortlessAlias() error {
+	if !h.look("portless") {
+		return nil
+	}
+
+	var stderr bytes.Buffer
+	command := h.command("portless", "alias", "--remove", "hara")
+	command.Stderr = &stderr
+
+	if err := h.call(command); err != nil && !strings.Contains(stderr.String(), "No alias found for") {
+		return fmt.Errorf("remove the existing Hara Portless alias before starting: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
 }
 
 // up prepares images before touching the running stack, then waits for readiness.
@@ -171,19 +203,28 @@ func (h host) up() error {
 		{"config", "--quiet"},
 		{"build", "init"},
 		{"pull", "proxy"},
-		{"up", "-d", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "60"},
 	} {
 		if err := h.call(h.compose(args...)); err != nil {
 			return err
 		}
 	}
 
+	if err := h.removePortlessAlias(); err != nil {
+		return err
+	}
+
+	if err := h.call(h.compose("up", "-d", "--no-build", "--force-recreate", "--wait", "--wait-timeout", "60")); err != nil {
+		return err
+	}
+
 	if err := h.tools([]string{"health"}); err != nil {
 		return err
 	}
 
-	if err := h.portless(); err != nil {
-		return err
+	if h.getenv("HARA_LAN") == "1" {
+		if err := h.portless(); err != nil {
+			return err
+		}
 	}
 
 	return h.status()

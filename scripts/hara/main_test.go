@@ -285,8 +285,15 @@ func TestUpStopsWithoutDocker(t *testing.T) {
 	assertCalls(t, h.fake.calls, "docker info")
 }
 
-func TestUpStartsTheStackAndPortless(t *testing.T) {
-	h := newTestHost(t, map[string]string{"HARA_PORT": "9000"}, "portless")
+func TestUpStartsTheStackAndOptInPortless(t *testing.T) {
+	h := newTestHost(t, map[string]string{"HARA_PORT": "9000", "HARA_INGRESS_PORT": "9001", "HARA_LAN": "1"}, "portless")
+	h.fake.respond = func(line string, cmd *exec.Cmd) error {
+		if line == "compose port ingress 8318" {
+			fmt.Fprintln(cmd.Stdout, "127.0.0.1:9001")
+		}
+
+		return nil
+	}
 
 	if err := h.dispatch([]string{"up"}); err != nil {
 		t.Fatal(err)
@@ -297,10 +304,12 @@ func TestUpStartsTheStackAndPortless(t *testing.T) {
 		"compose config --quiet",
 		"compose build init",
 		"compose pull proxy",
+		"portless alias --remove hara",
 		"compose up -d --no-build --force-recreate --wait --wait-timeout 60",
 		"compose run --rm --no-deps -T tools health",
+		"compose port ingress 8318",
 		"portless proxy start --lan",
-		"portless alias hara 9000 --force",
+		"portless alias hara 9001 --force",
 		"compose ps",
 		"compose run --rm --no-deps -T tools status",
 		"compose --profile tailscale ps -q --status running tailscale",
@@ -311,12 +320,34 @@ func TestUpStartsTheStackAndPortless(t *testing.T) {
 	}
 }
 
+func TestUpRemovesLegacyPortlessAliasWithoutEnablingLAN(t *testing.T) {
+	h := newTestHost(t, nil, "portless")
+	h.fake.respond = func(line string, cmd *exec.Cmd) error {
+		if line == "portless alias --remove hara" {
+			fmt.Fprintln(cmd.Stderr, `Error: No alias found for "hara.local".`)
+
+			return exitStatus(1)
+		}
+
+		return nil
+	}
+
+	if err := h.dispatch([]string{"up"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(h.fake.calls, "portless alias --remove hara") || slices.Contains(h.fake.calls, "portless proxy start --lan") {
+		t.Fatalf("unexpected Portless calls: %v", h.fake.calls)
+	}
+}
+
 func TestUpStopsAtFailedPreparationOrReadiness(t *testing.T) {
 	steps := []string{
 		"docker info",
 		"compose config --quiet",
 		"compose build init",
 		"compose pull proxy",
+		"portless alias --remove hara",
 		"compose up -d --no-build --force-recreate --wait --wait-timeout 60",
 	}
 
@@ -342,13 +373,27 @@ func TestPortlessIsOptional(t *testing.T) {
 	}
 
 	h = newTestHost(t, nil, "portless")
-	h.fake.respond = failing("portless proxy start --lan")
+	h.fake.respond = func(line string, cmd *exec.Cmd) error {
+		if line == "compose port ingress 8318" {
+			fmt.Fprintln(cmd.Stdout, "127.0.0.1:8318")
+		}
+
+		return failing("portless proxy start --lan")(line, cmd)
+	}
 
 	if err := h.dispatch([]string{"portless"}); err != nil || !strings.Contains(h.out.String(), "https://hara.local is unavailable") {
 		t.Fatalf("err %v, output %s", err, h.out)
 	}
 
-	assertCalls(t, h.fake.calls, "portless proxy start --lan")
+	assertCalls(t, h.fake.calls, "compose port ingress 8318", "portless proxy start --lan")
+
+	h = newTestHost(t, nil, "portless")
+
+	if err := h.dispatch([]string{"portless"}); err == nil {
+		t.Fatal("Portless started without a published inference port")
+	}
+
+	assertCalls(t, h.fake.calls, "compose port ingress 8318")
 }
 
 func TestStatusWaitsForTailscale(t *testing.T) {

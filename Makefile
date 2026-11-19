@@ -19,7 +19,7 @@ PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
 
 # Each area lists its actions, the first being the default, and one line of help.
 AREAS    := claude codex t3 ops web code
-SERVICES := proxy tailscale quota
+SERVICES := proxy ingress tailscale quota
 
 claude_ACTIONS := run backup
 claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
@@ -71,8 +71,8 @@ help:
 	  'make init | up | portless | down | purge | status | logs [service]   the proxy on this computer' \
 	  'make <area> [action]                                                 the first action is the default' \
 	  '' \
-	  '  up        Start Docker services, initialize private keys, apply config.yaml, run portless, then status' \
-	  '  portless  Serve the proxy at https://hara.local through portless in LAN mode (skipped if not installed)' \
+	  '  up        Start Docker services, initialize private keys, apply config.yaml, then status' \
+	  '  portless  Opt in to serving inference at https://hara.local in LAN mode' \
 	  '  down      Stop the proxy (credentials, logins and Tailscale identity kept)' \
 	  '  purge     Remove containers, networks, images, build cache and the hara.local route (private state kept)' \
 	  '  status    Check containers, proxy, panel, keys and accounts; print available addresses' \
@@ -150,7 +150,7 @@ codex/backup:
 
 ## --- t3: T3 Code's Claude and Codex provider instances -------------------------------------
 # T3 Code runs the same CLIs, so each instance carries the proxy URL and key; T3_URL overrides
-# the default (https://hara.local with portless, else localhost).
+# the default (localhost, or https://hara.local with HARA_LAN=1).
 
 t3/setup:
 	@$(HARA) t3 setup

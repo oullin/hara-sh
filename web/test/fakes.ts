@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import type { Embedder, Store } from '@worker/search';
 
 const DIMENSIONS = 768;
@@ -66,5 +67,23 @@ export class FakeIndex implements Store {
 }
 
 export function search() {
-	return { AI: new FakeAi(), INDEX_TOKEN: 'test-token', VECTORIZE: new FakeIndex() };
+	return {
+		AI: new FakeAi(),
+		INDEX_TOKEN: 'test-token',
+		SEARCH_BUDGET: { limit: vi.fn(() => Promise.resolve({ success: true })) },
+		SEARCH_LIMIT: { limit: vi.fn(() => Promise.resolve({ success: true })) },
+		VECTORIZE: new FakeIndex(),
+	};
+}
+
+export function stubSearchCache() {
+	const entries = new Map<string, Response>();
+
+	vi.stubGlobal('caches', {
+		open: () =>
+			Promise.resolve({
+				match: (key: string) => Promise.resolve(entries.get(key)?.clone()),
+				put: (key: string, response: Response) => Promise.resolve(void entries.set(key, response)),
+			}),
+	});
 }

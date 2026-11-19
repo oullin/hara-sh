@@ -4,7 +4,7 @@ import process from 'node:process';
 import { URL } from 'node:url';
 import { JSDOM } from 'jsdom';
 
-const assets = new URL('../.cloudflare/output/v0/workers/default/assets/', import.meta.url);
+const assets = new URL('../.cloudflare/output/v1/workers/default/assets/', import.meta.url);
 
 const guides = (await readdir(new URL('../docs/', import.meta.url))).filter((file) => file.endsWith('.md'));
 

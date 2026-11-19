@@ -163,9 +163,9 @@ func TestStatusDeadAddresses(t *testing.T) {
 
 	for _, want := range []string{
 		"✗ this computer       " + srv.URL + "  the proxy does not answer; run: make logs proxy",
-		"✗ your network        " + srv.URL + "  portless does not reach the proxy; run: make up",
+		"✗ your network        " + srv.URL + "  portless does not reach the proxy; run: make portless",
 		"! your tailnet        Tailscale is Stopped",
-		"- panel               not checked: your network fails",
+		"- panel               not checked: this computer fails",
 		"- client key          not checked: this computer fails",
 		"- accounts            not checked: this computer fails",
 	} {

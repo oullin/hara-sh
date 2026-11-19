@@ -27,16 +27,18 @@ docker compose -f local/compose.yaml exec tailscale tailscale status --peers=fal
 
 Keep `--profile tailscale` on later startup commands, or export `COMPOSE_PROFILES=tailscale`. `TS_HOSTNAME` changes the device name; `TS_AUTHKEY` optionally supplies a private enrolment key. Identity persists in your state directory.
 
-Use tailnet ACLs to restrict access. Management is available at the same address and requires its separate password. Avoid public port forwarding or Funnel.
+Use tailnet ACLs to restrict access. The tailnet URL serves inference APIs and health checks. Open the management panel on the Docker host at `http://localhost:8317/management.html`. Avoid public port forwarding or Funnel.
 
 ## Optional LAN access
 
-If portless is installed, `make up` serves Hara at `https://hara.local`; `make portless` repeats that step on its own. Without Make, run:
+LAN access is opt-in. Run `make up`, then `make portless` to serve inference at `https://hara.local`. Set `HARA_LAN=1` to register the alias on each `make up`. Without Make, start the Compose stack first, then run:
 
 ```bash
 portless proxy start --lan
-portless alias hara 8317 --force
+portless alias hara 8318 --force
 ```
+
+Use the value of `HARA_INGRESS_PORT` if you change port 8318. Use the host's loopback proxy port for management and provider sign-in.
 
 Starting the proxy on port 443 may ask for sudo. Run `sudo portless service install --lan` once to start it at boot instead. LAN mode exposes every app served by that instance. Client devices need mDNS and trust in its public CA; never transfer the private CA key.
 

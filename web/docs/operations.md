@@ -82,7 +82,7 @@ These commands run the same Docker tools as above:
 | Task                         | Command                                                    |
 | ---------------------------- | ---------------------------------------------------------- |
 | Start / stop / status        | `make up` / `make down` / `make status`                    |
-| Serve `https://hara.local`   | `make portless` (also run by `make up`)                    |
+| Serve `https://hara.local`   | `make portless` or `HARA_LAN=1 make up`                    |
 | Remove containers and images | `make purge` (private state kept)                          |
 | Accounts / models / quota    | `make ops accounts` / `make ops models` / `make ops quota` |
 | Request / WebSocket check    | `make ops smoke` / `make ops ws-smoke IDLE=2m`             |

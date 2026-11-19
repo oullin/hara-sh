@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SemanticSearch } from '@docs/.vitepress/theme/search';
 import { DOCS_HOST } from '@worker/host';
 import worker from '@worker/index';
-import { search } from '@test/fakes';
+import { search, stubSearchCache } from '@test/fakes';
 
 // Sends the docs client's requests to the real Worker handler with in-memory bindings.
 function client() {
@@ -13,6 +13,9 @@ function client() {
 }
 
 describe('docs search client', () => {
+	beforeEach(stubSearchCache);
+	afterEach(() => vi.unstubAllGlobals());
+
 	it('returns Worker results for a question', async () => {
 		const { bindings, semantic } = client();
 

@@ -75,6 +75,8 @@ make web deploy
 
 Run deployment from `web/` when invoking `cf` directly. Only the static site and routing Worker are published; your Docker proxy stays private.
 
+The search Worker uses two Cloudflare rate-limit namespaces. Keep their IDs distinct within your account. The limits are approximate and apply per Cloudflare location. Cached searches count toward the client limit, and only cache misses count toward the shared AI budget.
+
 ## Rebuild the management panel
 
 Install Bun and run `make code panel`. It applies `panel/ledger.patch` to the tagged upstream panel and updates `panel/management.html`. Review the result and reload the panel; the proxy serves the new file without a restart. A newer upstream tag may require rebasing the patch.

@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ type proxyLab struct {
 	calls  []string
 	base   string
 	client *http.Client
+	state  string
 }
 
 // Opt-in image contract tests use synthetic credentials and a local upstream only.
@@ -101,6 +103,18 @@ func TestProxyImage(t *testing.T) {
 
 		if got := len(lab.attempts()); got != 4 {
 			t.Fatalf("outage made %d attempts, want two accounts in two rounds", got)
+		}
+
+		err := filepath.WalkDir(lab.state, func(path string, entry fs.DirEntry, err error) error {
+			if err == nil && !entry.IsDir() && strings.HasPrefix(entry.Name(), "error-") {
+				return fmt.Errorf("outage wrote a request error log: %s", entry.Name())
+			}
+
+			return err
+		})
+
+		if err != nil {
+			t.Fatal(err)
 		}
 	})
 
@@ -224,7 +238,7 @@ func (lab *proxyLab) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 
 	if mode == "empty" && first {
-		dropProxyLabConnection(w)
+		w.WriteHeader(http.StatusOK)
 
 		return
 	}
@@ -314,6 +328,7 @@ func startProxyLab(t *testing.T) *proxyLab {
 	}
 
 	dir := t.TempDir()
+	lab.state = dir
 
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)

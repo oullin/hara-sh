@@ -12,6 +12,8 @@ const worker = defineWorker({
 		ASSETS: bindings.assets(),
 		// Bearer token for POST /api/search/index.
 		INDEX_TOKEN: bindings.secret(),
+		SEARCH_BUDGET: bindings.rateLimit({ namespace: '831702', simple: { limit: 120, period: 60 } }),
+		SEARCH_LIMIT: bindings.rateLimit({ namespace: '831701', simple: { limit: 30, period: 60 } }),
 		VECTORIZE: bindings.vectorize({ name: 'hara-docs' }),
 	},
 	name: 'hara-web',

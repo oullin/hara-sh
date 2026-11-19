@@ -62,12 +62,12 @@ var errFailed = errors.New("some checks failed")
 
 func run(cmd string, args []string, k keys, client *http.Client, sh shell, w io.Writer) error {
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
-	url := fs.String("url", "https://hara.local", "base URL of the proxy")
+	url := fs.String("url", "http://localhost:8317", "base URL of the proxy")
 
 	switch cmd {
 	case "status":
 		local := fs.String("local", "http://localhost:8317", "the proxy on this computer")
-		network := fs.String("network", "https://hara.local", "the proxy on your network (portless)")
+		network := fs.String("network", "", "optional URL of the proxy on your network (portless)")
 		project := fs.String("project", "cli-proxy-api-local", "the Docker Compose project")
 
 		if err := fs.Parse(args); err != nil {

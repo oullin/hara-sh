@@ -8,6 +8,8 @@ config-version: 8
 server:
   host: ""
   port: 8317
+  # Skip the request logger, including its capture of failed request/response bodies.
+  commercial-mode: true
 
 management:
   allow-remote: true
@@ -116,8 +118,6 @@ observability:
     # Retention: delete the oldest log files once the directory exceeds this size.
     # Upstream default is 0 (unbounded); rotation alone never deletes anything.
     logs-max-total-size-mb: 512
-    # Keep at most this many request error logs (upstream default 10).
-    error-logs-max-files: 10
     request-log: false
 
 # Plugin runtime (enabled from the management panel). Plugin binaries are installed

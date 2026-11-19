@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_HOST } from '@worker/host';
 import worker from '@worker/index';
 import { chunks, documents } from '@worker/docs';
 import { Search } from '@worker/search';
-import { search } from '@test/fakes';
+import { search, stubSearchCache } from '@test/fakes';
 
 function env() {
 	return { ...search(), ASSETS: { fetch: vi.fn(() => Promise.resolve(new Response('asset'))) } };
@@ -29,6 +29,10 @@ function query(q: unknown) {
 }
 
 describe('docs search', () => {
+	beforeEach(stubSearchCache);
+
+	afterEach(() => vi.unstubAllGlobals());
+
 	it('indexes every docs page and finds the one a question is about', async () => {
 		const bindings = env();
 
@@ -108,6 +112,65 @@ describe('docs search', () => {
 
 		expect(response.status).toBe(400);
 		expect(bindings.AI.inputs).toEqual([]);
+	});
+
+	it('rejects a request with no body', async () => {
+		const response = await worker.fetch(new Request(`https://${DOCS_HOST}/api/search/query`, { method: 'POST' }), env());
+
+		expect(response.status).toBe(400);
+	});
+
+	it('rejects an oversized body before JSON parsing or inference', async () => {
+		const bindings = env();
+
+		const response = await worker.fetch(post('/api/search/query', ' '.repeat(4097)), bindings);
+
+		expect(response.status).toBe(413);
+		expect(bindings.SEARCH_BUDGET.limit).not.toHaveBeenCalled();
+		expect(bindings.AI.inputs).toEqual([]);
+	});
+
+	it('enforces client rate limits before reading the body', async () => {
+		const bindings = env();
+
+		const request = post(
+			'/api/search/query',
+			'{}',
+			{ 'CF-Connecting-IP': '192.0.2.1' },
+		);
+
+		bindings.SEARCH_LIMIT.limit.mockResolvedValueOnce({ success: false });
+
+		const response = await worker.fetch(request, bindings);
+
+		expect(response.status).toBe(429);
+		expect(
+			response.headers.get('retry-after'),
+		).toBe('60');
+		expect(request.bodyUsed).toBe(false);
+		expect(bindings.SEARCH_LIMIT.limit).toHaveBeenCalledWith({ key: '192.0.2.1' });
+		expect(bindings.AI.inputs).toEqual([]);
+	});
+
+	it('serves a cached result when the shared budget is exhausted', async () => {
+		const bindings = env();
+
+		const first = await worker.fetch(query('keys'), bindings);
+
+		bindings.SEARCH_BUDGET.limit.mockResolvedValue({ success: false });
+
+		const hit = await worker.fetch(query(' keys '), bindings);
+
+		const miss = await worker.fetch(query('different search'), bindings);
+
+		expect(first.status).toBe(200);
+		expect(hit.status).toBe(200);
+
+		expect(await hit.json()).toEqual(await first.json());
+
+		expect(miss.status).toBe(429);
+		expect(bindings.AI.inputs).toHaveLength(1);
+		expect(bindings.SEARCH_BUDGET.limit).toHaveBeenCalledTimes(2);
 	});
 
 	it('only accepts POST', async () => {
