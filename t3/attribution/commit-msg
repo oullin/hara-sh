@@ -1,0 +1,67 @@
+#!/bin/sh
+# Strip AI-agent self-attribution from commit messages.
+#
+# Installed globally via core.hooksPath. Because that setting disables a
+# repository's own .git/hooks, this delegates to a repo-local commit-msg
+# hook first when one exists.
+
+set -e
+
+MSG_FILE="$1"
+
+# Agent addresses whose Co-authored-by trailers get dropped. Extend as needed.
+# Space separated: the awk on macOS rejects newlines in -v assignments.
+AGENT_EMAILS="cursoragent@cursor.com agent@cursor.com noreply@anthropic.com noreply@openai.com"
+
+# Run the repository's own hook first, so its validation sees the message as
+# the committer wrote it.
+# Note: `rev-parse --git-path hooks/...` honours core.hooksPath and would point
+# back here, so resolve against the git dir instead.
+LOCAL_HOOK="$(git rev-parse --absolute-git-dir)/hooks/commit-msg"
+if [ -x "$LOCAL_HOOK" ] && [ "$LOCAL_HOOK" != "$0" ]; then
+	"$LOCAL_HOOK" "$@" || exit $?
+fi
+
+TMP_FILE="$MSG_FILE.agentstrip"
+
+awk -v emails="$AGENT_EMAILS" '
+BEGIN {
+	n = split(emails, list, " ")
+	for (i = 1; i <= n; i++)
+		if (list[i] != "") drop[tolower(list[i])] = 1
+}
+{
+	line = $0
+
+	# Co-authored-by: Name <address> -> drop when address is a known agent.
+	if (tolower(line) ~ /^[ \t]*co-authored-by[ \t]*:/) {
+		if (match(line, /<[^<>]+>/)) {
+			addr = substr(line, RSTART + 1, RLENGTH - 2)
+			if (tolower(addr) in drop) next
+		}
+	}
+
+	# Cursor also appends a marketing footer.
+	if (line ~ /^[ \t]*Made with \[Cursor\]\(https:\/\/cursor\.com\)[ \t]*$/) next
+
+	# Claude Code and Codex footers, with or without the emoji and link:
+	# "🤖 Generated with [Claude Code](...)", "Generated with [Codex](...)." and "Generated with Codex."
+	if (line ~ /^[^A-Za-z]*Generated with (\[(Claude Code|Codex)\]\([^)]*\)|Claude Code|Codex)\.?[ \t]*$/) next
+
+	# Model and harness credit lines from agent skills, such as
+	# "Created with GPT 6.1 Sol (codex executor) and Claude Fable 5.1 in Claude Code under T3 Code."
+	if (line ~ /^[ \t]*Created with .*(Claude Code|Codex|T3 Code|Cursor)[^A-Za-z]*$/) next
+
+	# Claude Code links the claude.ai session from web and Remote Control sessions.
+	if (tolower(line) ~ /^[ \t]*claude-session[ \t]*:/) next
+
+	out[++count] = line
+}
+END {
+	# Drop blank lines left dangling at the end of the message.
+	while (count > 0 && out[count] ~ /^[ \t]*$/) count--
+	for (i = 1; i <= count; i++) print out[i]
+}
+' "$MSG_FILE" > "$TMP_FILE"
+
+mv "$TMP_FILE" "$MSG_FILE"

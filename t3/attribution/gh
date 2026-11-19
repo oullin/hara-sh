@@ -1,0 +1,191 @@
+#!/usr/bin/env -S python3 -I
+"""gh wrapper that strips AI-agent credit lines from text sent to GitHub.
+
+Covers pull request, issue and release bodies and comments, merge commit
+bodies, and `gh api` body fields. Every other call goes straight to the real
+gh. Counterpart of the commit-msg hook next to it.
+
+Install it as `gh` in a PATH directory that comes before the real gh. It runs
+the next `gh` on PATH, or GH_WRAPPER_REAL when set.
+"""
+import json
+import os
+import re
+import sys
+import tempfile
+
+
+def find_real_gh():
+    override = os.environ.get("GH_WRAPPER_REAL")
+    if override:
+        return override
+    me = os.path.realpath(__file__)
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        candidate = os.path.join(directory or ".", "gh")
+        if (
+            os.path.isfile(candidate)
+            and os.access(candidate, os.X_OK)
+            and os.path.realpath(candidate) != me
+        ):
+            return candidate
+    sys.exit("gh wrapper: no other gh found on PATH")
+
+
+REAL_GH = find_real_gh()
+
+CREDIT_LINE = re.compile(
+    r"^[ \t]*(?:"
+    r"Created with .*(?:Claude Code|Codex|T3 Code|Cursor)[^A-Za-z\n]*"
+    r"|[^A-Za-z\n]*Generated with (?:\[(?:Claude Code|Codex)\]\([^)\n]*\)|Claude Code|Codex)\.?[ \t]*"
+    r"|Made with \[Cursor\]\(https://cursor\.com\)[ \t]*"
+    r"|co-authored-by[ \t]*:.*<(?:noreply@anthropic\.com|noreply@openai\.com|cursoragent@cursor\.com|agent@cursor\.com)>[ \t]*"
+    r")$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+TEXT_COMMANDS = {
+    ("pr", "create"), ("pr", "edit"), ("pr", "comment"), ("pr", "review"), ("pr", "merge"),
+    ("issue", "create"), ("issue", "edit"), ("issue", "comment"),
+    ("release", "create"), ("release", "edit"),
+}
+TEXT_FLAGS = {"--body", "-b", "--notes", "-n"}
+FILE_FLAGS = {"--body-file", "-F", "--notes-file"}
+API_FIELD_FLAGS = {"-f", "--raw-field", "-F", "--field"}
+API_TEXT_KEYS = {"body", "message", "notes"}
+
+stripped = 0
+temp_files = []
+
+
+def clean(text):
+    global stripped
+    new, count = CREDIT_LINE.subn("", text)
+    if not count:
+        return text
+    stripped += count
+    new = re.sub(r"\n{3,}", "\n\n", new).rstrip() + ("\n" if text.endswith("\n") else "")
+    return new
+
+
+def clean_file(path):
+    if path == "-":
+        data = sys.stdin.read()
+    else:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = fh.read()
+        except (OSError, UnicodeDecodeError):
+            return path
+    new = clean(data)
+    if path != "-" and new == data:
+        return path
+    fd, tmp = tempfile.mkstemp(prefix="gh-body-", suffix=".md")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(new)
+    temp_files.append(tmp)
+    return tmp
+
+
+def clean_json_file(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError, UnicodeDecodeError):
+        return path
+    if not isinstance(data, dict):
+        return path
+    changed = False
+    for key in API_TEXT_KEYS & data.keys():
+        if isinstance(data[key], str):
+            new = clean(data[key])
+            changed |= new != data[key]
+            data[key] = new
+    if not changed:
+        return path
+    fd, tmp = tempfile.mkstemp(prefix="gh-input-", suffix=".json")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    temp_files.append(tmp)
+    return tmp
+
+
+def split_flag(arg):
+    if arg.startswith("--") and "=" in arg:
+        flag, value = arg.split("=", 1)
+        return flag, value
+    return arg, None
+
+
+def rewrite_text_command(args):
+    out, i = [], 0
+    while i < len(args):
+        flag, inline = split_flag(args[i])
+        if flag in TEXT_FLAGS | FILE_FLAGS:
+            if inline is None and i + 1 < len(args):
+                value, i = args[i + 1], i + 2
+            elif inline is not None:
+                value, i = inline, i + 1
+            else:
+                out.append(args[i]); i += 1; continue
+            value = clean(value) if flag in TEXT_FLAGS else clean_file(value)
+            out += [flag, value]
+            continue
+        out.append(args[i]); i += 1
+    return out
+
+
+def rewrite_field(value):
+    key, sep, rest = value.partition("=")
+    if not sep or key.split("[")[0] not in API_TEXT_KEYS:
+        return value
+    if rest.startswith("@"):
+        return f"{key}=@{clean_file(rest[1:])}"
+    return f"{key}={clean(rest)}"
+
+
+def rewrite_api(args):
+    out, i = [], 0
+    while i < len(args):
+        flag, inline = split_flag(args[i])
+        if flag in API_FIELD_FLAGS | {"--input"}:
+            if inline is None and i + 1 < len(args):
+                value, i = args[i + 1], i + 2
+            elif inline is not None:
+                value, i = inline, i + 1
+            else:
+                out.append(args[i]); i += 1; continue
+            value = clean_json_file(value) if flag == "--input" and value != "-" else rewrite_field(value)
+            out += [flag, value]
+            continue
+        out.append(args[i]); i += 1
+    return out
+
+
+def main():
+    args = sys.argv[1:]
+    words = [a for a in args if not a.startswith("-")]
+    if len(words) >= 2 and (words[0], words[1]) in TEXT_COMMANDS:
+        args = rewrite_text_command(args)
+    elif words[:1] == ["api"]:
+        args = rewrite_api(args)
+    else:
+        os.execv(REAL_GH, [REAL_GH] + args)
+
+    if stripped:
+        print(f"gh wrapper: removed {stripped} agent credit line(s)", file=sys.stderr)
+    if not temp_files:
+        os.execv(REAL_GH, [REAL_GH] + args)
+    import subprocess
+    try:
+        code = subprocess.call([REAL_GH] + args)
+    finally:
+        for tmp in temp_files:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    sys.exit(code)
+
+
+if __name__ == "__main__":
+    main()
