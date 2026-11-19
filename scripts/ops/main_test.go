@@ -54,7 +54,8 @@ func mockProxy(t *testing.T, accounts string) *httptest.Server {
 			Model string `json:"model"`
 		}
 
-		if r.Header.Get("X-Api-Key") != testKeys.api || json.NewDecoder(r.Body).Decode(&req) != nil || req.Model != "claude-haiku-4-5-20251001" {
+		if r.Header.Get("X-Api-Key") != testKeys.api || json.NewDecoder(r.Body).Decode(&req) != nil ||
+			req.Model != "claude-haiku-4-5-20251001" {
 			http.Error(w, `{"error":"no account for this model"}`, http.StatusBadGateway)
 
 			return
@@ -93,14 +94,24 @@ func fakeDocker(states map[string]string, tailscale string) shell {
 }
 
 var allRunning = map[string]string{
-	"p-proxy-1": "running/healthy", "p-tailscale-1": "running/", "p-quota-1": "running/",
+	"p-proxy-1":     "running/healthy",
+	"p-tailscale-1": "running/",
+	"p-quota-1":     "running/",
 }
 
 func runStatus(t *testing.T, srv *httptest.Server, k keys, sh shell) (string, error) {
 	t.Helper()
 
 	var out bytes.Buffer
-	err := run("status", []string{"-local", srv.URL, "-network", srv.URL + "/", "-project", "p"}, k, srv.Client(), sh, &out)
+	err := run("status", []string{
+		"-local",
+		srv.URL,
+		"-network",
+		srv.URL +
+			"/",
+		"-project",
+		"p",
+	}, k, srv.Client(), sh, &out)
 
 	return out.String(), err
 }
@@ -163,9 +174,9 @@ func TestStatusDeadAddresses(t *testing.T) {
 
 	for _, want := range []string{
 		"✗ this computer       " + srv.URL + "  the proxy does not answer; run: make logs proxy",
-		"✗ your network        " + srv.URL + "  portless does not reach the proxy; run: make up",
+		"✗ your network        " + srv.URL + "  portless does not reach the proxy; run: make portless",
 		"! your tailnet        Tailscale is Stopped",
-		"- panel               not checked: your network fails",
+		"- panel               not checked: this computer fails",
 		"- client key          not checked: this computer fails",
 		"- accounts            not checked: this computer fails",
 	} {
@@ -182,7 +193,8 @@ func TestTailnetRunning(t *testing.T) {
 	c := s.tailnet()
 
 	// The tailnet name does not resolve in the test, so the address check fails, naming it.
-	if c.level != fail || !strings.Contains(c.detail, "https://cliproxy.tail.ts.net  the tailnet does not reach the proxy") {
+	if c.level != fail ||
+		!strings.Contains(c.detail, "https://cliproxy.tail.ts.net  the tailnet does not reach the proxy") {
 		t.Fatalf("tailnet = %+v", c)
 	}
 }
@@ -203,7 +215,10 @@ func TestCommands(t *testing.T) {
 	for _, c := range cases {
 		var out bytes.Buffer
 
-		if err := run(c.cmd, append([]string{"-url", srv.URL}, c.args...), testKeys, srv.Client(), nil, &out); err != nil {
+		if err := run(c.cmd, append([]string{
+			"-url",
+			srv.URL,
+		}, c.args...), testKeys, srv.Client(), nil, &out); err != nil {
 			t.Fatalf("%s: %v", c.cmd, err)
 		}
 
@@ -218,11 +233,17 @@ func TestCommandErrors(t *testing.T) {
 
 	var out bytes.Buffer
 
-	if err := run("models", []string{"-url", srv.URL}, keys{api: "wrong"}, srv.Client(), nil, &out); err == nil || !strings.Contains(err.Error(), `401 {"error":"invalid api key"}`) {
+	if err := run("models", []string{"-url", srv.URL}, keys{api: "wrong"}, srv.Client(), nil, &out); err == nil ||
+		!strings.Contains(err.Error(), `401 {"error":"invalid api key"}`) {
 		t.Errorf("models with a wrong key: %v", err)
 	}
 
-	if err := run("smoke", []string{"-url", srv.URL, "-model", "nope"}, testKeys, srv.Client(), nil, &out); err == nil || !strings.Contains(err.Error(), "nope: 502") {
+	if err := run("smoke", []string{
+		"-url",
+		srv.URL,
+		"-model",
+		"nope",
+	}, testKeys, srv.Client(), nil, &out); err == nil || !strings.Contains(err.Error(), "nope: 502") {
 		t.Errorf("smoke with an unserved model: %v", err)
 	}
 

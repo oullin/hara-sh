@@ -1,0 +1,45 @@
+--- a/go.mod
++++ b/go.mod
+@@ -7 +7 @@
+-	github.com/andybalholm/brotli v1.0.6
++	github.com/andybalholm/brotli v1.3.0
+@@ -19 +19 @@
+-	github.com/klauspost/compress v1.17.4
++	github.com/klauspost/compress v1.20.4
+@@ -35,2 +35,2 @@
+-	golang.org/x/crypto v0.57.0
+-	golang.org/x/net v0.60.0
++	golang.org/x/crypto v0.59.0
++	golang.org/x/net v0.63.0
+@@ -38,3 +38,3 @@
+-	golang.org/x/sync v0.23.0
+-	golang.org/x/sys v0.48.0
+-	golang.org/x/text v0.42.0
++	golang.org/x/sync v0.25.0
++	golang.org/x/sys v0.50.0
++	golang.org/x/text v0.44.0
+--- a/go.sum
++++ b/go.sum
+@@ -10,0 +11,2 @@
++github.com/andybalholm/brotli v1.3.0 h1:IdkhjSe/+34U+fP7FSR2Q6Poj1hnHUa2GoWmzXJd6qY=
++github.com/andybalholm/brotli v1.3.0/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
+@@ -116,0 +119,2 @@
++github.com/klauspost/compress v1.20.4 h1:dD0v/bvxtjCBqQu6sx1TNWkalEY5lNTIe+HY9w8TeNI=
++github.com/klauspost/compress v1.20.4/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
+@@ -249,0 +254,2 @@
++golang.org/x/crypto v0.59.0 h1:xS2jhqYbzNrpvkWP2YTDf4TJwBy3ykR03i8vFDxEc7c=
++golang.org/x/crypto v0.59.0/go.mod h1:veDyUwATGs3c+vN3VfTbzViMGXeTBk3WyhBOkn+F/4U=
+@@ -255,0 +262,2 @@
++golang.org/x/net v0.63.0 h1:HCoTmNh9EpD1PpK8gBNFY4gcTY4N+KQEO8ylfIKqFJ0=
++golang.org/x/net v0.63.0/go.mod h1:15JLg3IX1bLjHK264EZQEbIpTiR/KVLuo9CTRWd0pig=
+@@ -260,0 +269,2 @@
++golang.org/x/sync v0.25.0 h1:dJnifr0nMV8/SBnBvdo4eSGGnrc3O4FFx6IqvtLcmRs=
++golang.org/x/sync v0.25.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
+@@ -269,0 +280,2 @@
++golang.org/x/sys v0.50.0 h1:dkKZEFTEKaLr1sjhs0WiKqoi8Jj5nHbS3Njmx1UoMJs=
++golang.org/x/sys v0.50.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=
+@@ -272,0 +285 @@
++golang.org/x/term v0.48.0 h1:G6UU1eiSB8nl3DzeUGt7Mg+2SctI8tPS6Z5/mBt6cOk=
+@@ -276,0 +290,2 @@
++golang.org/x/text v0.44.0 h1:YItdp/mQNGnsmrgpcdA5yQ3bnRxCfo/Tj/iByGW9GGo=
++golang.org/x/text v0.44.0/go.mod h1:S4FR1waQ9LbjQTls97SyRjDaUUVkaM+cXwwuG/G+MwY=

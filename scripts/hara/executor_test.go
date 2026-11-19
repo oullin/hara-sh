@@ -27,7 +27,9 @@ func executorTestHost(t *testing.T) (testHost, map[string]string, string) {
 	header := filepath.Join(h.home, "headers.txt")
 	env["EXECUTOR_HEADERS_FILE"] = header
 
-	if err := os.WriteFile(header, []byte("X-Service-Id: fixture-client\nauthorization: Bearer fixture-secret\n"), 0o600); err != nil {
+	if err := os.WriteFile(header, []byte(
+		"X-Service-Id: fixture-client\nauthorization: Bearer fixture-secret\n",
+	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -68,7 +70,9 @@ func TestExecutorSetupPreservesProvidersAndSecretsStayPrivate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := os.WriteFile(path, []byte(`{"counter":9007199254740993,"mcpServers":{"other":{"command":"keep"},"executor":{"url":"http://127.0.0.1:4789/mcp"}}}`), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(
+			`{"counter":9007199254740993,"mcpServers":{"other":{"command":"keep"},"executor":{"url":"http://127.0.0.1:4789/mcp"}}}`,
+		), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -104,7 +108,9 @@ func TestExecutorSetupPreservesProvidersAndSecretsStayPrivate(t *testing.T) {
 
 	servers := c["mcpServers"].(map[string]any)
 
-	if servers["other"].(map[string]any)["command"] != "keep" || servers["executor"].(map[string]any)["url"] != "https://executor.example/mcp" || !strings.Contains(string(content), "9007199254740993") {
+	if servers["other"].(map[string]any)["command"] != "keep" ||
+		servers["executor"].(map[string]any)["url"] != "https://executor.example/mcp" ||
+		!strings.Contains(string(content), "9007199254740993") {
 		t.Fatal("Cursor repair changed unrelated configuration or lost integer precision")
 	}
 
@@ -114,13 +120,15 @@ func TestExecutorSetupPreservesProvidersAndSecretsStayPrivate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if c["model_provider"] != "hara-proxy" || c["mcp_servers"].(map[string]any)["other"].(map[string]any)["command"] != "keep" {
+	if c["model_provider"] != "hara-proxy" ||
+		c["mcp_servers"].(map[string]any)["other"].(map[string]any)["command"] != "keep" {
 		t.Fatal("Codex inference or another MCP server changed")
 	}
 
 	content, _ = os.ReadFile(filepath.Join(profile, "config", "mcp_config.json"))
 
-	if strings.Contains(string(content), "fixture-secret") || !strings.Contains(string(content), "--header-file") || !strings.Contains(string(content), "http-only") {
+	if strings.Contains(string(content), "fixture-secret") ||
+		!strings.Contains(string(content), "--header-file") || !strings.Contains(string(content), "http-only") {
 		t.Fatal("Antigravity must use the authenticated stdio bridge without secrets in its args")
 	}
 
@@ -158,7 +166,9 @@ func TestExecutorPreflightRejectsInvalidConfigurationWithoutClientWrites(t *test
 			case "name":
 				env["EXECUTOR_NAME"] = "../outside"
 			case "headers":
-				if err := os.WriteFile(env["EXECUTOR_HEADERS_FILE"], []byte("Authorization: first\nauthorization: second\n"), 0o600); err != nil {
+				if err := os.WriteFile(env["EXECUTOR_HEADERS_FILE"], []byte(
+					"Authorization: first\nauthorization: second\n",
+				), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			case "json":
@@ -187,7 +197,8 @@ func TestExecutorPreflightRejectsInvalidConfigurationWithoutClientWrites(t *test
 
 			after, _ := os.ReadFile(codex)
 
-			if string(before) != string(after) || exists(filepath.Join(h.home, ".claude-hara", ".claude.json")) || exists(filepath.Join(profile, "config", "mcp_config.json")) {
+			if string(before) != string(after) || exists(filepath.Join(h.home, ".claude-hara", ".claude.json")) ||
+				exists(filepath.Join(profile, "config", "mcp_config.json")) {
 				t.Fatal("failed setup changed a client configuration")
 			}
 		})
@@ -195,7 +206,14 @@ func TestExecutorPreflightRejectsInvalidConfigurationWithoutClientWrites(t *test
 }
 
 func TestExecutorReportsAntigravityFailuresAndConfiguresOtherProviders(t *testing.T) {
-	for _, scenario := range []string{"missing-profile", "ambiguous-profile", "invalid-override", "missing-node", "invalid-config", "install"} {
+	for _, scenario := range []string{
+		"missing-profile",
+		"ambiguous-profile",
+		"invalid-override",
+		"missing-node",
+		"invalid-config",
+		"install",
+	} {
 		t.Run(scenario, func(t *testing.T) {
 			h, env, profile := executorTestHost(t)
 			path := filepath.Join(profile, "config", "mcp_config.json")
@@ -215,7 +233,9 @@ func TestExecutorReportsAntigravityFailuresAndConfiguresOtherProviders(t *testin
 					t.Fatal(err)
 				}
 			case "ambiguous-profile":
-				if err := os.MkdirAll(filepath.Join(filepath.Dir(profile), "second", "antigravity-acp"), 0o700); err != nil {
+				if err := os.MkdirAll(filepath.Join(filepath.Dir(
+					profile,
+				), "second", "antigravity-acp"), 0o700); err != nil {
 					t.Fatal(err)
 				}
 			case "invalid-override":
@@ -255,11 +275,16 @@ func TestExecutorReportsAntigravityFailuresAndConfiguresOtherProviders(t *testin
 				t.Fatal("skipped Antigravity setup changed its existing credentials")
 			}
 
-			if string(before) != string(after) || !strings.Contains(h.out.String(), "Skipping Antigravity") || strings.Contains(h.out.String(), "plus Antigravity") {
+			if string(before) != string(after) || !strings.Contains(h.out.String(), "Skipping Antigravity") ||
+				strings.Contains(h.out.String(), "plus Antigravity") {
 				t.Fatalf("optional failure was not reported correctly: %s", h.out)
 			}
 
-			for _, client := range []string{filepath.Join(h.home, ".claude-hara", ".claude.json"), filepath.Join(h.home, ".cursor", "mcp.json"), filepath.Join(h.home, ".codex-t3-hara", "config.toml")} {
+			for _, client := range []string{
+				filepath.Join(h.home, ".claude-hara", ".claude.json"),
+				filepath.Join(h.home, ".cursor", "mcp.json"),
+				filepath.Join(h.home, ".codex-t3-hara", "config.toml"),
+			} {
 				content, err := os.ReadFile(client)
 
 				if err != nil || !strings.Contains(string(content), "https://executor.example/mcp") {
@@ -289,10 +314,17 @@ func TestExecutorNamesAndHeadersAreDynamicAndConnectionsStayIsolated(t *testing.
 		t.Fatal(err)
 	}
 
-	for _, path := range []string{filepath.Join(h.home, ".claude-hara", ".claude.json"), filepath.Join(h.home, ".cursor", "mcp.json"), filepath.Join(profile, "config", "mcp_config.json"), filepath.Join(h.home, ".codex-t3-hara", "config.toml")} {
+	for _, path := range []string{
+		filepath.Join(h.home, ".claude-hara", ".claude.json"),
+		filepath.Join(h.home, ".cursor", "mcp.json"),
+		filepath.Join(profile, "config", "mcp_config.json"),
+		filepath.Join(h.home, ".codex-t3-hara", "config.toml"),
+	} {
 		content, _ := os.ReadFile(path)
 
-		if !strings.Contains(string(content), "first_tools") || !strings.Contains(string(content), "second_tools") || strings.Contains(string(content), "collections_executor") {
+		if !strings.Contains(string(content), "first_tools") || !strings.Contains(string(
+			content,
+		), "second_tools") || strings.Contains(string(content), "collections_executor") {
 			t.Fatalf("connector names were not applied consistently: %s", path)
 		}
 	}
@@ -301,7 +333,9 @@ func TestExecutorNamesAndHeadersAreDynamicAndConnectionsStayIsolated(t *testing.
 	first, _ := os.ReadFile(filepath.Join(state, "first_tools.headers"))
 	second, _ := os.ReadFile(filepath.Join(state, "second_tools.headers"))
 
-	if !strings.Contains(string(first), "Authorization: Bearer fixture-secret") || !strings.Contains(string(second), "X-Api-Key: second-fixture") || strings.Contains(string(first), "second-fixture") {
+	if !strings.Contains(string(first), "Authorization: Bearer fixture-secret") || !strings.Contains(string(
+		second,
+	), "X-Api-Key: second-fixture") || strings.Contains(string(first), "second-fixture") {
 		t.Fatal("named connections share or lost authentication headers")
 	}
 
@@ -320,7 +354,16 @@ func TestExecutorNamesAndHeadersAreDynamicAndConnectionsStayIsolated(t *testing.
 }
 
 func TestExecutorHeadersRejectMalformedNamesAndValues(t *testing.T) {
-	for _, content := range []string{"", "# empty\n", "bad name: value\n", "Authorization: first\nauthorization: second\n", "Authorization: \n", "Authorization: value\x00injected\n", "X-Test: value\x7finjected\n", "missing-colon\n"} {
+	for _, content := range []string{
+		"",
+		"# empty\n",
+		"bad name: value\n",
+		"Authorization: first\nauthorization: second\n",
+		"Authorization: \n",
+		"Authorization: value\x00injected\n",
+		"X-Test: value\x7finjected\n",
+		"missing-colon\n",
+	} {
 		path := filepath.Join(t.TempDir(), "headers")
 
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

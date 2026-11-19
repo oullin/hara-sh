@@ -24,7 +24,8 @@ services:
     restart: "no"
 
   proxy:
-    image: eceasy/cli-proxy-api:v8.0.43@sha256:3f74ca56cba8bea2a2a096a215bb774482d87d257da04c5047e6046493bfd644
+    image: hara-proxy:local
+    build: ../scripts/proxy
     init: true
     stop_grace_period: 30s
     logging: *logging
@@ -70,12 +71,37 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # LAN and tailnet clients can reach inference routes through this listener only.
+  ingress:
+    <<: *tools
+    command: ["ingress"]
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *logging
+    networks: [default, edge]
+    ports:
+      - "127.0.0.1:${HARA_INGRESS_PORT:-8318}:8318"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/hara-tools", "health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    environment:
+      URL: http://127.0.0.1:8318
+    depends_on:
+      proxy:
+        condition: service_healthy
+    restart: unless-stopped
+
   # Optional private HTTPS access; enable with --profile tailscale.
   tailscale:
     profiles: ["tailscale"]
-    image: tailscale/tailscale:stable
+    image: tailscale/tailscale:v1.104.7@sha256:72c1e19e0aedca96b8533bbb0b4368564410ff20b17e53b804eb6c1f04a31be4
     logging: *logging
     hostname: ${TS_HOSTNAME:-cliproxy}
+    networks: [edge]
     environment:
       TS_HOSTNAME: ${TS_HOSTNAME:-cliproxy}
       TS_AUTHKEY: ${TS_AUTHKEY:-}
@@ -87,7 +113,7 @@ services:
       - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/tailscale:/var/lib/tailscale
       - ./serve.json:/config/serve.json:ro
     depends_on:
-      proxy:
+      ingress:
         condition: service_healthy
     restart: unless-stopped
 
@@ -103,3 +129,6 @@ services:
       - ${LOCAL_DIR:-${HOME:?}/.hara-sh}/secrets:/state/secrets:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+networks:
+  edge:

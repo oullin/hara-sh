@@ -29,7 +29,10 @@ const props = withDefaults(
 		:as-child="asChild"
 		:class="cn(
 			buttonVariants(
-				{ variant, size },
+				{
+					variant,
+					size,
+				},
 			),
 			props.class,
 		)"

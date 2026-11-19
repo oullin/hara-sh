@@ -43,8 +43,10 @@ var messages = api{
 			"model":      model,
 			"max_tokens": 16,
 			"stream":     true,
-			"system":     []any{map[string]any{"type": "text", "text": prefix, "cache_control": map[string]string{"type": "ephemeral"}}},
-			"messages":   []any{map[string]any{"role": "user", "content": prompt}},
+			"system": []any{
+				map[string]any{"type": "text", "text": prefix, "cache_control": map[string]string{"type": "ephemeral"}},
+			},
+			"messages": []any{map[string]any{"role": "user", "content": prompt}},
 		}
 	},
 	auth: func(h http.Header, key string) {
@@ -92,7 +94,12 @@ var responses = api{
 			"store":            false,
 			"instructions":     prefix,
 			"prompt_cache_key": "bench-" + nonce,
-			"input":            []any{map[string]any{"role": "user", "content": []any{map[string]string{"type": "input_text", "text": prompt}}}},
+			"input": []any{
+				map[string]any{
+					"role":    "user",
+					"content": []any{map[string]string{"type": "input_text", "text": prompt}},
+				},
+			},
 		}
 	},
 	auth: func(h http.Header, key string) { h.Set("Authorization", "Bearer "+key) },

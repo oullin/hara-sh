@@ -2,16 +2,56 @@ export type Provider = { glyph: string; name: string; via: string };
 
 // 5×5 glyphs are abstract marks, not provider logos.
 export const providers: Array<Provider> = [
-	{ glyph: '..#..|#.#.#|.###.|#.#.#|..#..', name: 'Claude', via: 'OAuth · API key' },
-	{ glyph: '.#.#.|#...#|.....|#...#|.#.#.', name: 'Codex', via: 'OAuth · device code' },
-	{ glyph: '..#..|.###.|#####|.###.|..#..', name: 'Gemini', via: 'API key · Vertex' },
-	{ glyph: '..#..|.#.#.|#...#|.....|#...#', name: 'Antigravity', via: 'OAuth' },
-	{ glyph: '#...#|.#.#.|..#..|.#.#.|#...#', name: 'Grok', via: 'OAuth · API key' },
-	{ glyph: '#..#.|#.#..|##...|#.#..|#..#.', name: 'Kimi', via: 'OAuth' },
-	{ glyph: '###..|#..#.|#...#|#..#.|###..', name: 'Devin', via: 'OAuth' },
-	{ glyph: '.....|.#.#.|#.#.#|#...#|.....', name: 'Meta', via: 'OAuth · API key' },
-	{ glyph: '#####|#...#|#.#.#|#...#|#####', name: 'OpenAI-compatible', via: 'Any endpoint + key' },
-	{ glyph: '..#..|..#..|#####|..#..|..#..', name: 'Plugins', via: 'Copilot, Kiro and more' },
+	{
+		glyph: '..#..|#.#.#|.###.|#.#.#|..#..',
+		name: 'Claude',
+		via: 'OAuth · API key',
+	},
+	{
+		glyph: '.#.#.|#...#|.....|#...#|.#.#.',
+		name: 'Codex',
+		via: 'OAuth · device code',
+	},
+	{
+		glyph: '..#..|.###.|#####|.###.|..#..',
+		name: 'Gemini',
+		via: 'API key · Vertex',
+	},
+	{
+		glyph: '..#..|.#.#.|#...#|.....|#...#',
+		name: 'Antigravity',
+		via: 'OAuth',
+	},
+	{
+		glyph: '#...#|.#.#.|..#..|.#.#.|#...#',
+		name: 'Grok',
+		via: 'OAuth · API key',
+	},
+	{
+		glyph: '#..#.|#.#..|##...|#.#..|#..#.',
+		name: 'Kimi',
+		via: 'OAuth',
+	},
+	{
+		glyph: '###..|#..#.|#...#|#..#.|###..',
+		name: 'Devin',
+		via: 'OAuth',
+	},
+	{
+		glyph: '.....|.#.#.|#.#.#|#...#|.....',
+		name: 'Meta',
+		via: 'OAuth · API key',
+	},
+	{
+		glyph: '#####|#...#|#.#.#|#...#|#####',
+		name: 'OpenAI-compatible',
+		via: 'Any endpoint + key',
+	},
+	{
+		glyph: '..#..|..#..|#####|..#..|..#..',
+		name: 'Plugins',
+		via: 'Copilot, Kiro and more',
+	},
 ];
 
 // Default Docker host endpoint.
@@ -25,9 +65,21 @@ export type Client = { command: string; id: string; label: string };
 
 // The hero's "For …" switch: the one line each client needs.
 export const clients: Array<Client> = [
-	{ command: `export ANTHROPIC_BASE_URL=${PROXY_URL}`, id: 'claude', label: 'For Claude Code' },
-	{ command: `base_url = "${PROXY_URL}/v1"`, id: 'codex', label: 'For Codex' },
-	{ command: `curl -H "Authorization: Bearer YOUR_KEY" ${PROXY_URL}/v1/models`, id: 'openai', label: 'For any client' },
+	{
+		command: `export ANTHROPIC_BASE_URL=${PROXY_URL}`,
+		id: 'claude',
+		label: 'For Claude Code',
+	},
+	{
+		command: `base_url = "${PROXY_URL}/v1"`,
+		id: 'codex',
+		label: 'For Codex',
+	},
+	{
+		command: `curl -H "Authorization: Bearer YOUR_KEY" ${PROXY_URL}/v1/models`,
+		id: 'openai',
+		label: 'For any client',
+	},
 ];
 
 export type Step = {

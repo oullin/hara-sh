@@ -38,6 +38,8 @@ Keep browser artefacts outside the checkout. Test desktop/mobile navigation, sea
 
 Each docs page needs a unique frontmatter `description`. Use British English in public copy; preserve API headers, commands and configuration keys as written. The VitePress config generates canonical URLs, social metadata and structured data. Keep missing pages out of search results and sitemaps.
 
+Use the Node package aliases defined in `web/package.json` for local imports and project paths in `web/scripts/`. The production build checks script imports.
+
 ## Repository layout
 
 | Path                                                            | Purpose                                                       |
@@ -63,7 +65,9 @@ Each docs page needs a unique frontmatter `description`. Use British English in 
 | `panel.go`    | Management panel build                                             |
 | `settings.go` | Checkout discovery, `credentials.env` parsing, private directories |
 
-Unit tests replace the child processes with a recorder, so they need no Docker or network. Run them with `cd scripts/hara && go test ./...`; `make code check` also runs them in the tools image. `make code resilience` additionally starts disposable containers from the pinned proxy image and injects synthetic upstream failures. These opt-in image tests run on the Docker host and are skipped by the ordinary unit suite.
+Unit tests replace the child processes with a recorder, so they need no Docker or network. Run them with `cd scripts/hara && go test ./...`. `make code check` also runs them in the tools image. `make code resilience` builds the proxy image, starts disposable containers, and injects synthetic upstream failures.
+
+The proxy Dockerfile pins the upstream release commit and source archive checksum. `scripts/proxy/dependencies.patch` records the Go module versions and checksums used to rebuild that release. Refresh the patch against the new upstream release when upgrading it.
 
 ## Deploy your fork
 
@@ -74,6 +78,8 @@ make web deploy
 ```
 
 Run deployment from `web/` when invoking `cf` directly. Only the static site and routing Worker are published; your Docker proxy stays private.
+
+The search Worker uses two Cloudflare rate-limit namespaces. Keep their IDs distinct within your account. The limits are approximate and apply per Cloudflare location. Cached searches count toward the client limit, and only cache misses count toward the shared AI budget.
 
 ## Rebuild the management panel
 

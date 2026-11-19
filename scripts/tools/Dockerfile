@@ -1,5 +1,5 @@
 # Build every operations tool without requiring Go on the host.
-FROM golang:1.27-alpine AS build
+FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 WORKDIR /src
 COPY scripts/ops /src/ops
 COPY scripts/quota /src/quota
@@ -20,7 +20,7 @@ RUN for tool in ops quota wssmoke bench tools public hara; do \
     cd /src/$tool && go vet ./... && go test ./... || exit 1; \
     done
 
-FROM alpine:3.23
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 RUN apk add --no-cache ca-certificates
 COPY --from=build /bin-tools /usr/local/bin/
 ENTRYPOINT ["/usr/local/bin/hara-tools"]

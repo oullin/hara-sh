@@ -82,7 +82,7 @@ These commands run the same Docker tools as above:
 | Task                         | Command                                                    |
 | ---------------------------- | ---------------------------------------------------------- |
 | Start / stop / status        | `make up` / `make down` / `make status`                    |
-| Serve `https://hara.local`   | `make portless` (also run by `make up`)                    |
+| Serve `https://hara.local`   | `make portless` or `HARA_LAN=1 make up`                    |
 | Remove containers and images | `make purge` (private state kept)                          |
 | Accounts / models / quota    | `make ops accounts` / `make ops models` / `make ops quota` |
 | Request / WebSocket check    | `make ops smoke` / `make ops ws-smoke IDLE=2m`             |
@@ -102,9 +102,9 @@ Hara keeps conversations on their original account to reuse prompt caches. A tra
 
 Every eligible account can be tried, with at most one additional retry round. Streaming allows one recovery attempt before any output and sends heartbeats every 15 seconds after the stream starts. Partially delivered responses are never replayed, and pre-output heartbeats stay off so they do not prematurely commit the response. Upstream TLS handshakes have a 15-second limit; generation and established streams have no new time limit. Response buffering remains off to preserve first-token latency.
 
-`make up` validates Compose configuration, builds the tools image, and pulls the pinned proxy image before recreating services. Preparation failures leave the running containers in place. Startup waits up to 60 seconds for readiness before reporting success. Recreation interrupts active requests, so finish important turns first. Runtime container logs rotate separately from the proxy's own log files.
+`make up` validates Compose configuration and builds the tools and proxy images before recreating services. Preparation failures leave the running containers in place. Startup waits up to 60 seconds for readiness before reporting success. Recreation interrupts active requests, so finish important turns first. Runtime container logs rotate separately from the proxy's own log files.
 
-Use `make code resilience` on a Docker host with Go to exercise the pinned image against synthetic upstream failures. It uses disposable containers, synthetic credentials, and a local stub; it does not call AI providers or read your account files. CI runs the same checks. Use `make ops bench` to measure real inference latency and cache reuse separately.
+Use `make code resilience` on a Docker host with Go to exercise the rebuilt image against synthetic upstream failures. It uses disposable containers, synthetic credentials, and a local stub. CI runs the same checks. Use `make ops bench` to measure real inference latency and cache reuse separately.
 
 The host auth helper reads the existing private credential file directly, so starting a T3 provider session does not start an extra Docker container just to retrieve the key. It bounds and validates the credential before printing it, retains the container fallback when the file is missing, and keeps the explicit 1Password mode. Credentials stay outside the checkout.
 

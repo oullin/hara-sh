@@ -9,19 +9,23 @@ const BATCH = 10;
 
 const MAX_QUERY = 500;
 
+const MAX_QUERY_BODY = 4096;
+
 type Meta = { title: string; url: string };
 
 type Embeddings = { data: Array<{ embedding: Array<number> }> };
 
 // Structural slices of the Workers AI and Vectorize bindings, so tests can pass in-memory versions.
-export type Embedder = { run(model: string, inputs: { input: Array<string> }): Promise<unknown> };
+export type Embedder = { run(model: string, inputs: { input: Array<string> }): Promise<object> };
 
 export type Store = {
 	query(vector: Array<number>, options: { returnMetadata: 'all'; topK: number }): Promise<{ matches: Array<{ metadata?: object; score: number }> }>;
-	upsert(vectors: Array<{ id: string; metadata: Meta; values: Array<number> }>): Promise<unknown>;
+	upsert(vectors: Array<{ id: string; metadata: Meta; values: Array<number> }>): Promise<object>;
 };
 
-export type SearchEnv = { AI: Embedder; INDEX_TOKEN?: string; VECTORIZE: Store };
+type Limiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
+
+export type SearchEnv = { AI: Embedder; INDEX_TOKEN?: string; SEARCH_BUDGET: Limiter; SEARCH_LIMIT: Limiter; VECTORIZE: Store };
 
 export class Search {
 	readonly #ai: Embedder;
@@ -36,7 +40,10 @@ export class Search {
 	async query(q: string): Promise<Array<Result>> {
 		const [vector] = await this.#embed([`task: search result | query: ${q}`]);
 		// Pages can have several chunks, so ask for more matches and keep the best one per page.
-		const { matches } = await this.#store.query(vector!, { returnMetadata: 'all', topK: LIMIT * 2 });
+		const { matches } = await this.#store.query(vector!, {
+			returnMetadata: 'all',
+			topK: LIMIT * 2,
+		});
 
 		const results = new Map<string, Result>();
 
@@ -44,7 +51,11 @@ export class Search {
 			const { title, url } = metadata as Meta;
 
 			if (!results.has(url)) {
-				results.set(url, { score, title, url } satisfies Result);
+				results.set(url, {
+					score,
+					title,
+					url,
+				} satisfies Result);
 			}
 		}
 
@@ -57,10 +68,24 @@ export class Search {
 
 			const vectors = await this.#embed(batch.map(({ text }) => text));
 
-			await this.#store.upsert(batch.map(({ id, title, url }, n) => ({ id, metadata: { title, url } satisfies Meta, values: vectors[n]! })));
+			await this.#store.upsert(
+				batch.map(({ id, title, url }, n) => ({
+					id,
+					metadata: {
+						title,
+						url,
+					} satisfies Meta,
+					values: vectors[n]!,
+				})),
+			);
 		}
 
-		return { pages: new Set(chunks.map(({ url }) => url)).size, vectors: chunks.length };
+		return {
+			pages: new Set(
+				chunks.map(({ url }) => url),
+			).size,
+			vectors: chunks.length,
+		};
 	}
 
 	async #embed(input: Array<string>): Promise<Array<Array<number>>> {
@@ -86,8 +111,47 @@ async function authorised(request: Request, token: string | undefined): Promise<
 	return given.reduce((diff, byte, n) => diff | (byte ^ expected[n]!), 0) === 0;
 }
 
-async function question(request: Request): Promise<Nullable<string>> {
-	const body: unknown = await request.json().catch(() => null);
+async function readQueryBody(request: Request): Promise<string | null> {
+	const reader = request.body?.getReader();
+
+	if (!reader) {
+		return '';
+	}
+
+	const bytes = new Uint8Array(MAX_QUERY_BODY);
+
+	let length = 0;
+
+	try {
+		for (;;) {
+			const chunk = await reader.read();
+
+			if (chunk.done) {
+				return new TextDecoder().decode(bytes.subarray(0, length));
+			}
+
+			if (chunk.value.byteLength > bytes.length - length) {
+				await reader.cancel();
+
+				return null;
+			}
+
+			bytes.set(chunk.value, length);
+			length += chunk.value.byteLength;
+		}
+	} finally {
+		reader.releaseLock();
+	}
+}
+
+function question(text: string): Nullable<string> {
+	let body: unknown;
+
+	try {
+		body = JSON.parse(text);
+	} catch {
+		return null;
+	}
 
 	const q = (body as Nullable<{ q?: unknown }>)?.q;
 
@@ -98,13 +162,72 @@ async function question(request: Request): Promise<Nullable<string>> {
 	return q.trim();
 }
 
+function rateLimited(): Response {
+	return Response.json(
+		{ error: 'Too many search requests.' },
+		{
+			headers: { 'Retry-After': '60' },
+			status: 429,
+		},
+	);
+}
+
+async function query(request: Request, env: SearchEnv, search: Search): Promise<Response> {
+	const client = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+
+	if (!(await env.SEARCH_LIMIT.limit({ key: client })).success) {
+		return rateLimited();
+	}
+
+	const body = await readQueryBody(request);
+
+	if (body === null) {
+		return Response.json({ error: 'Search request is too large.' }, { status: 413 });
+	}
+
+	const q = question(body);
+
+	if (q === null) {
+		return Response.json({ error: `Send JSON with a q of 1 to ${MAX_QUERY} characters.` }, { status: 400 });
+	}
+
+	const hash = Array.from(await digest(`${MODEL}\n${q}`), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
+	const key = new URL(`/api/search/cache/${hash}`, request.url).toString();
+
+	const cache = await caches.open('hara-docs-search');
+
+	const hit = await cache.match(key);
+
+	if (hit) {
+		return hit;
+	}
+
+	// The shared budget also limits cache misses from many different clients in one location.
+	if (!(await env.SEARCH_BUDGET.limit({ key: 'query' })).success) {
+		return rateLimited();
+	}
+
+	const response = Response.json(await search.query(q), { headers: { 'Cache-Control': 'max-age=300' } });
+
+	await cache.put(key, response.clone());
+
+	return response;
+}
+
 export async function api(request: Request, env: SearchEnv, path: string): Promise<Response> {
 	if (path !== '/api/search/query' && path !== '/api/search/index') {
 		return Response.json({ error: 'Not found.' }, { status: 404 });
 	}
 
 	if (request.method !== 'POST') {
-		return Response.json({ error: 'Use POST.' }, { headers: { allow: 'POST' }, status: 405 });
+		return Response.json(
+			{ error: 'Use POST.' },
+			{
+				headers: { allow: 'POST' },
+				status: 405,
+			},
+		);
 	}
 
 	const search = new Search(env.AI, env.VECTORIZE);
@@ -118,13 +241,7 @@ export async function api(request: Request, env: SearchEnv, path: string): Promi
 			return Response.json(await search.index());
 		}
 
-		const q = await question(request);
-
-		if (q === null) {
-			return Response.json({ error: `Send JSON with a q of 1 to ${MAX_QUERY} characters.` }, { status: 400 });
-		}
-
-		return Response.json(await search.query(q));
+		return await query(request, env, search);
 	} catch {
 		return Response.json({ error: 'Search is unavailable.' }, { status: 502 });
 	}

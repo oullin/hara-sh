@@ -40,7 +40,7 @@ The command validates the direct provider configurations, backs up previous byte
 
 Cursor's selected entry replaces a stale localhost proxy if one exists. Antigravity's direct remote configuration did not expose the tools in the tested T3 runtime; the stdio bridge did. The bridge reads credentials from a private header file, keeping them out of process arguments.
 
-Antigravity setup is optional. Missing or ambiguous profiles, unavailable Node.js/npm, invalid Antigravity configuration, and bridge installation failures produce a `Skipping Antigravity` report while the direct providers continue. Node.js/npm and the pinned `mcp-remote@0.14.3` installation are needed only for Antigravity.
+Antigravity setup is optional. Missing or ambiguous profiles, unavailable Node.js/npm, invalid Antigravity configuration, and bridge installation failures produce a `Skipping Antigravity` report while the direct providers continue. Node.js/npm and the pinned `mcp-remote@0.16.7` installation are needed only for Antigravity.
 
 Overrides for another installation:
 

@@ -18,11 +18,17 @@ function host() {
 		),
 	);
 
-	return { api, wrapper };
+	return {
+		api,
+		wrapper,
+	};
 }
 
 function stubClipboard(writeText: (text: string) => Promise<void>) {
-	Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+	Object.defineProperty(navigator, 'clipboard', {
+		configurable: true,
+		value: { writeText },
+	});
 }
 
 describe('useCopy', () => {
@@ -35,7 +41,7 @@ describe('useCopy', () => {
 	});
 
 	it('copies the text and resets after the delay', async () => {
-		const writeText = vi.fn(() => Promise.resolve());
+		const writeText = vi.fn<Clipboard['writeText']>(() => Promise.resolve());
 
 		stubClipboard(writeText);
 

@@ -19,7 +19,10 @@ function stepElement(id: string): HTMLElement {
 }
 
 function stubClipboard(writeText: (text: string) => Promise<void>) {
-	Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+	Object.defineProperty(navigator, 'clipboard', {
+		configurable: true,
+		value: { writeText },
+	});
 }
 
 describe('SiteHeader', () => {
@@ -43,7 +46,7 @@ describe('SiteHeader', () => {
 
 describe('HeroSection', () => {
 	it('shows the Claude Code command first and copies it', async () => {
-		const writeText = vi.fn(() => Promise.resolve());
+		const writeText = vi.fn<Clipboard['writeText']>(() => Promise.resolve());
 
 		stubClipboard(writeText);
 
@@ -164,7 +167,12 @@ describe('StepsSection', () => {
 		const wrapper = mount(StepsSection);
 
 		report?.(
-			[{ isIntersecting: true, target: wrapper.find('[data-step="reach"]').element }],
+			[
+				{
+					isIntersecting: true,
+					target: wrapper.find('[data-step="reach"]').element,
+				},
+			],
 		);
 
 		await flushPromises();
@@ -174,7 +182,12 @@ describe('StepsSection', () => {
 		).toBe(steps[3].file);
 
 		report?.(
-			[{ isIntersecting: true, target: stepElement('unknown') }],
+			[
+				{
+					isIntersecting: true,
+					target: stepElement('unknown'),
+				},
+			],
 		);
 
 		await flushPromises();

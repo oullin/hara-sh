@@ -8,7 +8,12 @@ describe('DotGrid', () => {
 	it('renders one sized, staggered dot per entry and hides itself from assistive tech', () => {
 		const wrapper = mount(
 			DotGrid,
-			{ props: { dots: glyphDots('#####|.....|.....|.....|.....'), size: 8 } },
+			{
+				props: {
+					dots: glyphDots('#####|.....|.....|.....|.....'),
+					size: 8,
+				},
+			},
 		);
 
 		const dots = wrapper.findAll('span > span');

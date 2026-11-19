@@ -3,7 +3,10 @@ import DotGrid from '@/components/dots/DotGrid.vue';
 import { providers, DOCS_URL } from '@/lib/content';
 import { glyphDots } from '@/lib/dots';
 
-const items = providers.map((provider) => ({ ...provider, dots: glyphDots(provider.glyph) }));
+const items = providers.map((provider) => ({
+	...provider,
+	dots: glyphDots(provider.glyph),
+}));
 </script>
 <template>
 	<section id="providers" aria-labelledby="providers-title" class="marketing-section providers-section">

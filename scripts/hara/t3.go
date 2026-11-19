@@ -36,8 +36,9 @@ type agentAttribution struct {
 }
 
 // t3 prepares (setup) or checks (smoke) T3 Code's provider instances.
-// Env: T3_URL (default https://hara.local when portless is installed, else http://localhost:8317),
-// T3_CODEX_HOME (default ~/.codex-t3-hara), T3_CLAUDE_HOME (default ~/.claude-hara), T3_CURSOR_HOME (default ~/.cursor),
+// Env: T3_URL (default http://localhost:8317, or https://hara.local with HARA_LAN=1 and Portless),
+// T3_CODEX_HOME (default ~/.codex-t3-hara), T3_CLAUDE_HOME (default ~/.claude-hara), T3_CURSOR_HOME (default
+// ~/.cursor),
 // T3_HOME (default ~/.t3), T3_TAILSCALE_PORT (default 8443), MODEL (Claude model for smoke).
 func (h host) t3(args []string) error {
 	if len(args) > 0 && args[0] == "backup" {
@@ -93,7 +94,7 @@ func (h host) t3Settings() (t3Settings, error) {
 	switch {
 	case h.getenv("T3_URL") != "":
 		settings.url = strings.TrimSuffix(h.getenv("T3_URL"), "/")
-	case h.look("portless") && exists(portless):
+	case h.getenv("HARA_LAN") == "1" && h.look("portless") && exists(portless):
 		settings.url = "https://hara.local"
 	default:
 		settings.url = settings.local
@@ -101,7 +102,8 @@ func (h host) t3Settings() (t3Settings, error) {
 
 	// Only hara.local needs a certificate authority named: localhost is plain HTTP, and Tailscale
 	// certificates are publicly trusted. Claude Code and Codex ignore the macOS keychain's copy.
-	if parsed, err := url.Parse(settings.url); err == nil && parsed.Scheme == "https" && strings.HasSuffix(parsed.Hostname(), ".local") {
+	if parsed, err := url.Parse(settings.url); err == nil && parsed.Scheme == "https" &&
+		strings.HasSuffix(parsed.Hostname(), ".local") {
 		settings.ca = portless
 	}
 
@@ -173,7 +175,13 @@ func (h host) t3Setup(settings t3Settings) error {
 func (h host) t3Attribution(settings t3Settings) error {
 	for _, agent := range []agentAttribution{
 		{"Claude", settings.claudeHome, "settings.json", `{"commit":"","pr":"","sessionUrl":false}`, true},
-		{"Cursor", settings.cursorHome, "cli-config.json", `{"attributeCommitsToAgent":false,"attributePRsToAgent":false}`, false},
+		{
+			"Cursor",
+			settings.cursorHome,
+			"cli-config.json",
+			`{"attributeCommitsToAgent":false,"attributePRsToAgent":false}`,
+			false,
+		},
 	} {
 		if err := h.hideAttribution(agent); err != nil {
 			return err

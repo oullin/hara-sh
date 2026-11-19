@@ -449,7 +449,10 @@ func (runtime toolRuntime) launch(command string, args []string) error {
 			return errors.New("use the status command for containerised health checks")
 		}
 
-		if !slices.ContainsFunc(args, func(arg string) bool { return arg == "-url" || strings.HasPrefix(arg, "-url=") }) {
+		if !slices.ContainsFunc(args, func(arg string) bool {
+			return arg == "-url" ||
+				strings.HasPrefix(arg, "-url=")
+		}) {
 			args = append([]string{args[0], "-url", runtime.url}, args[1:]...)
 		}
 
@@ -487,6 +490,12 @@ func (runtime toolRuntime) run(args []string, input io.Reader, output io.Writer)
 	command, rest := args[0], args[1:]
 
 	switch command {
+	case "ingress":
+		if len(rest) != 0 {
+			return errors.New("unexpected tool arguments")
+		}
+
+		return serveInference()
 	case "init", "import", "rotate", "status", "health":
 		if len(rest) != 0 {
 			return errors.New("unexpected tool arguments")
@@ -519,6 +528,6 @@ func (runtime toolRuntime) run(args []string, input io.Reader, output io.Writer)
 	case "ops", "quota", "wssmoke", "bench":
 		return runtime.launch(command, rest)
 	default:
-		return errors.New("unknown tool; choose init, import, rotate, key, status, health, ops, quota, wssmoke or bench")
+		return errors.New("unknown tool; choose init, import, rotate, key, status, health, ops, quota, wssmoke, bench or ingress")
 	}
 }

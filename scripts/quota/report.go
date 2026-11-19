@@ -32,7 +32,9 @@ func show(out io.Writer, p proxy, now time.Time) error {
 		if usage.Disabled {
 			fmt.Fprintln(out, "    disabled in the proxy")
 		} else if usage.NextRetryAfter != nil && usage.NextRetryAfter.After(now) {
-			fmt.Fprintf(out, "    proxy cooldown until %s (in %s)\n", clock(*usage.NextRetryAfter), until(*usage.NextRetryAfter, now))
+			fmt.Fprintf(out, "    proxy cooldown until %s (in %s)\n", clock(
+				*usage.NextRetryAfter,
+			), until(*usage.NextRetryAfter, now))
 		}
 
 		switch {
@@ -74,7 +76,10 @@ func report(out io.Writer, name string, windows []window, now time.Time) []strin
 		fmt.Fprintf(out, "    %-14s %5.1f%% used  %5.1f%% left  %s\n", w.Label, w.Used, max(0, 100-w.Used), when)
 
 		if isExpiring(w, now) {
-			expiring = append(expiring, fmt.Sprintf("%s %s: %.0f%% left, resets in %s", name, w.Label, 100-w.Used, until(*w.Reset, now)))
+			expiring = append(
+				expiring,
+				fmt.Sprintf("%s %s: %.0f%% left, resets in %s", name, w.Label, 100-w.Used, until(*w.Reset, now)),
+			)
 		}
 	}
 

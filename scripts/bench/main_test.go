@@ -66,7 +66,14 @@ func (f *fakeProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (f *fakeProxy) events(path string, cached int) []string {
 	if path == messages.path {
-		events := []string{fmt.Sprintf(`{"type":"message_start","message":{"usage":{"input_tokens":%d,"cache_read_input_tokens":%d,"cache_creation_input_tokens":%d}}}`, 5000-cached, cached, map[bool]int{true: 0, false: 5000}[cached > 0])}
+		events := []string{
+			fmt.Sprintf(
+				`{"type":"message_start","message":{"usage":{"input_tokens":%d,"cache_read_input_tokens":%d,"cache_creation_input_tokens":%d}}}`,
+				5000-cached,
+				cached,
+				map[bool]int{true: 0, false: 5000}[cached > 0],
+			),
+		}
 
 		if !f.noText {
 			events = append(events, `{"type":"content_block_delta","delta":{"type":"text_delta","text":"pong"}}`)
@@ -81,11 +88,23 @@ func (f *fakeProxy) events(path string, cached int) []string {
 		events = append(events, `{"type":"response.output_text.delta","delta":"pong"}`)
 	}
 
-	return append(events, fmt.Sprintf(`{"type":"response.completed","response":{"usage":{"input_tokens":5000,"input_tokens_details":{"cached_tokens":%d}}}}`, cached))
+	return append(events, fmt.Sprintf(
+		`{"type":"response.completed","response":{"usage":{"input_tokens":5000,"input_tokens_details":{"cached_tokens":%d}}}}`,
+		cached,
+	))
 }
 
 func newBench(key string, n int) bench {
-	return bench{client: &http.Client{Timeout: 5 * time.Second}, key: key, n: n, claudeModel: "claude-haiku", codexModel: "gpt-5.5", apis: []api{messages, responses}}
+	return bench{
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+		key:         key,
+		n:           n,
+		claudeModel: "claude-haiku",
+		codexModel:  "gpt-5.5",
+		apis:        []api{messages, responses},
+	}
 }
 
 func start(f *fakeProxy) *httptest.Server {
@@ -115,7 +134,8 @@ func TestColdThenWarm(t *testing.T) {
 	for i, name := range []string{"claude", "codex"} {
 		line := lines[i+1]
 
-		if !strings.Contains(line, " "+name+" ") || !strings.Contains(line, "  3  ") || !strings.HasSuffix(line, "2/2 warm hits, 90% of prompt cached") {
+		if !strings.Contains(line, " "+name+" ") || !strings.Contains(line, "  3  ") ||
+			!strings.HasSuffix(line, "2/2 warm hits, 90% of prompt cached") {
 			t.Fatalf("line %q", line)
 		}
 	}
@@ -123,16 +143,19 @@ func TestColdThenWarm(t *testing.T) {
 	// The models, the cache marker and the per-run cache key reach the wire as the clients send them.
 	claude, codex := f.bodies[0], f.bodies[3]
 
-	if claude["model"] != "claude-haiku" || !strings.Contains(fmt.Sprint(claude["system"]), "cache_control:map[type:ephemeral]") {
+	if claude["model"] != "claude-haiku" ||
+		!strings.Contains(fmt.Sprint(claude["system"]), "cache_control:map[type:ephemeral]") {
 		t.Fatalf("claude body = %v", claude["system"])
 	}
 
-	if codex["model"] != "gpt-5.5" || !strings.HasPrefix(fmt.Sprint(codex["prompt_cache_key"]), "bench-") || codex["store"] != false {
+	if codex["model"] != "gpt-5.5" || !strings.HasPrefix(fmt.Sprint(codex["prompt_cache_key"]), "bench-") ||
+		codex["store"] != false {
 		t.Fatalf("codex body = %v", codex)
 	}
 
 	// A series repeats one prefix; the two APIs of a run do not share it.
-	if fmt.Sprint(f.bodies[0]["system"]) != fmt.Sprint(f.bodies[2]["system"]) || strings.Contains(fmt.Sprint(f.bodies[0]["system"]), fmt.Sprint(codex["instructions"])) {
+	if fmt.Sprint(f.bodies[0]["system"]) != fmt.Sprint(f.bodies[2]["system"]) ||
+		strings.Contains(fmt.Sprint(f.bodies[0]["system"]), fmt.Sprint(codex["instructions"])) {
 		t.Fatal("want one prefix per series")
 	}
 }

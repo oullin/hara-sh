@@ -8,21 +8,27 @@ import { renderToString } from 'vue/server-renderer';
 
 // Render the same components at build time so crawlers and visitors without
 // JavaScript receive the full page. No proxy state or credentials are read.
-const root = fileURLToPath(new URL('..', import.meta.url));
-const output = new URL('../.cloudflare/output/v0/workers/default/assets/index.html', import.meta.url);
+const root = fileURLToPath(new URL('.', import.meta.resolve('#web/package.json')));
+
+const output = new URL(
+	import.meta.resolve('#assets/index.html'),
+);
 
 const server = await createServer(
 	{
 		configFile: false,
 		plugins: [vue()],
-		resolve: { alias: { '@': fileURLToPath(new URL('../src', import.meta.url)) } },
+		resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.resolve('#src/App.vue'))) } },
 		root,
-		server: { middlewareMode: true, ws: false },
+		server: {
+			middlewareMode: true,
+			ws: false,
+		},
 	},
 );
 
 try {
-	const { default: App } = (await server.ssrLoadModule('/src/App.vue')) as { default: Component };
+	const { default: App } = (await server.ssrLoadModule('@/App.vue')) as { default: Component };
 
 	const content = await renderToString(
 		createSSRApp(App),

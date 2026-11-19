@@ -20,7 +20,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-const executorBridgeVersion = "0.14.3"
+const executorBridgeVersion = "0.16.7"
 
 var (
 	executorNamePattern       = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -80,7 +80,13 @@ func (h host) t3Executor(settings t3Settings) error {
 		return err
 	}
 
-	for _, dir := range []string{state, filepath.Join(state, "backups"), filepath.Dir(claudePath), filepath.Dir(cursorPath), filepath.Dir(codexPath)} {
+	for _, dir := range []string{
+		state,
+		filepath.Join(state, "backups"),
+		filepath.Dir(claudePath),
+		filepath.Dir(cursorPath),
+		filepath.Dir(codexPath),
+	} {
 		if err := privateDir(dir, h.root); err != nil {
 			return err
 		}
@@ -103,7 +109,10 @@ func (h host) t3Executor(settings t3Settings) error {
 	}
 
 	h.log("Installed %s MCP access for T3 %s. Private backups: %s", name, providers, filepath.Join(state, "backups"))
-	h.log("Start fresh T3 chats. Wait for Claude MCP startup; approve %s in Cursor if prompted. Verify skills and execute in each provider; use Grok in Cursor when other models have exhausted their quota.", name)
+	h.log(
+		"Start fresh T3 chats. Wait for Claude MCP startup; approve %s in Cursor if prompted. Verify skills and execute in each provider; use Grok in Cursor when other models have exhausted their quota.",
+		name,
+	)
 
 	return nil
 }
@@ -163,7 +172,8 @@ func (h host) executorAntigravityConfig(state, name, endpoint, headerPath string
 func validateExecutorURL(endpoint string) error {
 	parsed, err := url.Parse(endpoint)
 
-	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil ||
+		parsed.RawQuery != "" || parsed.Fragment != "" {
 		return errors.New("EXECUTOR_URL must be an HTTPS MCP endpoint without credentials, query or fragment")
 	}
 
@@ -191,7 +201,16 @@ func (h host) executorNode() (string, error) {
 }
 
 func (h host) executorInstall(state, bridge, proxyPath string) error {
-	install := h.command("npm", "install", "--prefix", bridge, "--no-audit", "--no-fund", "--no-package-lock", "mcp-remote@"+executorBridgeVersion)
+	install := h.command(
+		"npm",
+		"install",
+		"--prefix",
+		bridge,
+		"--no-audit",
+		"--no-fund",
+		"--no-package-lock",
+		"mcp-remote@"+executorBridgeVersion,
+	)
 	install.Env = append(os.Environ(), "npm_config_cache="+filepath.Join(state, "npm-cache"))
 
 	if err := h.call(install); err != nil {

@@ -36,7 +36,8 @@ type testHost struct {
 }
 
 func (f *fake) run(cmd *exec.Cmd) error {
-	line := strings.Replace(strings.Join(cmd.Args, " "), "docker compose -f "+filepath.Join(f.root, "local", "compose.yaml"), "compose", 1)
+	line := strings.Replace(strings.Join(cmd.Args, " "), "docker compose -f "+
+		filepath.Join(f.root, "local", "compose.yaml"), "compose", 1)
 	f.calls = append(f.calls, line)
 	f.envs[line] = cmd.Env
 
@@ -109,20 +110,31 @@ func TestConfigureAppliesPrivateSettingsAndDefaults(t *testing.T) {
 	home := t.TempDir()
 	state := filepath.Join(t.TempDir(), "state")
 	file := filepath.Join(t.TempDir(), "credentials.env")
-	content := "# names only\n: \"${OP_ACCOUNT:=ignored.1password.com}\"\n: \"${OP_VAULT:=Work}\"\nOP_ITEM_NAME='hara item'\n\nexport LOCAL_DIR=" + state + "\n"
+	content := "# names only\n: \"${OP_ACCOUNT:=ignored.1password.com}\"\n" +
+		": \"${OP_VAULT:=Work}\"\nOP_ITEM_NAME='hara item'\n\nexport LOCAL_DIR=" +
+		state + "\n"
 
 	if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	env := map[string]string{"HARA_ENV_FILE": file, "OP_ACCOUNT": "team.1password.com"}
-	got, err := configure(home, func(name string) string { return env[name] }, func(name, value string) error { env[name] = value; return nil })
+	got, err := configure(home, func(
+		name string,
+	) string {
+		return env[name]
+	}, func(name, value string) error { env[name] = value; return nil })
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := map[string]string{"OP_ACCOUNT": "team.1password.com", "OP_VAULT": "Work", "OP_ITEM_NAME": "hara item", "LOCAL_DIR": state}
+	want := map[string]string{
+		"OP_ACCOUNT":   "team.1password.com",
+		"OP_VAULT":     "Work",
+		"OP_ITEM_NAME": "hara item",
+		"LOCAL_DIR":    state,
+	}
 
 	for name, value := range want {
 		if env[name] != value {
@@ -141,7 +153,8 @@ func TestConfigureDefaultsAndRejections(t *testing.T) {
 	getenv := func(name string) string { return env[name] }
 	setenv := func(name, value string) error { env[name] = value; return nil }
 
-	if state, err := configure(home, getenv, setenv); err != nil || state != filepath.Join(home, ".hara-sh") || env["OP_ITEM_NAME"] != "cli-proxy-api" {
+	if state, err := configure(home, getenv, setenv); err != nil || state != filepath.Join(home, ".hara-sh") ||
+		env["OP_ITEM_NAME"] != "cli-proxy-api" {
 		t.Fatalf("defaults: state %q, err %v, env %v", state, err, env)
 	}
 
@@ -151,7 +164,8 @@ func TestConfigureDefaultsAndRejections(t *testing.T) {
 
 	clear(env)
 
-	if _, err := configure(home, getenv, setenv); err == nil || !strings.Contains(err.Error(), "mv ~/.cli-proxy-api ~/.hara-sh") {
+	if _, err := configure(home, getenv, setenv); err == nil ||
+		!strings.Contains(err.Error(), "mv ~/.cli-proxy-api ~/.hara-sh") {
 		t.Fatalf("legacy state was not refused: %v", err)
 	}
 
@@ -196,7 +210,16 @@ func TestPrivateDirRefusesTheCheckout(t *testing.T) {
 func TestDispatchRejectsUnknownCommands(t *testing.T) {
 	h := newTestHost(t, nil)
 
-	for _, args := range [][]string{nil, {"nope"}, {"down", "extra"}, {"backup"}, {"backup", "vim"}, {"bench", "1", "a", "b", "c"}} {
+	for _, args := range [][]string{
+		nil,
+		{
+			"nope",
+		},
+		{"down", "extra"},
+		{"backup"},
+		{"backup", "vim"},
+		{"bench", "1", "a", "b", "c"},
+	} {
 		if err := h.dispatch(args); err == nil {
 			t.Errorf("accepted %q", args)
 		}
@@ -285,8 +308,15 @@ func TestUpStopsWithoutDocker(t *testing.T) {
 	assertCalls(t, h.fake.calls, "docker info")
 }
 
-func TestUpStartsTheStackAndPortless(t *testing.T) {
-	h := newTestHost(t, map[string]string{"HARA_PORT": "9000"}, "portless")
+func TestUpStartsTheStackAndOptInPortless(t *testing.T) {
+	h := newTestHost(t, map[string]string{"HARA_PORT": "9000", "HARA_INGRESS_PORT": "9001", "HARA_LAN": "1"}, "portless")
+	h.fake.respond = func(line string, cmd *exec.Cmd) error {
+		if line == "compose port ingress 8318" {
+			fmt.Fprintln(cmd.Stdout, "127.0.0.1:9001")
+		}
+
+		return nil
+	}
 
 	if err := h.dispatch([]string{"up"}); err != nil {
 		t.Fatal(err)
@@ -295,12 +325,13 @@ func TestUpStartsTheStackAndPortless(t *testing.T) {
 	assertCalls(t, h.fake.calls,
 		"docker info",
 		"compose config --quiet",
-		"compose build init",
-		"compose pull proxy",
+		"compose build init proxy",
+		"portless alias --remove hara",
 		"compose up -d --no-build --force-recreate --wait --wait-timeout 60",
 		"compose run --rm --no-deps -T tools health",
+		"compose port ingress 8318",
 		"portless proxy start --lan",
-		"portless alias hara 9000 --force",
+		"portless alias hara 9001 --force",
 		"compose ps",
 		"compose run --rm --no-deps -T tools status",
 		"compose --profile tailscale ps -q --status running tailscale",
@@ -311,12 +342,34 @@ func TestUpStartsTheStackAndPortless(t *testing.T) {
 	}
 }
 
+func TestUpRemovesLegacyPortlessAliasWithoutEnablingLAN(t *testing.T) {
+	h := newTestHost(t, nil, "portless")
+	h.fake.respond = func(line string, cmd *exec.Cmd) error {
+		if line == "portless alias --remove hara" {
+			fmt.Fprintln(cmd.Stderr, `Error: No alias found for "hara.local".`)
+
+			return exitStatus(1)
+		}
+
+		return nil
+	}
+
+	if err := h.dispatch([]string{"up"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(h.fake.calls, "portless alias --remove hara") ||
+		slices.Contains(h.fake.calls, "portless proxy start --lan") {
+		t.Fatalf("unexpected Portless calls: %v", h.fake.calls)
+	}
+}
+
 func TestUpStopsAtFailedPreparationOrReadiness(t *testing.T) {
 	steps := []string{
 		"docker info",
 		"compose config --quiet",
-		"compose build init",
-		"compose pull proxy",
+		"compose build init proxy",
+		"portless alias --remove hara",
 		"compose up -d --no-build --force-recreate --wait --wait-timeout 60",
 	}
 
@@ -337,18 +390,34 @@ func TestUpStopsAtFailedPreparationOrReadiness(t *testing.T) {
 func TestPortlessIsOptional(t *testing.T) {
 	h := newTestHost(t, nil)
 
-	if err := h.dispatch([]string{"portless"}); err != nil || len(h.fake.calls) != 0 || !strings.Contains(h.out.String(), "portless not installed") {
+	if err := h.dispatch([]string{"portless"}); err != nil || len(h.fake.calls) != 0 ||
+		!strings.Contains(h.out.String(), "portless not installed") {
 		t.Fatalf("err %v, calls %v, output %s", err, h.fake.calls, h.out)
 	}
 
 	h = newTestHost(t, nil, "portless")
-	h.fake.respond = failing("portless proxy start --lan")
+	h.fake.respond = func(line string, cmd *exec.Cmd) error {
+		if line == "compose port ingress 8318" {
+			fmt.Fprintln(cmd.Stdout, "127.0.0.1:8318")
+		}
 
-	if err := h.dispatch([]string{"portless"}); err != nil || !strings.Contains(h.out.String(), "https://hara.local is unavailable") {
+		return failing("portless proxy start --lan")(line, cmd)
+	}
+
+	if err := h.dispatch([]string{"portless"}); err != nil ||
+		!strings.Contains(h.out.String(), "https://hara.local is unavailable") {
 		t.Fatalf("err %v, output %s", err, h.out)
 	}
 
-	assertCalls(t, h.fake.calls, "portless proxy start --lan")
+	assertCalls(t, h.fake.calls, "compose port ingress 8318", "portless proxy start --lan")
+
+	h = newTestHost(t, nil, "portless")
+
+	if err := h.dispatch([]string{"portless"}); err == nil {
+		t.Fatal("Portless started without a published inference port")
+	}
+
+	assertCalls(t, h.fake.calls, "compose port ingress 8318")
 }
 
 func TestStatusWaitsForTailscale(t *testing.T) {
@@ -385,7 +454,8 @@ func TestStatusWaitsForTailscale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if checks != 4 || strings.Count(h.out.String(), "Waiting for Tailscale") != 1 || !strings.Contains(h.out.String(), "Tailscale needs attention") {
+	if checks != 4 || strings.Count(h.out.String(), "Waiting for Tailscale") != 1 ||
+		!strings.Contains(h.out.String(), "Tailscale needs attention") {
 		t.Fatalf("checks %d, output %s", checks, h.out)
 	}
 }
@@ -471,11 +541,15 @@ func TestKey(t *testing.T) {
 		"compose run --rm --no-deps -T tools key claude-api-key",
 	)
 
-	if h.out.String() != "output of compose run --rm --no-deps -T tools key claude-api-key\n" || !strings.Contains(h.errOut.String(), "compose build tools") {
+	if h.out.String() != "output of compose run --rm --no-deps -T tools key claude-api-key\n" ||
+		!strings.Contains(h.errOut.String(), "compose build tools") {
 		t.Errorf("the credential shared standard output with the build: %q", h.out)
 	}
 
-	h = newTestHost(t, map[string]string{"HARA_SECRET_PROVIDER": "op", "OP_ACCOUNT": "a", "OP_VAULT": "v", "OP_ITEM_NAME": "i"})
+	h = newTestHost(
+		t,
+		map[string]string{"HARA_SECRET_PROVIDER": "op", "OP_ACCOUNT": "a", "OP_VAULT": "v", "OP_ITEM_NAME": "i"},
+	)
 
 	if err := h.dispatch([]string{"key", managementField}); err != nil {
 		t.Fatal(err)
@@ -531,7 +605,8 @@ func TestCodexProfileInstallsTheHelperPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := h.dispatch([]string{"codex-profile"}); err == nil || !strings.Contains(err.Error(), "bin/hara is missing") {
+	if err := h.dispatch([]string{"codex-profile"}); err == nil ||
+		!strings.Contains(err.Error(), "bin/hara is missing") {
 		t.Fatalf("installed a profile without the helper: %v", err)
 	}
 
@@ -594,10 +669,12 @@ func TestCodexProfileWarnsAboutMissingAuthCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := `! ` + filepath.Join(codexHome, "config.toml") + `:5 runs ` + removed + `, which no longer exists; set auth.command = "` +
+	want := `! ` + filepath.Join(codexHome, "config.toml") + `:5 runs ` + removed +
+		`, which no longer exists; set auth.command = "` +
 		filepath.Join(h.root, "bin", "hara") + `" and auth.args = ["key", "claude-api-key"], then restart Codex`
 
-	if lines := strings.Count(h.out.String(), "no longer exists"); lines != 1 || !strings.Contains(h.out.String(), want) {
+	if lines := strings.Count(h.out.String(), "no longer exists"); lines != 1 ||
+		!strings.Contains(h.out.String(), want) {
 		t.Errorf("output:\n%s\nwant one warning:\n%s", h.out, want)
 	}
 }
@@ -706,7 +783,10 @@ func TestCodexAppWritesAFreshConfig(t *testing.T) {
 
 	content, _ := os.ReadFile(config)
 	escaped := strings.ReplaceAll(strings.ReplaceAll(filepath.Join(h.root, "bin", "hara"), `\`, `\\`), `"`, `\"`)
-	want := strings.ReplaceAll(strings.TrimPrefix(appTemplate, "# Codex profile: select with codex --profile proxy.\n"), keyPlaceholder, escaped)
+	want := strings.ReplaceAll(strings.TrimPrefix(
+		appTemplate,
+		"# Codex profile: select with codex --profile proxy.\n",
+	), keyPlaceholder, escaped)
 
 	if string(content) != want {
 		t.Errorf("config.toml:\n%s\nwant:\n%s", content, want)
@@ -716,7 +796,10 @@ func TestCodexAppWritesAFreshConfig(t *testing.T) {
 		t.Errorf("mode = %v", info.Mode().Perm())
 	}
 
-	if parsed := parseTOML(t, config); tomlLookup(parsed, "model_providers.hara-proxy.auth.command") != filepath.Join(h.root, "bin", "hara") {
+	if parsed := parseTOML(
+		t,
+		config,
+	); tomlLookup(parsed, "model_providers.hara-proxy.auth.command") != filepath.Join(h.root, "bin", "hara") {
 		t.Errorf("auth.command = %v", tomlLookup(parsed, "model_providers.hara-proxy.auth.command"))
 	}
 
@@ -745,8 +828,15 @@ func TestCodexAppKeepsWhatTheAppWrote(t *testing.T) {
 	content, _ := os.ReadFile(config)
 	before, after := parseTOML(t, filepath.Join(h.state, "backups", "codex", "config.toml")), parseTOML(t, config)
 
-	for _, path := range []string{"notify", "features.web_search_request", "desktop.followUpQueueMode", "plugins.browser@openai-bundled.enabled",
-		"mcp_servers.node_repl.command", "mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES", "model_providers.other.name"} {
+	for _, path := range []string{
+		"notify",
+		"features.web_search_request",
+		"desktop.followUpQueueMode",
+		"plugins.browser@openai-bundled.enabled",
+		"mcp_servers.node_repl.command",
+		"mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES",
+		"model_providers.other.name",
+	} {
 		if want, got := tomlLookup(before, path), tomlLookup(after, path); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s = %v, want %v", path, got, want)
 		}
@@ -765,7 +855,11 @@ func TestCodexAppKeepsWhatTheAppWrote(t *testing.T) {
 		}
 	}
 
-	for _, line := range []string{"# Hara, added by hand.\n[model_providers.hara-proxy]\n", "web_search_request = true\ninstant_interrupt = false\n", "# The proxy's client key through bin/hara.\n"} {
+	for _, line := range []string{
+		"# Hara, added by hand.\n[model_providers.hara-proxy]\n",
+		"web_search_request = true\ninstant_interrupt = false\n",
+		"# The proxy's client key through bin/hara.\n",
+	} {
 		if !strings.Contains(string(content), line) {
 			t.Errorf("config.toml lacks %q:\n%s", line, content)
 		}
@@ -805,7 +899,10 @@ func TestCodexAppRunsAgainAndRefreshesTheHelperPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := tomlLookup(parseTOML(t, config), "model_providers.hara-proxy.auth.command"); got != filepath.Join(moved, "bin", "hara") {
+	if got := tomlLookup(
+		parseTOML(t, config),
+		"model_providers.hara-proxy.auth.command",
+	); got != filepath.Join(moved, "bin", "hara") {
 		t.Errorf("auth.command = %v after the move", got)
 	}
 
@@ -858,7 +955,9 @@ func TestCodexSmoke(t *testing.T) {
 	smokeHost := func(env map[string]string, template string) testHost {
 		h := newTestHost(t, env)
 
-		if err := os.WriteFile(filepath.Join(h.root, "codex", "proxy.config.toml"), []byte(template), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(h.root, "codex", "proxy.config.toml"), []byte(
+			template,
+		), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -873,7 +972,10 @@ func TestCodexSmoke(t *testing.T) {
 
 	template := "# Hara\nmodel_provider = \"hara-test\"\n\n[model_providers.hara-test]\nname = \"hara\"\n"
 
-	if err := newTestHost(t, env).dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "no Codex config at "+filepath.Join(codexHome, "proxy.config.toml")+"; run: make codex profile") {
+	if err := newTestHost(t, env).dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(
+		err.Error(),
+		"no Codex config at "+filepath.Join(codexHome, "proxy.config.toml")+"; run: make codex profile",
+	) {
 		t.Fatalf("err = %v", err)
 	}
 
@@ -891,7 +993,11 @@ func TestCodexSmoke(t *testing.T) {
 		}
 
 		h := smokeHost(env, template)
-		want := fmt.Sprintf("%s does not route Codex through Hara (model_provider is %q, want \"hara-test\"); run: make codex profile", profile, tc.provider)
+		want := fmt.Sprintf(
+			"%s does not route Codex through Hara (model_provider is %q, want \"hara-test\"); run: make codex profile",
+			profile,
+			tc.provider,
+		)
 
 		if err := h.dispatch([]string{"codex-smoke"}); err == nil || err.Error() != want {
 			t.Errorf("config %q: err = %v, want %q", tc.content, err, want)
@@ -902,16 +1008,22 @@ func TestCodexSmoke(t *testing.T) {
 		}
 	}
 
-	if err := smokeHost(env, "base_url = \"x\"\n").dispatch([]string{"codex-smoke"}); err == nil || !strings.Contains(err.Error(), "sets no model_provider") {
+	if err := smokeHost(env, "base_url = \"x\"\n").dispatch([]string{"codex-smoke"}); err == nil ||
+		!strings.Contains(err.Error(), "sets no model_provider") {
 		t.Errorf("template without a provider: err = %v", err)
 	}
 
 	// A profile chosen with CODEX_PROFILE is the user's own, so its provider name is not checked.
-	if err := os.WriteFile(filepath.Join(codexHome, "mine.config.toml"), []byte("model_provider = \"my-hara\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(codexHome, "mine.config.toml"), []byte(
+		"model_provider = \"my-hara\"\n",
+	), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	mine := smokeHost(map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": healthy.URL, "CODEX_PROFILE": "mine"}, template)
+	mine := smokeHost(
+		map[string]string{"CODEX_HOME": codexHome, "PROXY_URL": healthy.URL, "CODEX_PROFILE": "mine"},
+		template,
+	)
 
 	if err := mine.dispatch([]string{"codex-smoke"}); err != nil {
 		t.Errorf("custom profile: %v", err)
@@ -952,7 +1064,8 @@ func TestCodexSmoke(t *testing.T) {
 }
 
 func TestPanelBuildsThePatchedUpstream(t *testing.T) {
-	if err := newTestHost(t, nil).dispatch([]string{"panel"}); err == nil || !strings.Contains(err.Error(), "bun is required") {
+	if err := newTestHost(t, nil).dispatch([]string{"panel"}); err == nil ||
+		!strings.Contains(err.Error(), "bun is required") {
 		t.Fatalf("err = %v", err)
 	}
 
@@ -993,7 +1106,9 @@ func TestPanelBuildsThePatchedUpstream(t *testing.T) {
 	}
 
 	assertCalls(t, h.fake.calls,
-		"git -c advice.detachedHead=false clone --quiet --depth 1 --branch v9 https://github.com/router-for-me/Cli-Proxy-API-Management-Center "+buildDir,
+		"git -c advice.detachedHead=false clone --quiet --depth 1 --branch v9 "+
+			"https://github.com/router-for-me/Cli-Proxy-API-Management-Center "+
+			buildDir,
 		"git -C "+buildDir+" apply --whitespace=nowarn "+filepath.Join(h.root, "panel", "ledger.patch"),
 		"bun install --frozen-lockfile",
 		"bun run build",

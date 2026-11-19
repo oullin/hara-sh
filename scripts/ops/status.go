@@ -53,11 +53,16 @@ func (l level) String() string {
 func (s status) checks() []check {
 	out := s.containers()
 	local := s.address("this computer", s.local, "the proxy does not answer; run: make logs proxy")
-	network := s.address("your network", s.network, "portless does not reach the proxy; run: make up")
+	network := check{"your network", skip, "supply -network to check the Portless URL"}
+
+	if s.network != "" {
+		network = s.address("your network", s.network, "portless does not reach the proxy; run: make portless")
+	}
+
 	out = append(out, local, network, s.tailnet())
 
 	// The rest follows from the first broken address, so it would only repeat that failure.
-	out = append(out, after(network, "panel", s.panel))
+	out = append(out, after(local, "panel", s.panel))
 
 	return append(out, after(local, "client key", s.clientKey), after(local, "accounts", s.accounts))
 }
@@ -97,7 +102,13 @@ func (s status) containers() []check {
 
 // container reads the state and, for the proxy, the health check result: "running/healthy".
 func (s status) container(service, label, name string) check {
-	out, err := s.sh("docker", "inspect", "-f", "{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}", name)
+	out, err := s.sh(
+		"docker",
+		"inspect",
+		"-f",
+		"{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}",
+		name,
+	)
 
 	if err != nil {
 		return check{label, fail, "not found (is Docker running?); run: make up"}
@@ -168,11 +179,15 @@ func (s status) tailnet() check {
 
 func (s status) panel() check {
 	const label = "panel"
-	url := s.network + "/management.html"
-	_, code, err := proxy{client: s.short(), base: s.network}.get("/management.html", "")
+	url := s.local + "/management.html"
+	_, code, err := proxy{client: s.short(), base: s.local}.get("/management.html", "")
 
 	if err != nil || code != http.StatusOK {
-		return check{label, fail, fmt.Sprintf("%s  %d; is panel/management.html built? run: make code panel, then make up", url, code)}
+		return check{
+			label,
+			fail,
+			fmt.Sprintf("%s  %d; is panel/management.html built? run: make code panel, then make up", url, code),
+		}
 	}
 
 	return check{label, pass, url}

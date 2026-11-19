@@ -5,7 +5,7 @@
 # with no profile: model_provider, the [features] keys, and the provider table replaced whole.
 # Plain HTTP on localhost: the proxy runs on this computer, and hara.local would need the portless
 # certificate (CODEX_CA_CERTIFICATE), which the Codex app does not get when started from the Dock.
-# T3 Code sets it per provider instance, so `make t3` uses https://hara.local when portless is installed.
+# T3 Code uses https://hara.local when HARA_LAN=1 and Portless is ready.
 model_provider = "hara-proxy"
 
 [features]

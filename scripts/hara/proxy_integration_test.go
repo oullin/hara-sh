@@ -5,6 +5,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +26,7 @@ type proxyLab struct {
 	calls  []string
 	base   string
 	client *http.Client
+	state  string
 }
 
 // Opt-in image contract tests use synthetic credentials and a local upstream only.
@@ -32,7 +34,7 @@ type proxyLab struct {
 // Ordinary unit tests (including the containerised suite) never start Docker.
 func TestProxyImage(t *testing.T) {
 	if os.Getenv("HARA_PROXY_INTEGRATION") != "1" {
-		t.Skip("set HARA_PROXY_INTEGRATION=1 to test the pinned Docker image")
+		t.Skip("use make code resilience to build and test the proxy image")
 	}
 
 	t.Run("transient_failover_preserves_warm_binding", func(t *testing.T) {
@@ -99,8 +101,29 @@ func TestProxyImage(t *testing.T) {
 			t.Fatalf("outage reported HTTP %d", status)
 		}
 
-		if got := len(lab.attempts()); got != 4 {
-			t.Fatalf("outage made %d attempts, want two accounts in two rounds", got)
+		// The five-second cooldown and maximum retry wait coincide. A second
+		// round can see either account still cooling down.
+		attempts := lab.attempts()
+		accounts := map[string]int{}
+
+		for _, account := range attempts {
+			accounts[account]++
+		}
+
+		if len(accounts) != 2 || accounts["a"] < 1 || accounts["a"] > 2 || accounts["b"] < 1 || accounts["b"] > 2 {
+			t.Fatalf("outage attempts %v, want each account tried at least once and at most twice", attempts)
+		}
+
+		err := filepath.WalkDir(lab.state, func(path string, entry fs.DirEntry, err error) error {
+			if err == nil && !entry.IsDir() && strings.HasPrefix(entry.Name(), "error-") {
+				return fmt.Errorf("outage wrote a request error log: %s", entry.Name())
+			}
+
+			return err
+		})
+
+		if err != nil {
+			t.Fatal(err)
 		}
 	})
 
@@ -216,7 +239,11 @@ func (lab *proxyLab) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !payload.Stream {
-		_, _ = fmt.Fprintf(w, `{"id":"msg_test","type":"message","role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":%q}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`, id)
+		_, _ = fmt.Fprintf(
+			w,
+			`{"id":"msg_test","type":"message","role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":%q}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`,
+			id,
+		)
 
 		return
 	}
@@ -224,7 +251,7 @@ func (lab *proxyLab) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 
 	if mode == "empty" && first {
-		dropProxyLabConnection(w)
+		w.WriteHeader(http.StatusOK)
 
 		return
 	}
@@ -276,24 +303,27 @@ func startProxyLab(t *testing.T) *proxyLab {
 	t.Cleanup(upstream.Close)
 	_, port, _ := net.SplitHostPort(listener.Addr().String())
 	root := filepath.Join("..", "..")
-	compose, err := os.ReadFile(filepath.Join(root, "local", "compose.yaml"))
 
-	if err != nil {
+	var compose struct {
+		Services map[string]struct {
+			Image string `json:"image"`
+		} `json:"services"`
+	}
+
+	configJSON := labDocker(t, "compose", "-f", filepath.Join(
+		root,
+		"local",
+		"compose.yaml",
+	), "config", "--format", "json", "proxy")
+
+	if err := json.Unmarshal([]byte(configJSON), &compose); err != nil {
 		t.Fatal(err)
 	}
 
-	var image string
-
-	for line := range strings.SplitSeq(string(compose), "\n") {
-		if value, ok := strings.CutPrefix(strings.TrimSpace(line), "image: eceasy/cli-proxy-api:"); ok {
-			image = "eceasy/cli-proxy-api:" + value
-
-			break
-		}
-	}
+	image := compose.Services["proxy"].Image
 
 	if image == "" {
-		t.Fatal("could not find the pinned proxy image")
+		t.Fatal("could not find the Compose proxy image")
 	}
 
 	template, err := os.ReadFile(filepath.Join(root, "config.yaml"))
@@ -310,10 +340,17 @@ func startProxyLab(t *testing.T) *proxyLab {
 	config += "\napi-keys:\n  claude:\n"
 
 	for _, id := range []string{"a", "b"} {
-		config += fmt.Sprintf("    - name: %s\n      base-url: http://host.docker.internal:%s/%s\n      models:\n        - name: claude-opus-5-5\n      keys:\n        - api-key: synthetic-upstream-%s\n", id, port, id, id)
+		config += fmt.Sprintf(
+			"    - name: %s\n      base-url: http://host.docker.internal:%s/%s\n      models:\n        - name: claude-opus-5-5\n      keys:\n        - api-key: synthetic-upstream-%s\n",
+			id,
+			port,
+			id,
+			id,
+		)
 	}
 
 	dir := t.TempDir()
+	lab.state = dir
 
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
@@ -332,7 +369,28 @@ func startProxyLab(t *testing.T) *proxyLab {
 	// On Linux a root container would leave owner-only auth/log directories that
 	// the host's TempDir cleanup cannot remove. Docker Desktop masks that mismatch.
 	owner := fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
-	labDocker(t, "run", "-d", "--name", name, "--user", owner, "--add-host", "host.docker.internal:host-gateway", "-p", "127.0.0.1::8317", "-e", "WRITABLE_PATH=/test", "-v", dir+":/test", image, "./CLIProxyAPI", "-config", "/test/config.yaml", "--local-model")
+	labDocker(
+		t,
+		"run",
+		"-d",
+		"--name",
+		name,
+		"--user",
+		owner,
+		"--add-host",
+		"host.docker.internal:host-gateway",
+		"-p",
+		"127.0.0.1::8317",
+		"-e",
+		"WRITABLE_PATH=/test",
+		"-v",
+		dir+":/test",
+		image,
+		"./CLIProxyAPI",
+		"-config",
+		"/test/config.yaml",
+		"--local-model",
+	)
 	lab.base = "http://" + strings.TrimSpace(labDocker(t, "port", name, "8317/tcp"))
 	deadline := time.After(25 * time.Second)
 
@@ -376,8 +434,13 @@ func labDocker(t *testing.T, args ...string) string {
 func (lab *proxyLab) rawRequest(t *testing.T, stream bool, speed string) (int, string) {
 	t.Helper()
 
-	body := fmt.Sprintf(`{"model":"claude-opus-5-5","stream":%t,"speed":%q,"max_tokens":32,"messages":[{"role":"user","content":"synthetic test"}]}`, stream, speed)
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, lab.base+"/v1/messages", strings.NewReader(body))
+	body := fmt.Sprintf(
+		`{"model":"claude-opus-5-5","stream":%t,"speed":%q,"max_tokens":32,"messages":[{"role":"user","content":"synthetic test"}]}`,
+		stream,
+		speed,
+	)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, lab.base+
+		"/v1/messages", strings.NewReader(body))
 
 	if err != nil {
 		t.Fatal(err)

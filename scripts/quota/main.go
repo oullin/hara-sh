@@ -5,7 +5,7 @@
 // The provider usage endpoints are called through the proxy's /v0/management/api-call, which
 // substitutes $TOKEN$ with the account's OAuth token server-side: tokens never reach this program.
 //
-// Env: URL (default https://hara.local), and MGMT_KEY or MGMT_KEY_FILE (the management password).
+// Env: URL (default http://localhost:8317), and MGMT_KEY or MGMT_KEY_FILE (the management password).
 package main
 
 import (
@@ -66,7 +66,7 @@ func main() {
 	baseURL := os.Getenv("URL")
 
 	if baseURL == "" {
-		baseURL = "https://hara.local"
+		baseURL = "http://localhost:8317"
 	}
 
 	p := proxy{client: newClient(), baseURL: strings.TrimRight(baseURL, "/"), key: key}

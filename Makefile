@@ -2,6 +2,7 @@
 # Private credentials are read from local state, with Docker fallback; 1Password is optional.
 
 SHELL      := /bin/bash
+FMTKIT     ?= fmtkit
 # Host clients use loopback; containerized tools map it to the proxy service.
 URL        ?= http://localhost:$(or $(HARA_PORT),8317)
 MODEL      ?= claude-haiku-4-5-20251001
@@ -19,7 +20,7 @@ PORTLESS_CA = $(wildcard $(HOME)/.portless/ca.pem)
 
 # Each area lists its actions, the first being the default, and one line of help.
 AREAS    := claude codex t3 ops web code
-SERVICES := proxy tailscale quota
+SERVICES := proxy ingress tailscale quota
 
 claude_ACTIONS := run backup
 claude_HELP    := Claude Code through the proxy (flags in ARGS="..."); backup copies client settings outside the repository
@@ -71,8 +72,8 @@ help:
 	  'make init | up | portless | down | purge | status | logs [service]   the proxy on this computer' \
 	  'make <area> [action]                                                 the first action is the default' \
 	  '' \
-	  '  up        Start Docker services, initialize private keys, apply config.yaml, run portless, then status' \
-	  '  portless  Serve the proxy at https://hara.local through portless in LAN mode (skipped if not installed)' \
+	  '  up        Start Docker services, initialize private keys, apply config.yaml, then status' \
+	  '  portless  Opt in to serving inference at https://hara.local in LAN mode' \
 	  '  down      Stop the proxy (credentials, logins and Tailscale identity kept)' \
 	  '  purge     Remove containers, networks, images, build cache and the hara.local route (private state kept)' \
 	  '  status    Check containers, proxy, panel, keys and accounts; print available addresses' \
@@ -91,7 +92,8 @@ $(HARA): $(HARA_SOURCES)
 	else \
 	  docker run --rm -u "$$(id -u):$$(id -g)" -e CGO_ENABLED=0 -e GOCACHE=/tmp/go-cache \
 	    -e GOOS="$$(uname -s | tr '[:upper:]' '[:lower:]')" -e GOARCH="$$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
-	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src golang:1.27-alpine go build -trimpath -o /out/hara .; \
+	    -v "$(CURDIR)/scripts/hara:/src:ro" -v "$(@D):/out" -w /src \
+	    golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 go build -trimpath -o /out/hara .; \
 	fi
 
 init up portless down purge status logs claude/run claude/backup codex/profile codex/app codex/smoke codex/backup t3/setup t3/smoke t3/executor t3/backup code/panel: $(HARA)
@@ -150,7 +152,7 @@ codex/backup:
 
 ## --- t3: T3 Code's Claude and Codex provider instances -------------------------------------
 # T3 Code runs the same CLIs, so each instance carries the proxy URL and key; T3_URL overrides
-# the default (https://hara.local with portless, else localhost).
+# the default (localhost, or https://hara.local with HARA_LAN=1).
 
 t3/setup:
 	@$(HARA) t3 setup
@@ -234,12 +236,13 @@ code/check: code/test code/public
 
 # The one fmtkit target (settings in fmtkit.toml); go vet runs for every Go module.
 format-all:
-	fmtkit format --all
+	$(FMTKIT) format --all
 
 code/test:
 	docker build --target verify -f scripts/tools/Dockerfile .
 
 code/resilience:
+	docker compose -f local/compose.yaml build proxy
 	cd scripts/hara && HARA_PROXY_INTEGRATION=1 go test -count=1 -run TestProxyImage -v -timeout 2m .
 
 # Upstream panel + panel/ledger.patch; commit it, then `make up`.

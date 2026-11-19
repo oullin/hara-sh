@@ -13,7 +13,8 @@ import (
 	"testing"
 )
 
-const t3Template = "model_provider = \"hara-proxy\"\nbase_url = \"http://localhost:8317/v1\"\nauth.command = \"" + keyPlaceholder + "\"\n"
+const t3Template = "model_provider = \"hara-proxy\"\nbase_url = \"http://localhost:8317/v1\"\nauth.command = \"" +
+	keyPlaceholder + "\"\n"
 
 func newT3Host(t *testing.T, env map[string]string, installed ...string) testHost {
 	t.Helper()
@@ -32,11 +33,13 @@ func newT3Host(t *testing.T, env map[string]string, installed ...string) testHos
 func TestT3PicksTheProxyAddress(t *testing.T) {
 	h := newT3Host(t, map[string]string{"T3_URL": "https://cliproxy.example.ts.net/"}, "portless")
 
-	if settings, err := h.t3Settings(); err != nil || settings.url != "https://cliproxy.example.ts.net" || settings.ca != "" {
+	if settings, err := h.t3Settings(); err != nil || settings.url != "https://cliproxy.example.ts.net" ||
+		settings.ca != "" {
 		t.Fatalf("T3_URL: %+v, %v", settings, err)
 	}
 
-	h = newT3Host(t, map[string]string{"HARA_PORT": "9000"}, "portless")
+	env := map[string]string{"HARA_PORT": "9000"}
+	h = newT3Host(t, env, "portless")
 
 	if settings, _ := h.t3Settings(); settings.url != "http://localhost:9000" || settings.ca != "" {
 		t.Fatalf("portless without its certificate authority: %+v", settings)
@@ -51,6 +54,12 @@ func TestT3PicksTheProxyAddress(t *testing.T) {
 	if err := os.WriteFile(ca, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+
+	if settings, _ := h.t3Settings(); settings.url != "http://localhost:9000" || settings.ca != "" {
+		t.Fatalf("portless without LAN opt-in: %+v", settings)
+	}
+
+	env["HARA_LAN"] = "1"
 
 	if settings, _ := h.t3Settings(); settings.url != "https://hara.local" || settings.ca != ca {
 		t.Fatalf("portless: %+v", settings)
@@ -73,7 +82,8 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(h.out.String(), "T3 Code desktop settings not found") || !strings.Contains(h.out.String(), "ca.pem is missing") {
+	if !strings.Contains(h.out.String(), "T3 Code desktop settings not found") ||
+		!strings.Contains(h.out.String(), "ca.pem is missing") {
 		t.Fatalf("output: %s", h.out)
 	}
 
@@ -81,7 +91,9 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(desktop, []byte(`{"theme":"dark","tailscaleServePort":443,"window":{"width":1200}}`), 0o640); err != nil {
+	if err := os.WriteFile(desktop, []byte(
+		`{"theme":"dark","tailscaleServePort":443,"window":{"width":1200}}`,
+	), 0o640); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,7 +105,8 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 
 	config, _ := os.ReadFile(filepath.Join(h.home, ".codex-t3-hara", "config.toml"))
 
-	if !strings.Contains(string(config), "base_url = \"https://hara.local/v1\"\n") || !strings.Contains(string(config), filepath.Join(h.root, "bin", "hara")) {
+	if !strings.Contains(string(config), "base_url = \"https://hara.local/v1\"\n") ||
+		!strings.Contains(string(config), filepath.Join(h.root, "bin", "hara")) {
 		t.Errorf("Codex config: %s", config)
 	}
 
@@ -101,7 +114,8 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 
 	content, _ := os.ReadFile(desktop)
 
-	if err := json.Unmarshal(content, &settings); err != nil || settings["tailscaleServePort"] != float64(8443) || settings["theme"] != "dark" || settings["window"] == nil {
+	if err := json.Unmarshal(content, &settings); err != nil || settings["tailscaleServePort"] != float64(8443) ||
+		settings["theme"] != "dark" || settings["window"] == nil {
 		t.Errorf("desktop settings: %s", content)
 	}
 
@@ -133,7 +147,8 @@ func TestT3SetupWritesTheCodexHomeAndTailscalePort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if content, _ := os.ReadFile(desktop); string(content) != current || !strings.Contains(h.out.String(), "already serves Tailscale HTTPS on port 8443") {
+	if content, _ := os.ReadFile(desktop); string(content) != current ||
+		!strings.Contains(h.out.String(), "already serves Tailscale HTTPS on port 8443") {
 		t.Errorf("rewrote desktop settings that already had the port: %s\n%s", content, h.out)
 	}
 
@@ -174,7 +189,9 @@ func TestT3SetupHidesCursorAttribution(t *testing.T) {
 
 	var cursor map[string]any
 
-	if err := json.Unmarshal(content, &cursor); err != nil || fmt.Sprint(cursor["attribution"]) != fmt.Sprint(map[string]any{"attributeCommitsToAgent": false, "attributePRsToAgent": false}) ||
+	if err := json.Unmarshal(content, &cursor); err != nil || fmt.Sprint(
+		cursor["attribution"],
+	) != fmt.Sprint(map[string]any{"attributeCommitsToAgent": false, "attributePRsToAgent": false}) ||
 		cursor["version"] != float64(1) || !strings.Contains(string(content), "9007199254740993") {
 		t.Errorf("Cursor config: %s", content)
 	}
@@ -220,7 +237,9 @@ func TestT3SetupHidesClaudeAttribution(t *testing.T) {
 	claude = nil
 	content, _ = os.ReadFile(path)
 
-	if err := json.Unmarshal(content, &claude); err != nil || fmt.Sprint(claude["attribution"]) != fmt.Sprint(hidden) || claude["model"] != "opus" || claude["disabledMcpjsonServers"] == nil {
+	if err := json.Unmarshal(content, &claude); err != nil || fmt.Sprint(
+		claude["attribution"],
+	) != fmt.Sprint(hidden) || claude["model"] != "opus" || claude["disabledMcpjsonServers"] == nil {
 		t.Errorf("existing Claude settings: %s", content)
 	}
 
@@ -236,7 +255,8 @@ func TestT3SetupHidesClaudeAttribution(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if content, _ := os.ReadFile(path); string(content) != custom || !strings.Contains(h.out.String(), "already configured") {
+	if content, _ := os.ReadFile(path); string(content) != custom ||
+		!strings.Contains(h.out.String(), "already configured") {
 		t.Errorf("replaced an existing attribution: %s\n%s", content, h.out)
 	}
 
@@ -256,7 +276,8 @@ func TestT3Smoke(t *testing.T) {
 	port := strings.TrimPrefix(healthy.URL, "http://127.0.0.1:")
 	env := map[string]string{"HARA_PORT": port, "MODEL": "claude-test"}
 
-	if err := newT3Host(t, env).dispatch([]string{"t3", "smoke"}); err == nil || !strings.Contains(err.Error(), "run: make t3") {
+	if err := newT3Host(t, env).dispatch([]string{"t3", "smoke"}); err == nil ||
+		!strings.Contains(err.Error(), "run: make t3") {
 		t.Fatalf("smoke ran without the Codex home: %v", err)
 	}
 
@@ -292,17 +313,28 @@ func TestT3Smoke(t *testing.T) {
 		codex,
 	)
 
-	for _, want := range []string{"ANTHROPIC_AUTH_TOKEN=client-key-value", "ANTHROPIC_API_KEY=", "ANTHROPIC_BASE_URL=http://localhost:" + port, "CLAUDE_CONFIG_DIR=" + filepath.Join(h.home, ".claude-hara")} {
+	for _, want := range []string{
+		"ANTHROPIC_AUTH_TOKEN=client-key-value",
+		"ANTHROPIC_API_KEY=",
+		"ANTHROPIC_BASE_URL=http://localhost:" + port,
+		"CLAUDE_CONFIG_DIR=" + filepath.Join(h.home, ".claude-hara"),
+	} {
 		if !slices.Contains(h.fake.envs[claude], want) {
 			t.Errorf("Claude environment is missing %s", want)
 		}
 	}
 
-	if !slices.Contains(h.fake.envs[codex], "CODEX_HOME="+codexHome) || slices.ContainsFunc(h.fake.envs[codex], func(value string) bool { return strings.HasPrefix(value, "CODEX_CA_CERTIFICATE=") }) {
+	if !slices.Contains(h.fake.envs[codex], "CODEX_HOME="+codexHome) || slices.ContainsFunc(
+		h.fake.envs[codex],
+		func(value string) bool { return strings.HasPrefix(value, "CODEX_CA_CERTIFICATE=") },
+	) {
 		t.Errorf("Codex environment: %v", h.fake.envs[codex])
 	}
 
-	if !strings.Contains(h.out.String(), "ok: Claude answered pong") || !strings.Contains(h.out.String(), "ok: Codex answered pong over the WebSocket ("+filepath.Join(codexHome, "config.toml")) {
+	if !strings.Contains(h.out.String(), "ok: Claude answered pong") || !strings.Contains(
+		h.out.String(),
+		"ok: Codex answered pong over the WebSocket ("+filepath.Join(codexHome, "config.toml"),
+	) {
 		t.Errorf("output: %s", h.out)
 	}
 
@@ -312,7 +344,10 @@ func TestT3Smoke(t *testing.T) {
 
 	h.fake.calls = nil
 
-	if err := h.dispatch([]string{"t3", "smoke"}); err == nil || !strings.Contains(err.Error(), `does not route Codex through Hara (model_provider is "", want "hara-proxy"); run: make t3`) {
+	if err := h.dispatch([]string{"t3", "smoke"}); err == nil || !strings.Contains(
+		err.Error(),
+		`does not route Codex through Hara (model_provider is "", want "hara-proxy"); run: make t3`,
+	) {
 		t.Errorf("smoke accepted a Codex home without the Hara provider: %v", err)
 	}
 
@@ -328,7 +363,8 @@ func TestT3Smoke(t *testing.T) {
 
 	skip.fake.respond = func(_ string, cmd *exec.Cmd) error { fmt.Fprintln(cmd.Stdout, "pong"); return nil }
 
-	if err := skip.dispatch([]string{"t3", "smoke"}); err != nil || !strings.Contains(skip.out.String(), "claude is not installed") {
+	if err := skip.dispatch([]string{"t3", "smoke"}); err != nil ||
+		!strings.Contains(skip.out.String(), "claude is not installed") {
 		t.Fatalf("err %v, output %s", err, skip.out)
 	}
 }

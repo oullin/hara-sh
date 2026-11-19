@@ -20,13 +20,20 @@ func TestFindingsRedactMatchedContent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			issues := findings("config.txt", []byte("safe\n"+tc.content+"\n"+tc.content))
 
-			if len(issues) != 1 || !strings.Contains(issues[0], tc.want) || !strings.Contains(issues[0], "2, 3") || strings.Contains(issues[0], tc.content) {
+			if len(issues) != 1 || !strings.Contains(issues[0], tc.want) || !strings.Contains(issues[0], "2, 3") ||
+				strings.Contains(issues[0], tc.content) {
 				t.Fatal("finding omitted its location or disclosed private content")
 			}
 		})
 	}
 
-	for _, path := range []string{"claude/settings.json", ".claude/settings.json", "codex/config.toml", "nested/.env", "auth.json"} {
+	for _, path := range []string{
+		"claude/settings.json",
+		".claude/settings.json",
+		"codex/config.toml",
+		"nested/.env",
+		"auth.json",
+	} {
 		if !privateFile(path) {
 			t.Errorf("private file was allowed: %s", path)
 		}
@@ -64,7 +71,20 @@ func gitForTest(t *testing.T, root string, args ...string) {
 func TestCurrentFilesRejectUnsupportedSourceAndIgnoreDeletedCandidates(t *testing.T) {
 	root := newRepository(t)
 
-	paths := []string{"README.md", "helper.ts", "helper.py", "helper.js", "helper.mjs", "helper.cjs", "helper.jsx", "helper.es", "helper.es6", "helper.mts", "helper.cts", "uppercase.JS"}
+	paths := []string{
+		"README.md",
+		"helper.ts",
+		"helper.py",
+		"helper.js",
+		"helper.mjs",
+		"helper.cjs",
+		"helper.jsx",
+		"helper.es",
+		"helper.es6",
+		"helper.mts",
+		"helper.cts",
+		"uppercase.JS",
+	}
 
 	for _, path := range paths {
 		if err := os.WriteFile(filepath.Join(root, path), []byte("public fixture"), 0o600); err != nil {
@@ -78,7 +98,8 @@ func TestCurrentFilesRejectUnsupportedSourceAndIgnoreDeletedCandidates(t *testin
 	check := checker{root: root, output: &output}
 	failed, err := check.currentFiles()
 
-	if err != nil || !failed || !strings.Contains(output.String(), "Python source is not permitted") || !strings.Contains(output.String(), "Reviewed 12") {
+	if err != nil || !failed || !strings.Contains(output.String(), "Python source is not permitted") ||
+		!strings.Contains(output.String(), "Reviewed 12") {
 		t.Fatal("publication check allowed unsupported source or failed to deduplicate tracked files")
 	}
 
@@ -129,7 +150,8 @@ func TestHistoryFindsPrivateFilesDeletedFromCurrentTree(t *testing.T) {
 	output.Reset()
 	failed, err := check.historyFiles()
 
-	if err != nil || !failed || !strings.Contains(output.String(), "claude/settings.json") || !strings.Contains(output.String(), "provider credential") || strings.Contains(output.String(), content) {
+	if err != nil || !failed || !strings.Contains(output.String(), "claude/settings.json") ||
+		!strings.Contains(output.String(), "provider credential") || strings.Contains(output.String(), content) {
 		t.Fatal("historical private content was missed or disclosed")
 	}
 }
