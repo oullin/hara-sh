@@ -7,6 +7,9 @@ custom vocabulary and free-form instructions. Configure the provider home
 placeholders locally before merging settings; these files are not a drop-in
 replacement for T3's entire state directory.
 
+`attribution/` keeps agent credit lines out of new pull requests and commits.
+See [its README](attribution/README.md).
+
 ## Encrypted recovery backup
 
 Install `age`, `sqlite3` and Go, then finish running agents and quit T3 Code.
