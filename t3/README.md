@@ -17,6 +17,14 @@ environment links are configured locally.
 `attribution/` keeps agent credit lines out of new pull requests and commits.
 See [its README](attribution/README.md).
 
+## Chrome opens a blank or crashed tab from T3
+
+If the expected URL appears in Chrome but the tab stays blank or shows
+**Untitled – Crashed**, open another site directly in Chrome. If that tab
+crashes too, enter `chrome://restart` in the address bar to restart Chrome.
+Then click the original link in T3 again and confirm the page loads in Chrome.
+If Chrome still crashes, see [Google's Chrome troubleshooting guide](https://support.google.com/chrome/answer/6098869).
+
 ## Encrypted recovery backup
 
 Install `age`, `sqlite3` and Go, then finish running agents and quit T3 Code.
