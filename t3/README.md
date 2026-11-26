@@ -7,6 +7,13 @@ custom vocabulary and free-form instructions. Configure the provider home
 placeholders locally before merging settings; these files are not a drop-in
 replacement for T3's entire state directory.
 
+The snapshot binds the desktop server to loopback and keeps Tailscale Serve as
+the optional private route for systems where Tailscale is configured. New T3
+Connect devices require approval. New threads default to Supervised. Review
+permissions separately in existing threads and scheduled tasks. Workflows and
+Linked environments are enabled. Workflow definitions, paired devices, and
+environment links are configured locally.
+
 `attribution/` keeps agent credit lines out of new pull requests and commits.
 See [its README](attribution/README.md).
 

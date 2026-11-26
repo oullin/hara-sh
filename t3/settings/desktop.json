@@ -1,5 +1,5 @@
 {
-  "serverExposureMode": "network-accessible",
+  "serverExposureMode": "local-only",
   "tailscaleServeEnabled": true,
   "tailscaleServePort": 8443,
   "updateChannelConfiguredByUser": true
