@@ -7,8 +7,23 @@ custom vocabulary and free-form instructions. Configure the provider home
 placeholders locally before merging settings; these files are not a drop-in
 replacement for T3's entire state directory.
 
+The snapshot binds the desktop server to loopback and keeps Tailscale Serve as
+the optional private route for systems where Tailscale is configured. New T3
+Connect devices require approval. New threads default to Supervised. Review
+permissions separately in existing threads and scheduled tasks. Workflows and
+Linked environments are enabled. Workflow definitions, paired devices, and
+environment links are configured locally.
+
 `attribution/` keeps agent credit lines out of new pull requests and commits.
 See [its README](attribution/README.md).
+
+## Chrome opens a blank or crashed tab from T3
+
+If the expected URL appears in Chrome but the tab stays blank or shows
+**Untitled – Crashed**, open another site directly in Chrome. If that tab
+crashes too, enter `chrome://restart` in the address bar to restart Chrome.
+Then click the original link in T3 again and confirm the page loads in Chrome.
+If Chrome still crashes, see [Google's Chrome troubleshooting guide](https://support.google.com/chrome/answer/6098869).
 
 ## Encrypted recovery backup
 
